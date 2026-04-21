@@ -67,9 +67,19 @@ function writeSafetyLog(entry) {
 // ── Market Data (Binance public API — free, no key needed) ───────────────────
 
 async function fetchCandles(symbol, interval, limit = 100) {
-  const url = `${BINANCE_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const res  = await fetch(url);
-  const data = await res.json();
+  // Try Binance futures endpoint first, fall back to spot
+  const urls = [
+    `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+    `${BINANCE_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+  ];
+  let data;
+  for (const url of urls) {
+    const res = await fetch(url);
+    data = await res.json();
+    if (Array.isArray(data)) break;
+    console.log(`Market data warning: ${JSON.stringify(data)}`);
+  }
+  if (!Array.isArray(data)) throw new Error(`Could not fetch candle data: ${JSON.stringify(data)}`);
   return data.map(c => ({
     open:   parseFloat(c[1]),
     high:   parseFloat(c[2]),
