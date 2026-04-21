@@ -17,10 +17,17 @@ const CONFIG = {
   portfolioUsd: parseFloat(process.env.PORTFOLIO_USD)    || 1000,
   maxTradeUsd:  parseFloat(process.env.MAX_TRADE_USD)    || 100,
   maxPerDay:    parseInt(process.env.MAX_TRADES_PER_DAY) || 3,
-  symbol:       process.env.SYMBOL              || 'BTCUSDT',
   timeframe:    process.env.TIMEFRAME           || '4h',
   paperTrading: process.env.PAPER_TRADING !== 'false',
 };
+
+// All symbols the bot monitors and trades
+const SYMBOLS = [
+  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
+  'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
+  'AAPLUSDT', 'NVDAUSDT', 'GOOGLUSDT',
+  'XAUUSDT', 'UKOUSD',
+];
 
 const RULES_PATH      = './rules.json';
 const TRADES_PATH     = './trades.csv';
@@ -42,11 +49,15 @@ function todayString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function countTodayTrades() {
+function countTodayTrades(symbol = null) {
   if (!fs.existsSync(TRADES_PATH)) return 0;
   const lines = fs.readFileSync(TRADES_PATH, 'utf8').trim().split('\n');
   const today = todayString();
-  return lines.slice(1).filter(l => l.startsWith(today)).length;
+  return lines.slice(1).filter(l => {
+    if (!l.startsWith(today)) return false;
+    if (symbol) return l.includes(symbol);
+    return true;
+  }).length;
 }
 
 function appendTrade(row) {
@@ -178,36 +189,32 @@ async function bitgetRequest(method, path, body = null) {
 }
 
 async function setLeverage(symbol, leverage) {
-  await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
-    symbol,
-    productType: 'USDT-FUTURES',
-    marginCoin:  'USDT',
-    leverage:    leverage.toString(),
-    holdSide:    'long',
-  });
-  await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
-    symbol,
-    productType: 'USDT-FUTURES',
-    marginCoin:  'USDT',
-    leverage:    leverage.toString(),
-    holdSide:    'short',
-  });
+  const marginCoin = symbol.endsWith('USD') ? 'USD' : 'USDT';
+  for (const holdSide of ['long', 'short']) {
+    await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
+      symbol,
+      productType: 'USDT-FUTURES',
+      marginCoin,
+      leverage:    leverage.toString(),
+      holdSide,
+    });
+  }
 }
 
-async function placeOrder(side, price, quantity) {
+async function placeOrder(side, price, quantity, symbol) {
   if (CONFIG.paperTrading) {
     const label = CONFIG.mode === 'futures'
       ? `[PAPER FUTURES ${CONFIG.leverage}x] ${side.toUpperCase()}`
       : `[PAPER SPOT] ${side.toUpperCase()}`;
-    console.log(`${label} ${quantity} ${CONFIG.symbol} @ ${price}`);
+    console.log(`  ${label} ${quantity} ${symbol} @ ${price}`);
     return { orderId: 'PAPER-' + Date.now(), paper: true };
   }
 
   if (CONFIG.mode === 'futures') {
-    await setLeverage(CONFIG.symbol, CONFIG.leverage);
+    await setLeverage(symbol, CONFIG.leverage);
     const futuresSide = side === 'long' ? 'open_long' : 'open_short';
     return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {
-      symbol:      CONFIG.symbol,
+      symbol,
       productType: 'USDT-FUTURES',
       marginCoin:  'USDT',
       marginMode:  'crossed',
@@ -218,7 +225,7 @@ async function placeOrder(side, price, quantity) {
   }
 
   return bitgetRequest('POST', '/api/v2/spot/trade/placeOrder', {
-    symbol:    CONFIG.symbol,
+    symbol,
     side:      side.toLowerCase(),
     orderType: 'market',
     size:      quantity.toString(),
@@ -251,79 +258,85 @@ async function run() {
 
   const rules = loadRules();
   console.log(`\n── Bot run ${new Date().toISOString()} ──`);
-  console.log(`Strategy : ${rules.strategy}`);
-  console.log(`Symbol   : ${CONFIG.symbol}  Timeframe: ${CONFIG.timeframe}`);
-  console.log(`Mode     : ${CONFIG.mode}${CONFIG.mode === 'futures' ? `  Leverage: ${CONFIG.leverage}x` : ''}`);
-  console.log(`Paper    : ${CONFIG.paperTrading}`);
+  console.log(`Strategy  : ${rules.strategy}`);
+  console.log(`Symbols   : ${SYMBOLS.join(', ')}`);
+  console.log(`Timeframe : ${CONFIG.timeframe}`);
+  console.log(`Mode      : ${CONFIG.mode}${CONFIG.mode === 'futures' ? `  Leverage: ${CONFIG.leverage}x` : ''}`);
+  console.log(`Paper     : ${CONFIG.paperTrading}`);
+  console.log(`─`.repeat(60));
 
-  // Daily trade limit
-  const todayCount = countTodayTrades();
-  if (todayCount >= CONFIG.maxPerDay) {
-    console.log(`Daily limit reached (${todayCount}/${CONFIG.maxPerDay}) — skipping.`);
-    return;
-  }
+  for (const symbol of SYMBOLS) {
+    console.log(`\n▶ Checking ${symbol}...`);
 
-  // Fetch market data
-  const candles = await fetchCandles(CONFIG.symbol, CONFIG.timeframe, 100);
-  const { passed, direction, indicators, reasons } = safetyCheck(candles, rules);
+    // Per-symbol daily trade limit
+    const symbolCount = countTodayTrades(symbol);
+    if (symbolCount >= CONFIG.maxPerDay) {
+      console.log(`  Daily limit reached for ${symbol} (${symbolCount}/${CONFIG.maxPerDay}) — skipping`);
+      continue;
+    }
 
-  console.log(`\nIndicators:`);
-  console.log(`  Price : $${indicators.price.toFixed(2)}`);
-  console.log(`  EMA8  : $${indicators.ema8.toFixed(2)}`);
-  console.log(`  RSI3  : ${indicators.rsi3.toFixed(1)}`);
-  console.log(`  VWAP  : $${indicators.vwap.toFixed(2)}`);
-  console.log(`  VWAP% : ${indicators.vwapDist.toFixed(2)}%`);
-  console.log(`Direction: ${direction}`);
+    // Fetch candles and run safety check
+    let candles;
+    try {
+      candles = await fetchCandles(symbol, CONFIG.timeframe, 100);
+    } catch (err) {
+      console.log(`  ✗ Could not fetch candles: ${err.message}`);
+      continue;
+    }
 
-  const logEntry = {
-    timestamp:  new Date().toISOString(),
-    symbol:     CONFIG.symbol,
-    indicators,
-    direction,
-    passed,
-    reasons,
-    action:     null,
-    order:      null,
-  };
+    const { passed, direction, indicators, reasons } = safetyCheck(candles, rules);
 
-  if (!passed) {
-    console.log(`\nSafety check FAILED:`);
-    reasons.forEach(r => console.log(`  ✗ ${r}`));
+    console.log(`  Price: $${indicators.price.toFixed(2)}  EMA8: $${indicators.ema8.toFixed(2)}  RSI3: ${indicators.rsi3.toFixed(1)}  VWAP%: ${indicators.vwapDist.toFixed(2)}%  → ${direction}`);
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      symbol,
+      indicators,
+      direction,
+      passed,
+      reasons,
+      action: null,
+      order:  null,
+    };
+
+    if (!passed) {
+      reasons.forEach(r => console.log(`  ✗ ${r}`));
+      writeSafetyLog(logEntry);
+      continue;
+    }
+
+    console.log(`  ✓ Safety check PASSED — placing ${direction} order`);
+
+    const qty   = calcQuantity(indicators.price);
+    const order = await placeOrder(direction, indicators.price, qty, symbol);
+
+    logEntry.action = direction;
+    logEntry.order  = order;
     writeSafetyLog(logEntry);
-    return;
+
+    // Log to CSV
+    const now      = new Date();
+    const totalUsd = (qty * indicators.price).toFixed(2);
+    const fee      = CONFIG.paperTrading ? '0' : 'check-exchange';
+    const row = [
+      now.toISOString().slice(0, 10),
+      now.toISOString().slice(11, 19),
+      'BitGet',
+      symbol,
+      direction,
+      qty,
+      indicators.price.toFixed(2),
+      totalUsd,
+      fee,
+      totalUsd,
+      order.orderId || order.data?.orderId || 'unknown',
+      CONFIG.paperTrading ? 'paper' : 'live',
+      rules.strategy,
+    ].join(',');
+    appendTrade(row);
+
+    console.log(`  Trade logged. Order ID: ${order.orderId || order.data?.orderId || 'unknown'}`);
   }
-
-  console.log(`\nSafety check PASSED — placing ${direction} order`);
-
-  const qty   = calcQuantity(indicators.price);
-  const order = await placeOrder(direction, indicators.price, qty);
-
-  logEntry.action = direction;
-  logEntry.order  = order;
-  writeSafetyLog(logEntry);
-
-  // Log to CSV
-  const now     = new Date();
-  const totalUsd = (qty * indicators.price).toFixed(2);
-  const fee      = CONFIG.paperTrading ? '0' : 'check-exchange';
-  const row = [
-    now.toISOString().slice(0, 10),
-    now.toISOString().slice(11, 19),
-    'BitGet',
-    CONFIG.symbol,
-    direction,
-    qty,
-    indicators.price.toFixed(2),
-    totalUsd,
-    fee,
-    totalUsd,
-    order.orderId || order.data?.orderId || 'unknown',
-    CONFIG.paperTrading ? 'paper' : 'live',
-    rules.strategy,
-  ].join(',');
-  appendTrade(row);
-
-  console.log(`Trade logged. Order ID: ${order.orderId || order.data?.orderId || 'unknown'}`);
 }
 
 run().catch(err => {

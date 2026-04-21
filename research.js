@@ -7,10 +7,21 @@ const BITGET_BASE        = 'https://api.bitget.com';
 
 // Tokens always included in the watchlist regardless of daily research
 const WATCHLIST = [
-  { token: 'HYPE',    name: 'Hyperliquid',  category: 'crypto', pair: 'HYPE/USDT',    note: 'Long-term watchlist' },
-  { token: 'VIRTUAL', name: 'Virtual',      category: 'crypto', pair: 'VIRTUAL/USDT', note: 'Long-term watchlist' },
-  { token: 'XRP',     name: 'XRP',          category: 'crypto', pair: 'XRP/USDT',     note: 'Long-term watchlist' },
-  { token: 'LINK',    name: 'Chainlink',    category: 'crypto', pair: 'LINK/USDT',    note: 'Long-term watchlist' },
+  // Crypto
+  { token: 'BTC',     name: 'Bitcoin',      category: 'crypto',    pair: 'BTC/USDT',     note: 'Long-term watchlist' },
+  { token: 'ETH',     name: 'Ethereum',     category: 'crypto',    pair: 'ETH/USDT',     note: 'Long-term watchlist' },
+  { token: 'SOL',     name: 'Solana',       category: 'crypto',    pair: 'SOL/USDT',     note: 'Long-term watchlist' },
+  { token: 'XRP',     name: 'XRP',          category: 'crypto',    pair: 'XRP/USDT',     note: 'Long-term watchlist' },
+  { token: 'LINK',    name: 'Chainlink',    category: 'crypto',    pair: 'LINK/USDT',    note: 'Long-term watchlist' },
+  { token: 'HYPE',    name: 'Hyperliquid',  category: 'crypto',    pair: 'HYPE/USDT',    note: 'Long-term watchlist' },
+  { token: 'VIRTUAL', name: 'Virtual',      category: 'crypto',    pair: 'VIRTUAL/USDT', note: 'Long-term watchlist' },
+  // Stocks
+  { token: 'AAPL',   name: 'Apple',        category: 'stock',     pair: 'AAPL/USDT',    note: 'Long-term watchlist' },
+  { token: 'NVDA',   name: 'Nvidia',       category: 'stock',     pair: 'NVDA/USDT',    note: 'Long-term watchlist' },
+  { token: 'GOOGL',  name: 'Alphabet',     category: 'stock',     pair: 'GOOGL/USDT',   note: 'Long-term watchlist' },
+  // Commodities
+  { token: 'XAU',    name: 'Gold',         category: 'commodity', pair: 'XAU/USDT',     note: 'Long-term watchlist' },
+  { token: 'UKO',    name: 'Brent Crude',  category: 'commodity', pair: 'UKO/USD',      note: 'Long-term watchlist' },
 ];
 
 // ── Read local trade logs ─────────────────────────────────────────────────────
@@ -156,7 +167,7 @@ Focus on these sources if available:
 
 For each token, coin, forex pair, commodity, or stock mentioned with a clear bullish or bearish view, extract it.
 
-IMPORTANT: Always include today's sentiment for these specific tokens even if not widely discussed — search for them specifically: HYPE (Hyperliquid), VIRTUAL, XRP, LINK (Chainlink).
+IMPORTANT: Always include today's sentiment for these specific tokens even if not widely discussed — search for them specifically: BTC, ETH, SOL, XRP, LINK (Chainlink), HYPE (Hyperliquid), VIRTUAL, AAPL (Apple), NVDA (Nvidia), GOOGL (Alphabet/Google), XAU (Gold), UKO (Brent Crude Oil).
 
 Return ONLY a valid JSON object in this exact format, no other text:
 {
