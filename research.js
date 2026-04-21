@@ -13,6 +13,117 @@ const WATCHLIST = [
   { token: 'LINK',    name: 'Chainlink',    category: 'crypto', pair: 'LINK/USDT',    note: 'Long-term watchlist' },
 ];
 
+// ── Read local trade logs ─────────────────────────────────────────────────────
+
+function readTrades() {
+  try {
+    if (!fs.existsSync('./trades.csv')) return [];
+    const lines = fs.readFileSync('./trades.csv', 'utf8').trim().split('\n');
+    return lines.slice(1).filter(l => l.trim()).map(l => {
+      const [date, time, exchange, symbol, side, quantity, price, totalUsd, fee, netAmount, orderId, mode, notes] = l.split(',');
+      return { date, time, exchange, symbol, side, quantity: parseFloat(quantity), price: parseFloat(price), totalUsd: parseFloat(totalUsd), fee, netAmount: parseFloat(netAmount), orderId, mode, notes };
+    });
+  } catch { return []; }
+}
+
+function readSafetyLog() {
+  try {
+    if (!fs.existsSync('./safety-check-log.json')) return [];
+    return JSON.parse(fs.readFileSync('./safety-check-log.json', 'utf8'));
+  } catch { return []; }
+}
+
+function buildTradeSection(trades, safetyLog) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayTrades  = trades.filter(t => t.date === today);
+  const todayChecks  = safetyLog.filter(e => e.timestamp?.startsWith(today));
+  const passed  = todayChecks.filter(e => e.passed).length;
+  const failed  = todayChecks.filter(e => !e.passed).length;
+
+  // Win/loss — compare entry price vs most recent check price
+  let winCount = 0, lossCount = 0, totalPnl = 0;
+  todayTrades.forEach(t => {
+    const latest = safetyLog.find(e => e.symbol === t.symbol && e.timestamp > `${t.date}T${t.time}`);
+    if (latest?.indicators?.price) {
+      const currentPrice = latest.indicators.price;
+      const pnl = t.side === 'long'
+        ? (currentPrice - t.price) * t.quantity * 3  // 3x leverage
+        : (t.price - currentPrice) * t.quantity * 3;
+      totalPnl += pnl;
+      if (pnl >= 0) winCount++; else lossCount++;
+    }
+  });
+
+  // Recommendations based on failed checks
+  const failReasons = {};
+  todayChecks.filter(e => !e.passed).forEach(e => {
+    (e.reasons || []).forEach(r => {
+      failReasons[r] = (failReasons[r] || 0) + 1;
+    });
+  });
+  const recommendations = Object.entries(failReasons)
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, count]) => {
+      let tip = '';
+      if (reason.includes('VWAP')) tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
+      else if (reason.includes('RSI')) tip = 'RSI3 is staying mid-range — market may be trending. Consider adding a trend filter or adjusting RSI thresholds';
+      else if (reason.includes('directional')) tip = 'No clear signal detected. Market may be consolidating — consider sitting out until a clear trend emerges';
+      else tip = 'Review strategy conditions — this rule is blocking most trades';
+      return `<li><strong>${reason}</strong> (${count}x today)<br><span class="tip">💡 ${tip}</span></li>`;
+    }).join('');
+
+  const tradeRows = todayTrades.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades executed today</td></tr>'
+    : todayTrades.map(t => {
+        const modeLabel = t.mode === 'paper'
+          ? '<span style="color:#d29922">📄 Paper</span>'
+          : '<span style="color:#3fb950">💰 Live</span>';
+        return `<tr>
+          <td>${t.date}</td>
+          <td>${t.time}</td>
+          <td>${t.symbol}</td>
+          <td>${t.side === 'long' ? '🟢 Long' : '🔴 Short'}</td>
+          <td>$${t.price?.toFixed(2)}</td>
+          <td>${t.quantity}</td>
+          <td>$${t.totalUsd?.toFixed(2)}</td>
+          <td>${modeLabel}</td>
+        </tr>`;
+      }).join('');
+
+  const pnlColor  = totalPnl >= 0 ? '#3fb950' : '#f85149';
+  const pnlSign   = totalPnl >= 0 ? '+' : '';
+  const winRate   = (winCount + lossCount) > 0
+    ? Math.round((winCount / (winCount + lossCount)) * 100)
+    : 0;
+
+  return `
+  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
+
+  <div class="stats">
+    <div class="stat"><div class="num" style="color:#3fb950">${passed}</div><div class="label">Checks Passed</div></div>
+    <div class="stat"><div class="num" style="color:#f85149">${failed}</div><div class="label">Checks Failed</div></div>
+    <div class="stat"><div class="num" style="color:#58a6ff">${todayTrades.length}</div><div class="label">Trades Taken</div></div>
+    <div class="stat"><div class="num" style="color:${pnlColor}">${pnlSign}$${Math.abs(totalPnl).toFixed(2)}</div><div class="label">Unrealised P&L</div></div>
+    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate</div></div>
+  </div>
+
+  <table style="margin-bottom:24px">
+    <thead>
+      <tr>
+        <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+        <th>Entry Price</th><th>Quantity</th><th>Total</th><th>Mode</th>
+      </tr>
+    </thead>
+    <tbody>${tradeRows}</tbody>
+  </table>
+
+  ${recommendations ? `
+  <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">💡 Recommendations to Improve Signal Quality</h2>
+  <div class="summary">
+    <ul style="padding-left:20px;line-height:2">${recommendations}</ul>
+  </div>` : ''}`;
+}
+
 // ── Fetch available BitGet futures pairs ──────────────────────────────────────
 
 async function fetchBitgetPairs() {
@@ -115,7 +226,7 @@ function categoryBadge(cat) {
   return map[cat] || '📊';
 }
 
-function generateHTML(date, summary, signals, bitgetPairs) {
+function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
   // Watchlist rows — always shown, pinned at top
   const watchlistTokens = new Set(WATCHLIST.map(w => w.token.toUpperCase()));
   const watchlistSignals = WATCHLIST.map(w => {
@@ -270,6 +381,7 @@ function generateHTML(date, summary, signals, bitgetPairs) {
     .source { color: #58a6ff; font-size: 12px; }
     .watchlist-row td { background: #1a1f2e; border-left: 3px solid #58a6ff; }
     .watchlist-row:hover td { background: #1f2535; }
+    .tip { color: #8b949e; font-size: 13px; font-weight: 400; }
     footer {
       margin-top: 24px;
       text-align: center;
@@ -313,6 +425,8 @@ function generateHTML(date, summary, signals, bitgetPairs) {
     <tbody>${watchlistSignals}${rows}</tbody>
   </table>
 
+  ${tradeSection}
+
   <footer>Data sourced from public trader commentary · Not financial advice · Paper trading mode active</footer>
 </body>
 </html>`;
@@ -345,9 +459,14 @@ async function run() {
     console.log(`  ${s.token.padEnd(8)} ${s.signal.padEnd(8)} Risk:${s.risk.padEnd(8)} BitGet:${onBitget ? 'YES' : 'NO'}`);
   });
 
+  // Read trade logs
+  const trades      = readTrades();
+  const safetyLog   = readSafetyLog();
+  const tradeSection = buildTradeSection(trades, safetyLog);
+
   // Generate and save HTML dashboard
   if (!fs.existsSync('./docs')) fs.mkdirSync('./docs');
-  const html = generateHTML(date, research.summary, signals, bitgetPairs);
+  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeSection);
   fs.writeFileSync('./docs/index.html', html);
   console.log(`\nDashboard saved to docs/index.html`);
 }
