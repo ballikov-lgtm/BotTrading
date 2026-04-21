@@ -1,9 +1,36 @@
 name: Run Trading Bot
 
 on:
+  workflow_dispatch: # Manual trigger for testing
   schedule:
-    - cron: '0 */4 * * *'  # Every 4 hours
-  workflow_dispatch:          # Allows manual run from GitHub
+    # ── WEEKENDS (Sat=6, Sun=0) — every 4 hours ──────────────────────────────
+    - cron: '0 0,4,8,12,16,20 * * 0,6'
+
+    # ── WEEKDAYS (Mon–Fri) ────────────────────────────────────────────────────
+
+    # Asian session: 00:00–02:00 UK (UTC) — every 15 mins
+    - cron: '0,15,30,45 0,1 * * 1-5'
+
+    # Quiet period: 02:00–07:00 UK (UTC) — every hour
+    - cron: '0 2,3,4,5,6 * * 1-5'
+
+    # London open: 07:00–10:00 UK (UTC) — every 15 mins
+    - cron: '0,15,30,45 7,8,9 * * 1-5'
+
+    # Mid-morning: 10:00–13:00 UK (UTC) — every 30 mins
+    - cron: '0,30 10,11,12 * * 1-5'
+
+    # US open + London overlap: 13:00–17:00 UK (UTC) — every 15 mins
+    - cron: '0,15,30,45 13,14,15,16 * * 1-5'
+
+    # Afternoon: 17:00–20:00 UK (UTC) — every 30 mins
+    - cron: '0,30 17,18,19 * * 1-5'
+
+    # US close volatility: 20:00–22:00 UK (UTC) — every 15 mins
+    - cron: '0,15,30,45 20,21 * * 1-5'
+
+    # Wind down: 22:00–00:00 UK (UTC) — every hour
+    - cron: '0 22,23 * * 1-5'
 
 permissions:
   contents: write
@@ -30,7 +57,6 @@ jobs:
           PORTFOLIO_USD:       ${{ secrets.PORTFOLIO_USD }}
           MAX_TRADE_USD:       ${{ secrets.MAX_TRADE_USD }}
           MAX_TRADES_PER_DAY:  ${{ secrets.MAX_TRADES_PER_DAY }}
-          SYMBOL:              ${{ secrets.SYMBOL }}
           TIMEFRAME:           ${{ secrets.TIMEFRAME }}
           PAPER_TRADING:       ${{ secrets.PAPER_TRADING }}
         run: node bot.js
