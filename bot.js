@@ -67,26 +67,21 @@ function writeSafetyLog(entry) {
 // ── Market Data (Binance public API — free, no key needed) ───────────────────
 
 async function fetchCandles(symbol, interval, limit = 100) {
-  // Try Binance futures endpoint first, fall back to spot
-  const urls = [
-    `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-    `${BINANCE_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-  ];
-  let data;
-  for (const url of urls) {
-    const res = await fetch(url);
-    data = await res.json();
-    if (Array.isArray(data)) break;
-    console.log(`Market data warning: ${JSON.stringify(data)}`);
-  }
-  if (!Array.isArray(data)) throw new Error(`Could not fetch candle data: ${JSON.stringify(data)}`);
+  // BitGet granularity map (BitGet uses minutes-based strings)
+  const granularityMap = { '1m':'1min', '3m':'3min', '5m':'5min', '15m':'15min', '30m':'30min', '1h':'1h', '4h':'4h', '1d':'1day' };
+  const granularity = granularityMap[interval] || interval;
+  const url = `${BITGET_BASE}/api/v2/mix/market/candles?symbol=${symbol}&productType=USDT-FUTURES&granularity=${granularity}&limit=${limit}`;
+  const res  = await fetch(url);
+  const json = await res.json();
+  const data = json.data;
+  if (!Array.isArray(data)) throw new Error(`Could not fetch candle data: ${JSON.stringify(json)}`);
   return data.map(c => ({
     open:   parseFloat(c[1]),
     high:   parseFloat(c[2]),
     low:    parseFloat(c[3]),
     close:  parseFloat(c[4]),
     volume: parseFloat(c[5]),
-    time:   c[0],
+    time:   parseInt(c[0]),
   }));
 }
 
