@@ -1,0 +1,39 @@
+{
+  "strategy": "VWAP + RSI(3) + EMA(8) Scalping",
+  "asset": "BTCUSDT",
+  "timeframe": "1m",
+  "indicators": {
+    "ema_period": 8,
+    "rsi_period": 3,
+    "vwap": true
+  },
+  "long_entry": {
+    "description": "Price is above VWAP — buyers in control for the session",
+    "conditions": [
+      "price > vwap",
+      "price > ema8",
+      "rsi3 < 30"
+    ]
+  },
+  "short_entry": {
+    "description": "Price is below VWAP — sellers in control",
+    "conditions": [
+      "price < vwap",
+      "price < ema8",
+      "rsi3 > 70"
+    ]
+  },
+  "exit_conditions": [
+    "rsi3 crosses 50",
+    "price touches vwap",
+    "price touches ema8",
+    "stop_loss_pct: 0.3"
+  ],
+  "avoidance_rules": [
+    "Do not trade if price is more than 1.5% away from VWAP — overextended"
+  ],
+  "risk": {
+    "max_risk_per_trade_pct": 1,
+    "note": "Designed for fast 1-5 minute scalps only"
+  }
+}
