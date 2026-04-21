@@ -1,0 +1,84 @@
+{
+  "strategy": "Ironclad Multi-Timeframe Swing Strategy",
+  "description": "Based on backtested parameter optimization achieving 72.17% win rate and 957% return. Daily trend filter with 15m entries. Originally designed for Forex, adapted for crypto futures.",
+  "source": "https://youtu.be/s9HV_jyeUDk?t=535",
+
+  "timeframes": {
+    "htf": "1D",
+    "ltf": "15m"
+  },
+
+  "swing_detection": {
+    "swing_lookback": 2,
+    "ltf_swing_lookback": 2,
+    "trend_swing_count": 2,
+    "swing_mode": 1,
+    "atr_threshold": 0.5,
+    "description": "A swing high/low is confirmed when a candle's high/low is greater/less than the 2 candles either side. ATR threshold filters out noise."
+  },
+
+  "trend_rules": {
+    "bullish": "2 consecutive higher swing highs AND 2 consecutive higher swing lows on Daily timeframe",
+    "bearish": "2 consecutive lower swing highs AND 2 consecutive lower swing lows on Daily timeframe",
+    "neutral": "Mixed or insufficient swing data"
+  },
+
+  "entry_rules": {
+    "long": {
+      "conditions": [
+        "Daily trend is BULLISH (higher highs + higher lows)",
+        "15m price pulls back and forms a confirmed swing low",
+        "Price closes above the swing low high — breakout confirmed"
+      ],
+      "description": "Buy the dip in an uptrend on the 15 minute chart"
+    },
+    "short": {
+      "conditions": [
+        "Daily trend is BEARISH (lower highs + lower lows)",
+        "15m price rallies and forms a confirmed swing high",
+        "Price closes below the swing high low — breakdown confirmed"
+      ],
+      "description": "Sell the rally in a downtrend on the 15 minute chart"
+    }
+  },
+
+  "exit_rules": {
+    "stop_loss": {
+      "long": "Below the most recent 15m confirmed swing low",
+      "short": "Above the most recent 15m confirmed swing high",
+      "atr_buffer": 0.5
+    },
+    "take_profit": {
+      "method": "Next significant swing high (long) or swing low (short) on 15m",
+      "risk_reward_minimum": 1.5
+    }
+  },
+
+  "filters": {
+    "use_zone_filter": false,
+    "use_ob_filter": false,
+    "ob_touch_lookback": 90
+  },
+
+  "risk": {
+    "max_risk_per_trade_pct": 1,
+    "leverage": 3,
+    "note": "Original backtest was spot (no leverage). 3x leverage increases drawdown risk. Max 50% drawdown was observed on spot — with 3x this could be significant. Paper trade thoroughly before going live.",
+    "position_sizing": "1% of portfolio per trade — conservative due to leverage"
+  },
+
+  "symbols": [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",
+    "LINKUSDT", "HYPEUSDT", "VIRTUALUSDT",
+    "AAPLUSDT", "NVDAUSDT", "GOOGLUSDT",
+    "XAUUSDT"
+  ],
+
+  "performance": {
+    "backtest_win_rate": "72.17%",
+    "backtest_total_return": "957.39%",
+    "backtest_total_trades": 1175,
+    "original_market": "Forex",
+    "adapted_for": "Crypto futures + stocks + commodities on BitGet"
+  }
+}

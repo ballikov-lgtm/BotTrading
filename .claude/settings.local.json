@@ -5,7 +5,19 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:www.perplexity.ai)",
-      "WebFetch(domain:docs.perplexity.ai)"
+      "WebFetch(domain:docs.perplexity.ai)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 scripts/office/unpack.py \"C:/Users/balli/research/Best day trading & trend recognition.docx\" /c/Users/balli/research/unpacked_docx/)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(mkdir -p /c/Users/balli/research/unpacked_docx)",
+      "Bash(node -e ' *)",
+      "Bash(npm list *)",
+      "Bash(cmd.exe /c \"dir /s /b \\\\\"C:\\\\Users\\\\balli\\\\research\\\\\" 2>&1\")",
+      "Bash(cmd.exe /c \"dir /s /b \\\\\"C:\\\\Users\\\\balli\\\\\" | findstr /i \\\\\"Best day\\\\\"\")",
+      "Bash(cmd.exe /c \"dir /s /b \\\\\"C:\\\\Users\\\\balli\\\\\" 2>nul | findstr /i \\\\\"Best day\\\\\"\")",
+      "Bash(cmd.exe /c \"dir /s \\\\\"C:\\\\Users\\\\balli\\\\research\\\\\" 2>&1\")",
+      "Bash(mkdir -p C:/Users/balli/research/unpacked_docx)"
     ]
   }
 }
