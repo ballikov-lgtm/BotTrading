@@ -68,7 +68,7 @@ function writeSafetyLog(entry) {
 
 async function fetchCandles(symbol, interval, limit = 100) {
   // BitGet granularity map (BitGet uses minutes-based strings)
-  const granularityMap = { '1m':'1min', '3m':'3min', '5m':'5min', '15m':'15min', '30m':'30min', '1h':'1h', '4h':'4h', '1d':'1day' };
+  const granularityMap = { '1m':'1m', '3m':'3m', '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '6h':'6H', '12h':'12H', '1d':'1D', '1w':'1W' };
   const granularity = granularityMap[interval] || interval;
   const url = `${BITGET_BASE}/api/v2/mix/market/candles?symbol=${symbol}&productType=USDT-FUTURES&granularity=${granularity}&limit=${limit}`;
   const res  = await fetch(url);
