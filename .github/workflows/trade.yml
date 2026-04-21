@@ -1,0 +1,33 @@
+name: Run Trading Bot
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'  # Every 4 hours
+  workflow_dispatch:          # Allows manual run from GitHub
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run bot
+        env:
+          BITGET_API_KEY:      ${{ secrets.BITGET_API_KEY }}
+          BITGET_SECRET_KEY:   ${{ secrets.BITGET_SECRET_KEY }}
+          BITGET_PASSPHRASE:   ${{ secrets.BITGET_PASSPHRASE }}
+          MODE:                ${{ secrets.MODE }}
+          LEVERAGE:            ${{ secrets.LEVERAGE }}
+          PORTFOLIO_USD:       ${{ secrets.PORTFOLIO_USD }}
+          MAX_TRADE_USD:       ${{ secrets.MAX_TRADE_USD }}
+          MAX_TRADES_PER_DAY:  ${{ secrets.MAX_TRADES_PER_DAY }}
+          SYMBOL:              ${{ secrets.SYMBOL }}
+          TIMEFRAME:           ${{ secrets.TIMEFRAME }}
+          PAPER_TRADING:       ${{ secrets.PAPER_TRADING }}
+        run: node bot.js
