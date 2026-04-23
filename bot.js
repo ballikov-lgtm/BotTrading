@@ -21,12 +21,12 @@ const CONFIG = {
   paperTrading: process.env.PAPER_TRADING !== 'false',
 };
 
-// All symbols the bot monitors and trades
+// Strategy 1 — VWAP + RSI3 + EMA8 scalping
+// CRYPTO ONLY — works best in ranging/choppy markets
+// Stocks and commodities are handled by the Ironclad bot
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
-  'AAPLUSDT', 'NVDAUSDT', 'GOOGLUSDT',
-  'XAUUSDT', 'UKOUSD',
 ];
 
 const RULES_PATH      = './rules.json';
@@ -145,19 +145,27 @@ function safetyCheck(candles, rules) {
 
   const vwapDist = Math.abs((price - vwap) / vwap) * 100;
 
-  const indicators = { price, ema8, rsi3, vwap, vwapDist };
+  // Detect if market is strongly trending (not suitable for this scalping strategy)
+  // If the last 10 closes are ALL above or ALL below EMA8, market is trending
+  const last10 = closes.slice(-10);
+  const allAboveEMA = last10.every(c => c > ema8);
+  const allBelowEMA = last10.every(c => c < ema8);
+  const isTrending  = allAboveEMA || allBelowEMA;
 
-  // Avoidance rules
-  const tooFarFromVwap = vwapDist > 1.5;
+  const indicators = { price, ema8, rsi3, vwap, vwapDist, isTrending };
+
+  // Avoidance rules — widened VWAP threshold from 1.5% to 2.0%
+  const tooFarFromVwap = vwapDist > 2.0;
 
   // Direction
   let direction = 'neutral';
   if (price > vwap && price > ema8 && rsi3 < 30) direction = 'long';
   if (price < vwap && price < ema8 && rsi3 > 70) direction = 'short';
 
-  const passed  = !tooFarFromVwap && direction !== 'neutral';
+  const passed  = !tooFarFromVwap && !isTrending && direction !== 'neutral';
   const reasons = [];
-  if (tooFarFromVwap) reasons.push(`Price ${vwapDist.toFixed(2)}% from VWAP (max 1.5%) — overextended`);
+  if (tooFarFromVwap) reasons.push(`Price ${vwapDist.toFixed(2)}% from VWAP (max 2.0%) — overextended`);
+  if (isTrending)     reasons.push(`Market is strongly trending — VWAP scalping not suitable, deferring to Ironclad`);
   if (direction === 'neutral') reasons.push('No clear directional signal from VWAP/EMA8/RSI3');
 
   return { passed, direction, indicators, reasons };

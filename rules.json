@@ -1,18 +1,36 @@
 {
   "strategy": "VWAP + RSI(3) + EMA(8) Scalping",
-  "asset": "BTCUSDT",
-  "timeframe": "1m",
+  "version": "2.0",
+  "market_environment": "RANGING / CHOPPY markets only",
+  "asset_classes": ["crypto"],
+  "description": "Short-term crypto scalping strategy. Only trades when the market is oscillating around VWAP rather than trending strongly in one direction. Stocks, commodities and forex are handled by the Ironclad strategy.",
+
+  "asset": "Crypto pairs on BitGet Futures",
+  "symbols": [
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",
+    "LINKUSDT", "HYPEUSDT", "VIRTUALUSDT"
+  ],
+  "timeframe": "4h",
+
   "indicators": {
     "ema_period": 8,
     "rsi_period": 3,
     "vwap": true
   },
+
+  "market_environment_filter": {
+    "description": "Skip if the last 10 candles are ALL above or ALL below EMA8 — this indicates a strong trend where scalping is dangerous",
+    "trending_candle_lookback": 10,
+    "action_when_trending": "Skip — defer to Ironclad strategy which is designed for trending markets"
+  },
+
   "long_entry": {
     "description": "Price is above VWAP — buyers in control for the session",
     "conditions": [
       "price > vwap",
       "price > ema8",
-      "rsi3 < 30"
+      "rsi3 < 30",
+      "market is NOT strongly trending"
     ]
   },
   "short_entry": {
@@ -20,20 +38,32 @@
     "conditions": [
       "price < vwap",
       "price < ema8",
-      "rsi3 > 70"
+      "rsi3 > 70",
+      "market is NOT strongly trending"
     ]
   },
+
   "exit_conditions": [
     "rsi3 crosses 50",
     "price touches vwap",
     "price touches ema8",
     "stop_loss_pct: 0.3"
   ],
+
   "avoidance_rules": [
-    "Do not trade if price is more than 1.5% away from VWAP — overextended"
+    "Do not trade if price is more than 2.0% away from VWAP — overextended",
+    "Do not trade if last 10 candles are all on one side of EMA8 — strongly trending",
+    "Do not trade stocks, commodities or forex — use Ironclad for those"
   ],
+
   "risk": {
     "max_risk_per_trade_pct": 1,
-    "note": "Designed for fast 1-5 minute scalps only"
+    "leverage": 3,
+    "note": "Designed for fast ranging crypto markets. Performs poorly in strong trends."
+  },
+
+  "strategy_comparison": {
+    "use_this_when": "Market is choppy, oscillating, ranging — RSI3 cycling between extremes",
+    "use_ironclad_when": "Market has a clear daily trend — use for stocks, commodities, forex and trending crypto"
   }
 }

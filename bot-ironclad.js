@@ -22,12 +22,17 @@ const TRADES_PATH     = './trades-ironclad.csv';
 const SAFETY_LOG_PATH = './ironclad-log.json';
 const BITGET_BASE     = 'https://api.bitget.com';
 
-// Symbols to monitor — excludes UKOUSD as it needs special handling
+// Ironclad monitors ALL asset classes — crypto, stocks, commodities
+// This is the trend-following strategy, best in markets with a clear daily direction
+// Strategy 1 (VWAP scalping) handles crypto-only ranging markets
 const SYMBOLS = [
+  // Crypto — trending pairs
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
+  // Stocks
   'AAPLUSDT', 'NVDAUSDT', 'GOOGLUSDT',
-  'XAUUSDT',
+  // Commodities
+  'XAUUSDT', 'UKOUSD',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -67,11 +67,14 @@
     "position_sizing": "1% of portfolio per trade — conservative due to leverage"
   },
 
+  "market_environment": "TRENDING markets — all asset classes",
+  "description_extended": "Ironclad handles ALL asset classes including stocks, commodities and forex. It uses the daily chart for trend direction so it always trades with the bigger picture. Strategy 1 (VWAP scalping) runs alongside this for crypto-only ranging conditions.",
+
   "symbols": [
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT",
     "LINKUSDT", "HYPEUSDT", "VIRTUALUSDT",
     "AAPLUSDT", "NVDAUSDT", "GOOGLUSDT",
-    "XAUUSDT"
+    "XAUUSDT", "UKOUSD"
   ],
 
   "performance": {

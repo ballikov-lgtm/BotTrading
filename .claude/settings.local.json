@@ -17,7 +17,12 @@
       "Bash(cmd.exe /c \"dir /s /b \\\\\"C:\\\\Users\\\\balli\\\\\" | findstr /i \\\\\"Best day\\\\\"\")",
       "Bash(cmd.exe /c \"dir /s /b \\\\\"C:\\\\Users\\\\balli\\\\\" 2>nul | findstr /i \\\\\"Best day\\\\\"\")",
       "Bash(cmd.exe /c \"dir /s \\\\\"C:\\\\Users\\\\balli\\\\research\\\\\" 2>&1\")",
-      "Bash(mkdir -p C:/Users/balli/research/unpacked_docx)"
+      "Bash(mkdir -p C:/Users/balli/research/unpacked_docx)",
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=AAPLUSDT&productType=USDT-FUTURES\")",
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=GOOGLUSDT&productType=USDT-FUTURES\")",
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=BTCUSDT&productType=USDT-FUTURES\")",
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=ETHUSDT&productType=USDT-FUTURES\")",
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=SOLUSDT&productType=USDT-FUTURES\")"
     ]
   }
 }
