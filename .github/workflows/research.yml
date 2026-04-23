@@ -2,7 +2,8 @@ name: Daily Market Research
 
 on:
   schedule:
-    - cron: '0 8 * * *'   # 9am UK (BST) / 8am UTC
+    - cron: '0 8 * * *'   # 9am UK (BST) / 8am UTC  — morning briefing
+    - cron: '0 17 * * *'  # 6pm UK (BST) / 5pm UTC  — end of day review
   workflow_dispatch:        # Manual trigger for testing
 
 permissions:
