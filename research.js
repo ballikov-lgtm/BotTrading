@@ -180,18 +180,35 @@ function buildTradeSection(trades, safetyLog) {
   const passed  = todayChecks.filter(e => e.passed).length;
   const failed  = todayChecks.filter(e => !e.passed).length;
 
-  // Win/loss — compare entry price vs most recent check price
-  let winCount = 0, lossCount = 0, totalPnl = 0;
+  // Today's unrealised P&L — compare entry price vs most recent safety-log price
+  let winCount = 0, lossCount = 0, todayPnl = 0;
   todayTrades.forEach(t => {
     const latest = safetyLog.find(e => e.symbol === t.symbol && e.timestamp > `${t.date}T${t.time}`);
     if (latest?.indicators?.price) {
       const currentPrice = latest.indicators.price;
+      const leverage = 3; // 3x futures leverage
       const pnl = t.side === 'long'
-        ? (currentPrice - t.price) * t.quantity * 3  // 3x leverage
-        : (t.price - currentPrice) * t.quantity * 3;
-      totalPnl += pnl;
+        ? (currentPrice - t.price) * t.quantity * leverage
+        : (t.price - currentPrice) * t.quantity * leverage;
+      todayPnl += pnl;
       if (pnl >= 0) winCount++; else lossCount++;
     }
+  });
+
+  // All-time stats
+  const totalVolume   = trades.reduce((s, t) => s + (t.totalUsd || 0), 0);
+  const totalFees     = trades.reduce((s, t) => s + (parseFloat(t.fee) || 0), 0);
+  const paperCount    = trades.filter(t => t.mode === 'paper').length;
+  const liveCount     = trades.filter(t => t.mode === 'live').length;
+
+  // By symbol breakdown
+  const bySymbol = {};
+  trades.forEach(t => {
+    if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { count: 0, volume: 0, longs: 0, shorts: 0 };
+    bySymbol[t.symbol].count++;
+    bySymbol[t.symbol].volume += t.totalUsd || 0;
+    if (t.side === 'long')  bySymbol[t.symbol].longs++;
+    if (t.side === 'short') bySymbol[t.symbol].shorts++;
   });
 
   // Recommendations based on failed checks
@@ -205,16 +222,38 @@ function buildTradeSection(trades, safetyLog) {
     .sort((a, b) => b[1] - a[1])
     .map(([reason, count]) => {
       let tip = '';
-      if (reason.includes('VWAP')) tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
-      else if (reason.includes('RSI')) tip = 'RSI3 is staying mid-range — market may be trending. Consider adding a trend filter or adjusting RSI thresholds';
-      else if (reason.includes('directional')) tip = 'No clear signal detected. Market may be consolidating — consider sitting out until a clear trend emerges';
+      if (reason.includes('VWAP'))        tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
+      else if (reason.includes('trending')) tip = 'Market is trending — Ironclad swing strategy will handle this. VWAP scalper correctly sitting out';
+      else if (reason.includes('RSI'))    tip = 'RSI3 is staying mid-range — market may be consolidating. Consider sitting out until a clear reversal signal';
+      else if (reason.includes('directional')) tip = 'No clear signal detected — market may be choppy. This is correct behaviour';
       else tip = 'Review strategy conditions — this rule is blocking most trades';
-      return `<li><strong>${reason}</strong> (${count}x today)<br><span class="tip">💡 ${tip}</span></li>`;
+      return `<li><strong>${reason}</strong> (${count}× today)<br><span class="tip">💡 ${tip}</span></li>`;
     }).join('');
 
-  const tradeRows = todayTrades.length === 0
+  // Today's trades table rows
+  const todayTradeRows = todayTrades.length === 0
     ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades executed today</td></tr>'
     : todayTrades.map(t => {
+        const modeLabel = t.mode === 'paper'
+          ? '<span style="color:#d29922">📄 Paper</span>'
+          : '<span style="color:#3fb950">💰 Live</span>';
+        return `<tr>
+          <td>${t.time}</td>
+          <td>${t.symbol}</td>
+          <td>${t.side === 'long' ? '🟢 Long' : '🔴 Short'}</td>
+          <td>$${t.price?.toFixed(2)}</td>
+          <td>${t.quantity}</td>
+          <td>$${t.totalUsd?.toFixed(2)}</td>
+          <td>${t.notes || '—'}</td>
+          <td>${modeLabel}</td>
+        </tr>`;
+      }).join('');
+
+  // All trades history table — most recent first, capped at 50 rows
+  const recentTrades = [...trades].reverse().slice(0, 50);
+  const allTradeRows = recentTrades.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades recorded yet — bot is running in safety-check mode</td></tr>'
+    : recentTrades.map(t => {
         const modeLabel = t.mode === 'paper'
           ? '<span style="color:#d29922">📄 Paper</span>'
           : '<span style="color:#3fb950">💰 Live</span>';
@@ -230,38 +269,79 @@ function buildTradeSection(trades, safetyLog) {
         </tr>`;
       }).join('');
 
-  const pnlColor  = totalPnl >= 0 ? '#3fb950' : '#f85149';
-  const pnlSign   = totalPnl >= 0 ? '+' : '';
+  // Symbol breakdown rows
+  const symbolRows = Object.entries(bySymbol)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([sym, d]) => `<tr>
+      <td>${sym}</td>
+      <td>${d.count}</td>
+      <td>${d.longs}</td>
+      <td>${d.shorts}</td>
+      <td>$${d.volume.toFixed(2)}</td>
+    </tr>`).join('');
+
+  const pnlColor  = todayPnl >= 0 ? '#3fb950' : '#f85149';
+  const pnlSign   = todayPnl >= 0 ? '+' : '';
   const winRate   = (winCount + lossCount) > 0
     ? Math.round((winCount / (winCount + lossCount)) * 100)
     : 0;
 
   return `
+  <!-- ── Today's Activity ── -->
   <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
 
   <div class="stats">
     <div class="stat"><div class="num" style="color:#3fb950">${passed}</div><div class="label">Checks Passed</div></div>
     <div class="stat"><div class="num" style="color:#f85149">${failed}</div><div class="label">Checks Failed</div></div>
-    <div class="stat"><div class="num" style="color:#58a6ff">${todayTrades.length}</div><div class="label">Trades Taken</div></div>
-    <div class="stat"><div class="num" style="color:${pnlColor}">${pnlSign}$${Math.abs(totalPnl).toFixed(2)}</div><div class="label">Unrealised P&L</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate</div></div>
+    <div class="stat"><div class="num" style="color:#58a6ff">${todayTrades.length}</div><div class="label">Trades Today</div></div>
+    <div class="stat"><div class="num" style="color:${pnlColor}">${pnlSign}$${Math.abs(todayPnl).toFixed(2)}</div><div class="label">Today's P&L (est.)</div></div>
+    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate Today</div></div>
   </div>
 
   <table style="margin-bottom:24px">
     <thead>
       <tr>
-        <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry Price</th><th>Quantity</th><th>Total</th><th>Mode</th>
+        <th>Time</th><th>Symbol</th><th>Side</th>
+        <th>Entry Price</th><th>Qty</th><th>Total</th><th>Strategy</th><th>Mode</th>
       </tr>
     </thead>
-    <tbody>${tradeRows}</tbody>
+    <tbody>${todayTradeRows}</tbody>
   </table>
 
   ${recommendations ? `
-  <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">💡 Recommendations to Improve Signal Quality</h2>
+  <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">💡 Why Checks Are Failing</h2>
   <div class="summary">
     <ul style="padding-left:20px;line-height:2">${recommendations}</ul>
-  </div>` : ''}`;
+  </div>` : ''}
+
+  <!-- ── All-Time Summary ── -->
+  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Trade Summary</h2>
+
+  <div class="stats">
+    <div class="stat"><div class="num" style="color:#58a6ff">${trades.length}</div><div class="label">Total Trades</div></div>
+    <div class="stat"><div class="num" style="color:#e6edf3">$${totalVolume.toFixed(2)}</div><div class="label">Total Volume</div></div>
+    <div class="stat"><div class="num" style="color:#d29922">${paperCount}</div><div class="label">Paper Trades</div></div>
+    <div class="stat"><div class="num" style="color:#3fb950">${liveCount}</div><div class="label">Live Trades</div></div>
+    <div class="stat"><div class="num" style="color:#f85149">$${totalFees.toFixed(4)}</div><div class="label">Total Fees</div></div>
+  </div>
+
+  ${Object.keys(bySymbol).length > 0 ? `
+  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
+  <table style="margin-bottom:24px">
+    <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th></tr></thead>
+    <tbody>${symbolRows}</tbody>
+  </table>` : ''}
+
+  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Recent Trade Log ${trades.length > 50 ? '(last 50)' : ''}</h3>
+  <table style="margin-bottom:24px">
+    <thead>
+      <tr>
+        <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+        <th>Entry Price</th><th>Qty</th><th>Total</th><th>Mode</th>
+      </tr>
+    </thead>
+    <tbody>${allTradeRows}</tbody>
+  </table>`;
 }
 
 // ── Fetch available BitGet futures pairs ──────────────────────────────────────
@@ -536,7 +616,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
       <h1>📊 Daily Market Research</h1>
       <div class="date">Generated ${date} · Powered by Perplexity Sonar Pro</div>
     </div>
-    <div class="date">⏱ Updates every morning at 9am UK time</div>
+    <div class="date">⏱ Updated 9am &amp; 6pm UK time daily</div>
   </header>
 
   <div class="summary">${summary}</div>
@@ -589,8 +669,7 @@ async function run() {
   const research = await fetchMarketResearch(date);
   console.log(`Got ${research.signals?.length || 0} signals from Perplexity`);
 
-  // Fetch DegenDave transcript signals (runs every day, picks up latest video)
-  const isThursday = new Date().getDay() === 4;
+  // Fetch DegenDave transcript signals — auto-discovers latest ChartHackers video via RSS
   let degenDaveSignals = [];
   try {
     const videos = await fetchDegenDaveTranscript();
