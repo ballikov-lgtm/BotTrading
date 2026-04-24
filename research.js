@@ -5,6 +5,10 @@ import fs from 'fs';
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || '';
 const BITGET_BASE        = 'https://api.bitget.com';
 
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 // Tokens always included in the watchlist regardless of daily research
 const WATCHLIST = [
   // Crypto
