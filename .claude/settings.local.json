@@ -22,7 +22,22 @@
       "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=GOOGLUSDT&productType=USDT-FUTURES\")",
       "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=BTCUSDT&productType=USDT-FUTURES\")",
       "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=ETHUSDT&productType=USDT-FUTURES\")",
-      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=SOLUSDT&productType=USDT-FUTURES\")"
+      "Bash(curl -s \"https://api.bitget.com/api/v2/mix/market/ticker?symbol=SOLUSDT&productType=USDT-FUTURES\")",
+      "WebSearch",
+      "Bash(where py *)",
+      "Bash(where python3.exe)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/balli/AppData/Local/Programs/**)",
+      "Bash(/c/Users/balli/AppData/Local/Microsoft/WindowsApps/python3.exe --version)",
+      "Bash(where node *)",
+      "Bash(where curl *)",
+      "Bash(node -e \"console.log\\(process.env.SENDGRID_API_KEY ? 'KEY_SET len=' + process.env.SENDGRID_API_KEY.length : 'NOT_SET'\\)\")",
+      "PowerShell($key = $env:SENDGRID_API_KEY; if \\($key\\) { \"KEY SET len=$\\($key.Length\\)\" } else { \"NOT SET\" })",
+      "mcp__scheduled-tasks__create_scheduled_task",
+      "mcp__scheduled-tasks__list_scheduled_tasks",
+      "WebFetch(domain:www.youtube.com)",
+      "WebFetch(domain:x.com)",
+      "Bash(npm install *)"
     ]
   }
 }

@@ -32,8 +32,35 @@ const SYMBOLS = [
 const RULES_PATH      = './rules.json';
 const TRADES_PATH     = './trades.csv';
 const SAFETY_LOG_PATH = './safety-check-log.json';
+const SIGNALS_PATH    = './research-signals.json';
 const BITGET_BASE     = 'https://api.bitget.com';
 const BINANCE_BASE    = 'https://api.binance.com';
+
+// ── Research Signal Filter ────────────────────────────────────────────────────
+
+function loadResearchSignals() {
+  try {
+    if (!fs.existsSync(SIGNALS_PATH)) return null;
+    const data = JSON.parse(fs.readFileSync(SIGNALS_PATH, 'utf8'));
+    // Only use signals from today
+    if (data.date !== new Date().toISOString().slice(0, 10)) return null;
+    return data;
+  } catch { return null; }
+}
+
+function getResearchSignal(researchData, symbol) {
+  if (!researchData) return null;
+  const token = symbol.replace('USDT', '').replace('USD', '');
+  return researchData.signals.find(s => s.token === token) || null;
+}
+
+function isResearchAligned(researchSignal, direction) {
+  if (!researchSignal) return true; // No research data — allow trade
+  if (researchSignal.signal === 'neutral') return true; // Neutral — allow
+  if (direction === 'long'  && researchSignal.signal === 'bull') return true;
+  if (direction === 'short' && researchSignal.signal === 'bear') return true;
+  return false; // Research conflicts with trade direction — skip
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -264,13 +291,15 @@ async function run() {
     return;
   }
 
-  const rules = loadRules();
+  const rules          = loadRules();
+  const researchData   = loadResearchSignals();
   console.log(`\n── Bot run ${new Date().toISOString()} ──`);
   console.log(`Strategy  : ${rules.strategy}`);
   console.log(`Symbols   : ${SYMBOLS.join(', ')}`);
   console.log(`Timeframe : ${CONFIG.timeframe}`);
   console.log(`Mode      : ${CONFIG.mode}${CONFIG.mode === 'futures' ? `  Leverage: ${CONFIG.leverage}x` : ''}`);
   console.log(`Paper     : ${CONFIG.paperTrading}`);
+  console.log(`Research  : ${researchData ? `${researchData.signals.length} signals loaded from ${researchData.generated}` : 'No signal file — running on technicals only'}`);
   console.log(`─`.repeat(60));
 
   for (const symbol of SYMBOLS) {
@@ -313,7 +342,18 @@ async function run() {
       continue;
     }
 
-    console.log(`  ✓ Safety check PASSED — placing ${direction} order`);
+    // Research sentiment filter
+    const researchSignal = getResearchSignal(researchData, symbol);
+    if (researchSignal) {
+      console.log(`  Research: ${researchSignal.signal.toUpperCase()} (${researchSignal.source})`);
+    }
+    if (!isResearchAligned(researchSignal, direction)) {
+      console.log(`  ✗ Research sentiment conflicts — ${researchSignal.signal} vs ${direction} — skipping`);
+      writeSafetyLog({ ...logEntry, reasons: [`Research conflict: sentiment is ${researchSignal.signal} but signal is ${direction}`] });
+      continue;
+    }
+
+    console.log(`  ✓ Safety check PASSED + Research aligned — placing ${direction} order`);
 
     const qty   = calcQuantity(indicators.price);
     const order = await placeOrder(direction, indicators.price, qty, symbol);

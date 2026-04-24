@@ -20,7 +20,33 @@ const CONFIG = {
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
 const SAFETY_LOG_PATH = './ironclad-log.json';
+const SIGNALS_PATH    = './research-signals.json';
 const BITGET_BASE     = 'https://api.bitget.com';
+
+// ── Research Signal Filter ────────────────────────────────────────────────────
+
+function loadResearchSignals() {
+  try {
+    if (!fs.existsSync(SIGNALS_PATH)) return null;
+    const data = JSON.parse(fs.readFileSync(SIGNALS_PATH, 'utf8'));
+    if (data.date !== new Date().toISOString().slice(0, 10)) return null;
+    return data;
+  } catch { return null; }
+}
+
+function getResearchSignal(researchData, symbol) {
+  if (!researchData) return null;
+  const token = symbol.replace('USDT', '').replace('USD', '');
+  return researchData.signals.find(s => s.token === token) || null;
+}
+
+function isResearchAligned(researchSignal, direction) {
+  if (!researchSignal) return true;
+  if (researchSignal.signal === 'neutral') return true;
+  if (direction === 'long'  && researchSignal.signal === 'bull') return true;
+  if (direction === 'short' && researchSignal.signal === 'bear') return true;
+  return false;
+}
 
 // Ironclad monitors ALL asset classes — crypto, stocks, commodities
 // This is the trend-following strategy, best in markets with a clear daily direction
@@ -286,13 +312,15 @@ function calcQuantity(entry, stopLoss) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function run() {
-  const rules = loadRules();
+  const rules        = loadRules();
+  const researchData = loadResearchSignals();
 
   console.log(`\n══ IRONCLAD Bot run ${new Date().toISOString()} ══`);
   console.log(`Strategy  : ${rules.strategy}`);
   console.log(`HTF       : ${rules.timeframes.htf}  LTF: ${rules.timeframes.ltf}`);
   console.log(`Leverage  : ${CONFIG.leverage}x  Paper: ${CONFIG.paperTrading}`);
   console.log(`Symbols   : ${SYMBOLS.length} pairs`);
+  console.log(`Research  : ${researchData ? `${researchData.signals.length} signals loaded` : 'No signal file — technicals only'}`);
   console.log(`─`.repeat(60));
 
   for (const symbol of SYMBOLS) {
@@ -350,6 +378,19 @@ async function run() {
     console.log(`    Target   : $${entry.takeProfit.toFixed(2)}`);
     console.log(`    R:R      : 1:${entry.riskReward}`);
     console.log(`    Reason   : ${entry.reason}`);
+
+    // Research sentiment filter
+    const researchSignal = getResearchSignal(researchData, symbol);
+    if (researchSignal) {
+      const extra = researchSignal.chart_pattern ? ` | Pattern: ${researchSignal.chart_pattern}` : '';
+      const level = researchSignal.price_level   ? ` | Level: ${researchSignal.price_level}` : '';
+      console.log(`    Research : ${researchSignal.signal.toUpperCase()} — ${researchSignal.reason}${extra}${level}`);
+    }
+    if (!isResearchAligned(researchSignal, entry.signal)) {
+      console.log(`  ✗ Research conflicts (${researchSignal.signal}) with ${entry.signal} — skipping`);
+      writeLog({ timestamp: new Date().toISOString(), symbol, htfTrend: htf.trend, signal: null, reason: `Research conflict: ${researchSignal.signal} vs ${entry.signal}` });
+      continue;
+    }
 
     const qty   = calcQuantity(entry.entry, entry.stopLoss);
     const order = await placeOrder(symbol, entry.signal, qty, entry.entry);

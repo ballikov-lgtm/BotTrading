@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || '';
 const BITGET_BASE        = 'https://api.bitget.com';
@@ -23,6 +24,87 @@ const WATCHLIST = [
   { token: 'XAU',    name: 'Gold',         category: 'commodity', pair: 'XAU/USDT',     note: 'Long-term watchlist' },
   { token: 'UKO',    name: 'Brent Crude',  category: 'commodity', pair: 'UKO/USD',      note: 'Long-term watchlist' },
 ];
+
+// ── DegenDave / ChartHackers YouTube Transcript ──────────────────────────────
+
+// Known video IDs — updated manually or automatically when new videos are found
+// DegenDave posts every Thursday on ChartHackers
+const DEGENDAVE_VIDEOS = [
+  { id: 'oAH36N9X7pA', title: 'Latest ChartHackers — DegenDave', date: '2026-04-22' },
+];
+
+async function fetchDegenDaveTranscript() {
+  const results = [];
+  for (const video of DEGENDAVE_VIDEOS) {
+    try {
+      console.log(`Fetching DegenDave transcript: ${video.id}...`);
+      const transcript = await YoutubeTranscript.fetchTranscript(video.id);
+      const fullText   = transcript.map(t => t.text).join(' ');
+      results.push({ ...video, transcript: fullText.slice(0, 8000) }); // Limit size
+      console.log(`  Got ${fullText.length} chars of transcript`);
+    } catch (err) {
+      console.log(`  Could not fetch transcript for ${video.id}: ${err.message}`);
+    }
+  }
+  return results;
+}
+
+async function analyseDegenDaveTranscript(videos) {
+  if (!videos.length) return [];
+  const combined = videos.map(v => `Video: ${v.title}\nDate: ${v.date}\n\n${v.transcript}`).join('\n\n---\n\n');
+
+  const prompt = `You are a crypto trading analyst. Below are transcripts from DegenDave (X: @DavidSendsIt) who appears on the ChartHackers YouTube channel. He is well respected for chart reading and swing trade analysis.
+
+Analyse these transcripts and extract every crypto token or coin he mentions with a clear view on it.
+
+Return ONLY valid JSON, no other text:
+{
+  "signals": [
+    {
+      "token": "BTC",
+      "name": "Bitcoin",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "one sentence describing his view",
+      "source": "DegenDave / ChartHackers",
+      "price_level": "optional key level mentioned e.g. $95000 resistance",
+      "chart_pattern": "optional pattern e.g. bull flag, swing low, breakout"
+    }
+  ]
+}
+
+Rules:
+- signal must be: "bull", "bear", or "neutral"
+- risk must be: "low", "medium", or "high"
+- Only include tokens where he gives a clear directional view
+- Include price levels and chart patterns if mentioned
+- If he mentions something is near a swing high or swing low, note it
+
+Transcripts:
+${combined}`;
+
+  const res  = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      model:    'sonar-pro',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+    }),
+  });
+
+  const json    = await res.json();
+  const content = json.choices?.[0]?.message?.content || '';
+  const match   = content.match(/\{[\s\S]*\}/);
+  if (!match) return [];
+
+  const parsed = JSON.parse(match[0]);
+  return (parsed.signals || []).map(s => ({ ...s, source: 'DegenDave / ChartHackers' }));
+}
 
 // ── Read local trade logs ─────────────────────────────────────────────────────
 
@@ -458,9 +540,30 @@ async function run() {
 
   console.log(`Querying Perplexity for today's signals...`);
   const research = await fetchMarketResearch(date);
-  console.log(`Got ${research.signals?.length || 0} signals`);
+  console.log(`Got ${research.signals?.length || 0} signals from Perplexity`);
 
-  const signals = research.signals || [];
+  // Fetch DegenDave transcript signals (runs every day, picks up latest video)
+  const isThursday = new Date().getDay() === 4;
+  let degenDaveSignals = [];
+  try {
+    const videos = await fetchDegenDaveTranscript();
+    if (videos.length) {
+      degenDaveSignals = await analyseDegenDaveTranscript(videos);
+      console.log(`Got ${degenDaveSignals.length} signals from DegenDave / ChartHackers`);
+    }
+  } catch (err) {
+    console.log(`DegenDave fetch skipped: ${err.message}`);
+  }
+
+  // Merge signals — DegenDave signals take priority, then Perplexity
+  const allSignalTokens = new Set();
+  const signals = [];
+  for (const s of [...degenDaveSignals, ...(research.signals || [])]) {
+    if (!allSignalTokens.has(s.token?.toUpperCase())) {
+      allSignalTokens.add(s.token?.toUpperCase());
+      signals.push(s);
+    }
+  }
 
   // Log summary to console
   console.log(`\nMarket Summary: ${research.summary}`);
@@ -474,6 +577,27 @@ async function run() {
   const trades      = readTrades();
   const safetyLog   = readSafetyLog();
   const tradeSection = buildTradeSection(trades, safetyLog);
+
+  // Save machine-readable signal file for the trading bots to read
+  const signalFile = {
+    generated:  new Date().toISOString(),
+    date:       todayString(),
+    summary:    research.summary,
+    signals:    signals.map(s => ({
+      token:         s.token?.toUpperCase(),
+      name:          s.name,
+      category:      s.category,
+      signal:        s.signal,        // bull / bear / neutral
+      risk:          s.risk,          // low / medium / high
+      reason:        s.reason,
+      source:        s.source,
+      price_level:   s.price_level   || null,
+      chart_pattern: s.chart_pattern || null,
+      bitget:        bitgetPairs.has(s.token?.toUpperCase()),
+    })),
+  };
+  fs.writeFileSync('./research-signals.json', JSON.stringify(signalFile, null, 2));
+  console.log(`Signal file saved to research-signals.json (${signals.length} signals)`);
 
   // Generate and save HTML dashboard
   if (!fs.existsSync('./docs')) fs.mkdirSync('./docs');
