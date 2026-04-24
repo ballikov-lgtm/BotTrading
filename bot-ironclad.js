@@ -156,14 +156,47 @@ function calcEMALevels(candles) {
   };
 }
 
-// Build 3 take-profit levels from EMA levels + HTF swing highs/lows.
+// ── Fibonacci Levels ──────────────────────────────────────────────────────────
+// Draw Fib from the most recent confirmed swing high → swing low (for longs)
+// or swing low → swing high (for shorts). Standard retracement ratios used
+// as TP targets. 0.382 and 0.618 are the most respected bounce/resistance zones.
+// Extensions (1.272, 1.618) are included for TP3 when price is in price discovery.
+
+const FIB_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618];
+
+function calcFibLevels(direction, entry, htfSwingHighs, htfSwingLows) {
+  if (!htfSwingHighs.length || !htfSwingLows.length) return [];
+
+  // Use the most recent confirmed swing high and swing low from HTF data
+  const recentHigh = htfSwingHighs[htfSwingHighs.length - 1].price;
+  const recentLow  = htfSwingLows[htfSwingLows.length - 1].price;
+  const range      = recentHigh - recentLow;
+
+  if (range <= 0) return [];
+
+  let levels;
+  if (direction === 'long') {
+    // Fib drawn high → low. Retracement levels above current price are TP targets.
+    // e.g. 0.382 = low + (range × 0.382) — first significant resistance on the way up
+    levels = FIB_RATIOS.map(r => parseFloat((recentLow + range * r).toFixed(4)));
+  } else {
+    // Fib drawn low → high. Retracement levels below current price are TP targets.
+    levels = FIB_RATIOS.map(r => parseFloat((recentHigh - range * r).toFixed(4)));
+  }
+
+  return levels;
+}
+
+// Build 3 take-profit levels from EMA levels + HTF swing highs/lows + Fibonacci.
 // For longs  : pick the 3 nearest levels ABOVE entry price
 // For shorts : pick the 3 nearest levels BELOW entry price
+// Fibonacci and EMA levels that coincide = double confirmation → prioritised.
 // Falls back to fixed R:R multiples (1.5R, 2.5R, 4R) if not enough levels found.
 function calcTakeProfitLevels(direction, entry, stopLoss, emaLevels, htfSwingHighs, htfSwingLows) {
-  const risk = Math.abs(entry - stopLoss);
+  const risk    = Math.abs(entry - stopLoss);
+  const fibLvls = calcFibLevels(direction, entry, htfSwingHighs, htfSwingLows);
 
-  // Collect all candidate S/R levels
+  // Collect all candidate S/R levels — EMA + swing structure + Fibonacci
   const candidates = [
     emaLevels.ema21,
     emaLevels.ema50,
@@ -171,6 +204,7 @@ function calcTakeProfitLevels(direction, entry, stopLoss, emaLevels, htfSwingHig
     emaLevels.ema200,
     ...htfSwingHighs.map(s => s.price),
     ...htfSwingLows.map(s => s.price),
+    ...fibLvls,
   ].filter(p => p !== null && p !== undefined);
 
   let levels;
@@ -493,6 +527,7 @@ async function run() {
     const qty   = calcQuantity(entry.entry, entry.stopLoss);
     const order = await placeOrder(symbol, entry.signal, qty, entry.entry, entry.stopLoss, tps.tp1);
 
+    const fibLevels = calcFibLevels(entry.signal, entry.entry, htf.swingHighs, htf.swingLows);
     writeLog({
       timestamp: new Date().toISOString(),
       symbol,
@@ -504,10 +539,13 @@ async function run() {
       rr1: tps.rr1, rr2: tps.rr2, rr3: tps.rr3,
       slAfterTp1: tps.slPlan.afterTp1,
       slAfterTp2: tps.slPlan.afterTp2,
-      split:     tps.split,
+      split:      tps.split,
       emaLevels,
-      reason:    entry.reason,
-      orderId:   order.orderId || order.data?.orderId,
+      fibLevels:  { ratios: FIB_RATIOS, levels: fibLevels },
+      swingHigh:  htf.swingHighs[htf.swingHighs.length - 1]?.price,
+      swingLow:   htf.swingLows[htf.swingLows.length - 1]?.price,
+      reason:     entry.reason,
+      orderId:    order.orderId || order.data?.orderId,
     });
 
     const now = new Date();
