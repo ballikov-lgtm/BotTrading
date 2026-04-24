@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
-import { YoutubeTranscript } from 'youtube-transcript';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { YoutubeTranscript } = require('youtube-transcript');
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || '';
 const BITGET_BASE        = 'https://api.bitget.com';
