@@ -55,6 +55,7 @@ const SYMBOLS = [
   // Crypto — trending pairs
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
+  'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
   // Stocks
   'AAPLUSDT', 'NVDAUSDT', 'GOOGLUSDT',
   // Commodities
@@ -79,7 +80,7 @@ function countTodayTrades(symbol) {
 }
 
 function appendTrade(row) {
-  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Entry Price,Stop Loss,Take Profit,Total USD,Order ID,Mode,Strategy';
+  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Entry Price,Stop Loss,TP1,TP2,TP3,RR1,RR2,RR3,SL→BE after,Total USD,Order ID,Mode,Strategy';
   if (!fs.existsSync(TRADES_PATH)) fs.writeFileSync(TRADES_PATH, header + '\n');
   fs.appendFileSync(TRADES_PATH, row + '\n');
 }
@@ -130,6 +131,92 @@ function calcATR(candles, period = 14) {
     );
   });
   return trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+}
+
+// ── EMA Calculation ───────────────────────────────────────────────────────────
+
+function calcEMA(candles, period) {
+  if (candles.length < period) return null;
+  const closes = candles.map(c => c.close);
+  const k = 2 / (period + 1);
+  let ema = closes.slice(0, period).reduce((s, v) => s + v, 0) / period;
+  for (let i = period; i < closes.length; i++) {
+    ema = closes[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+// Calculate key EMA levels on HTF candles
+function calcEMALevels(candles) {
+  return {
+    ema21:  calcEMA(candles, 21),
+    ema50:  calcEMA(candles, 50),
+    ema100: calcEMA(candles, 100),
+    ema200: calcEMA(candles, 200),
+  };
+}
+
+// Build 3 take-profit levels from EMA levels + HTF swing highs/lows.
+// For longs  : pick the 3 nearest levels ABOVE entry price
+// For shorts : pick the 3 nearest levels BELOW entry price
+// Falls back to fixed R:R multiples (1.5R, 2.5R, 4R) if not enough levels found.
+function calcTakeProfitLevels(direction, entry, stopLoss, emaLevels, htfSwingHighs, htfSwingLows) {
+  const risk = Math.abs(entry - stopLoss);
+
+  // Collect all candidate S/R levels
+  const candidates = [
+    emaLevels.ema21,
+    emaLevels.ema50,
+    emaLevels.ema100,
+    emaLevels.ema200,
+    ...htfSwingHighs.map(s => s.price),
+    ...htfSwingLows.map(s => s.price),
+  ].filter(p => p !== null && p !== undefined);
+
+  let levels;
+  if (direction === 'long') {
+    // Only levels above entry, sorted nearest first
+    levels = candidates
+      .filter(p => p > entry * 1.002) // Must be at least 0.2% above entry
+      .sort((a, b) => a - b);
+  } else {
+    // Only levels below entry, sorted nearest first (highest to lowest)
+    levels = candidates
+      .filter(p => p < entry * 0.998)
+      .sort((a, b) => b - a);
+  }
+
+  // De-duplicate levels that are within 0.3% of each other
+  const deduped = [];
+  for (const lvl of levels) {
+    if (!deduped.length || Math.abs(lvl - deduped[deduped.length - 1]) / entry > 0.003) {
+      deduped.push(lvl);
+    }
+  }
+
+  // Take the 3 nearest; fill gaps with R:R multiples if fewer than 3 found
+  const fallbacks = direction === 'long'
+    ? [entry + risk * 1.5, entry + risk * 2.5, entry + risk * 4.0]
+    : [entry - risk * 1.5, entry - risk * 2.5, entry - risk * 4.0];
+
+  const tp1 = parseFloat((deduped[0] ?? fallbacks[0]).toFixed(4));
+  const tp2 = parseFloat((deduped[1] ?? fallbacks[1]).toFixed(4));
+  const tp3 = parseFloat((deduped[2] ?? fallbacks[2]).toFixed(4));
+
+  // R:R ratios for logging
+  const rr = (tp) => parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
+
+  return {
+    tp1, tp2, tp3,
+    rr1: rr(tp1), rr2: rr(tp2), rr3: rr(tp3),
+    // Position split: close 40% at TP1, 35% at TP2, 25% at TP3
+    split: [0.40, 0.35, 0.25],
+    // SL management plan
+    slPlan: {
+      afterTp1: entry,           // Move SL to break-even after TP1
+      afterTp2: tp1,             // Trail SL to TP1 price after TP2
+    },
+  };
 }
 
 // ── Swing Detection ───────────────────────────────────────────────────────────
@@ -208,18 +295,13 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
     const swingLowHigh   = ltfCandles[recentSwingLow.index].high;
 
     if (currentPrice > swingLowHigh) {
-      const stopLoss   = recentSwingLow.price - (atr * 0.5);
-      const riskPips   = currentPrice - stopLoss;
-      const takeProfit = currentPrice + (riskPips * 1.5); // Minimum 1.5 R:R
-
+      const stopLoss = parseFloat((recentSwingLow.price - atr * 0.5).toFixed(4));
       return {
-        signal:     'long',
-        entry:      currentPrice,
-        stopLoss:   parseFloat(stopLoss.toFixed(4)),
-        takeProfit: parseFloat(takeProfit.toFixed(4)),
-        swingRef:   recentSwingLow.price,
-        riskReward: 1.5,
-        reason:     `HTF bullish trend + 15m swing low breakout above $${swingLowHigh.toFixed(2)}`,
+        signal:   'long',
+        entry:    currentPrice,
+        stopLoss,
+        swingRef: recentSwingLow.price,
+        reason:   `HTF bullish + 15m swing low breakout above $${swingLowHigh.toFixed(2)}`,
       };
     }
   }
@@ -230,18 +312,13 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
     const swingHighLow    = ltfCandles[recentSwingHigh.index].low;
 
     if (currentPrice < swingHighLow) {
-      const stopLoss   = recentSwingHigh.price + (atr * 0.5);
-      const riskPips   = stopLoss - currentPrice;
-      const takeProfit = currentPrice - (riskPips * 1.5);
-
+      const stopLoss = parseFloat((recentSwingHigh.price + atr * 0.5).toFixed(4));
       return {
-        signal:     'short',
-        entry:      currentPrice,
-        stopLoss:   parseFloat(stopLoss.toFixed(4)),
-        takeProfit: parseFloat(takeProfit.toFixed(4)),
-        swingRef:   recentSwingHigh.price,
-        riskReward: 1.5,
-        reason:     `HTF bearish trend + 15m swing high breakdown below $${swingHighLow.toFixed(2)}`,
+        signal:   'short',
+        entry:    currentPrice,
+        stopLoss,
+        swingRef: recentSwingHigh.price,
+        reason:   `HTF bearish + 15m swing high breakdown below $${swingHighLow.toFixed(2)}`,
       };
     }
   }
@@ -343,15 +420,17 @@ async function run() {
       continue;
     }
 
-    // Step 1: Detect HTF trend
+    // Step 1: Detect HTF trend + EMA levels
     const htf = detectTrend(
       htfCandles,
       rules.swing_detection.swing_lookback,
       rules.swing_detection.trend_swing_count,
       rules.swing_detection.atr_threshold
     );
+    const emaLevels = calcEMALevels(htfCandles);
 
-    console.log(`  HTF Trend : ${htf.trend.toUpperCase()}  (${htf.swingHighs.length} highs, ${htf.swingLows.length} lows confirmed)`);
+    console.log(`  HTF Trend : ${htf.trend.toUpperCase()}  (${htf.swingHighs.length} highs, ${htf.swingLows.length} lows)`);
+    console.log(`  EMA levels: 21=$${emaLevels.ema21?.toFixed(2) ?? '—'}  50=$${emaLevels.ema50?.toFixed(2) ?? '—'}  100=$${emaLevels.ema100?.toFixed(2) ?? '—'}  200=$${emaLevels.ema200?.toFixed(2) ?? '—'}`);
 
     if (htf.trend === 'neutral') {
       console.log(`  ✗ No clear HTF trend — skipping`);
@@ -372,11 +451,23 @@ async function run() {
       continue;
     }
 
+    // Step 3: Calculate 3 TP levels from EMA + HTF swing levels
+    const tps = calcTakeProfitLevels(
+      entry.signal,
+      entry.entry,
+      entry.stopLoss,
+      emaLevels,
+      htf.swingHighs,
+      htf.swingLows
+    );
+
     console.log(`  ✓ Entry signal: ${entry.signal.toUpperCase()}`);
     console.log(`    Entry    : $${entry.entry.toFixed(2)}`);
-    console.log(`    Stop     : $${entry.stopLoss.toFixed(2)}`);
-    console.log(`    Target   : $${entry.takeProfit.toFixed(2)}`);
-    console.log(`    R:R      : 1:${entry.riskReward}`);
+    console.log(`    Stop     : $${entry.stopLoss.toFixed(2)}  (below swing ref $${entry.swingRef.toFixed(2)})`);
+    console.log(`    TP1      : $${tps.tp1.toFixed(2)}  (1:${tps.rr1} R:R)  → SL moves to break-even`);
+    console.log(`    TP2      : $${tps.tp2.toFixed(2)}  (1:${tps.rr2} R:R)  → SL trails to TP1`);
+    console.log(`    TP3      : $${tps.tp3.toFixed(2)}  (1:${tps.rr3} R:R)  → final exit`);
+    console.log(`    Split    : 40% / 35% / 25% of position`);
     console.log(`    Reason   : ${entry.reason}`);
 
     // Research sentiment filter
@@ -396,15 +487,20 @@ async function run() {
     const order = await placeOrder(symbol, entry.signal, qty, entry.entry);
 
     writeLog({
-      timestamp:  new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       symbol,
-      htfTrend:   htf.trend,
-      signal:     entry.signal,
-      entry:      entry.entry,
-      stopLoss:   entry.stopLoss,
-      takeProfit: entry.takeProfit,
-      reason:     entry.reason,
-      orderId:    order.orderId || order.data?.orderId,
+      htfTrend:  htf.trend,
+      signal:    entry.signal,
+      entry:     entry.entry,
+      stopLoss:  entry.stopLoss,
+      tp1: tps.tp1, tp2: tps.tp2, tp3: tps.tp3,
+      rr1: tps.rr1, rr2: tps.rr2, rr3: tps.rr3,
+      slAfterTp1: tps.slPlan.afterTp1,
+      slAfterTp2: tps.slPlan.afterTp2,
+      split:     tps.split,
+      emaLevels,
+      reason:    entry.reason,
+      orderId:   order.orderId || order.data?.orderId,
     });
 
     const now = new Date();
@@ -417,7 +513,13 @@ async function run() {
       qty,
       entry.entry.toFixed(2),
       entry.stopLoss.toFixed(2),
-      entry.takeProfit.toFixed(2),
+      tps.tp1.toFixed(2),
+      tps.tp2.toFixed(2),
+      tps.tp3.toFixed(2),
+      tps.rr1,
+      tps.rr2,
+      tps.rr3,
+      tps.slPlan.afterTp1.toFixed(2),
       (qty * entry.entry).toFixed(2),
       order.orderId || order.data?.orderId || 'unknown',
       CONFIG.paperTrading ? 'paper' : 'live',
