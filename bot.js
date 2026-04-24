@@ -41,26 +41,39 @@ const BINANCE_BASE    = 'https://api.binance.com';
 // ── Research Signal Filter ────────────────────────────────────────────────────
 
 // Build the final symbol list for this run.
-// Adds any token flagged bull/bear by DegenDave in today's research
-// that isn't already in the base list — max 5 extras to avoid overtrading.
+// Base symbols are always checked. On top of that, any crypto token found
+// by today's research (Perplexity OR DegenDave) with a clear bull/bear
+// signal that is confirmed live on BitGet futures gets added automatically.
+// Neutral signals are ignored — no clear direction, no trade.
 function buildSymbolList(researchData) {
   const symbols = [...BASE_SYMBOLS];
   if (!researchData?.signals) return symbols;
 
-  const extras = researchData.signals
-    .filter(s =>
-      s.source?.toLowerCase().includes('degendave') &&
-      s.signal !== 'neutral' &&
-      s.token
-    )
-    .map(s => `${s.token.toUpperCase()}USDT`)
-    .filter(sym => !symbols.includes(sym))
-    .slice(0, 5); // Cap at 5 extra tokens per session
+  const degenPicks   = [];
+  const researchPicks = [];
 
-  if (extras.length) {
-    console.log(`  DegenDave picks added: ${extras.join(', ')}`);
-    symbols.push(...extras);
+  for (const s of researchData.signals) {
+    if (!s.token || s.signal === 'neutral') continue;
+    if (s.category !== 'crypto') continue;   // Stocks/commodities handled by Ironclad
+    if (!s.bitget) continue;                  // Not available on BitGet futures — skip
+
+    const sym = `${s.token.toUpperCase()}USDT`;
+    if (symbols.includes(sym)) continue;      // Already in base list
+
+    if (s.source?.toLowerCase().includes('degendave')) {
+      degenPicks.push(sym);
+    } else {
+      researchPicks.push(sym);
+    }
   }
+
+  // DegenDave picks have priority, then general research, total cap of 8 extras
+  const extras = [...new Set([...degenPicks, ...researchPicks])].slice(0, 8);
+
+  if (degenPicks.length)    console.log(`  DegenDave picks   : ${degenPicks.join(', ')}`);
+  if (researchPicks.length) console.log(`  Research picks    : ${researchPicks.join(', ')}`);
+  if (extras.length)        symbols.push(...extras);
+
   return symbols;
 }
 
