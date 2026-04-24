@@ -1,10 +1,6 @@
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const { YoutubeTranscript } = require('youtube-transcript');
 
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY || '';
 const BITGET_BASE        = 'https://api.bitget.com';
@@ -80,6 +76,50 @@ async function fetchLatestChartHackersVideos() {
   }
 }
 
+// Fetch a YouTube transcript natively — no npm package needed.
+// Parses the caption track URL directly from the video's player response.
+async function fetchYouTubeTranscript(videoId) {
+  const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: {
+      'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+  const html = await pageRes.text();
+
+  // Pull out the embedded player JSON
+  const jsonMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*(?:;|<\/script>)/s);
+  if (!jsonMatch) throw new Error('ytInitialPlayerResponse not found in page');
+
+  const player    = JSON.parse(jsonMatch[1]);
+  const tracks    = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+  if (!tracks?.length) throw new Error('No caption tracks available');
+
+  // Prefer English captions (manual or auto-generated)
+  const track = tracks.find(t => t.languageCode === 'en') ||
+                tracks.find(t => t.languageCode?.startsWith('en')) ||
+                tracks[0];
+
+  // Fetch the raw XML caption file
+  const captRes = await fetch(track.baseUrl);
+  const captXml = await captRes.text();
+
+  // Parse <text> nodes and decode HTML entities
+  const text = [...captXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)]
+    .map(m => m[1]
+      .replace(/&amp;/g,  '&')
+      .replace(/&lt;/g,   '<')
+      .replace(/&gt;/g,   '>')
+      .replace(/&#39;/g,  "'")
+      .replace(/&quot;/g, '"')
+    )
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return text;
+}
+
 async function fetchDegenDaveTranscript() {
   const videos  = await fetchLatestChartHackersVideos();
   const results = [];
@@ -87,8 +127,7 @@ async function fetchDegenDaveTranscript() {
   for (const video of videos) {
     try {
       console.log(`Fetching transcript: ${video.title} (${video.id})...`);
-      const transcript = await YoutubeTranscript.fetchTranscript(video.id);
-      const fullText   = transcript.map(t => t.text).join(' ');
+      const fullText = await fetchYouTubeTranscript(video.id);
       results.push({ ...video, transcript: fullText.slice(0, 8000) }); // Cap at 8k chars
       console.log(`  Got ${fullText.length} chars of transcript`);
     } catch (err) {
