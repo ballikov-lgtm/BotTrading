@@ -24,9 +24,11 @@ const CONFIG = {
 // Strategy 1 — VWAP + RSI3 + EMA8 scalping
 // CRYPTO ONLY — works best in ranging/choppy markets
 // Stocks and commodities are handled by the Ironclad bot
-const SYMBOLS = [
+// Base watchlist — always checked every run
+const BASE_SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
+  'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
 ];
 
 const RULES_PATH      = './rules.json';
@@ -37,6 +39,30 @@ const BITGET_BASE     = 'https://api.bitget.com';
 const BINANCE_BASE    = 'https://api.binance.com';
 
 // ── Research Signal Filter ────────────────────────────────────────────────────
+
+// Build the final symbol list for this run.
+// Adds any token flagged bull/bear by DegenDave in today's research
+// that isn't already in the base list — max 5 extras to avoid overtrading.
+function buildSymbolList(researchData) {
+  const symbols = [...BASE_SYMBOLS];
+  if (!researchData?.signals) return symbols;
+
+  const extras = researchData.signals
+    .filter(s =>
+      s.source?.toLowerCase().includes('degendave') &&
+      s.signal !== 'neutral' &&
+      s.token
+    )
+    .map(s => `${s.token.toUpperCase()}USDT`)
+    .filter(sym => !symbols.includes(sym))
+    .slice(0, 5); // Cap at 5 extra tokens per session
+
+  if (extras.length) {
+    console.log(`  DegenDave picks added: ${extras.join(', ')}`);
+    symbols.push(...extras);
+  }
+  return symbols;
+}
 
 function loadResearchSignals() {
   try {
@@ -320,6 +346,7 @@ async function run() {
   const rules          = loadRules();
   const researchData   = loadResearchSignals();
   const sessionInfo    = getSessionInfo();
+  const SYMBOLS        = buildSymbolList(researchData);
 
   console.log(`\n── Bot run ${new Date().toISOString()} ──`);
   console.log(`Strategy  : ${rules.strategy}`);

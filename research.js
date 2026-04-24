@@ -19,6 +19,10 @@ const WATCHLIST = [
   { token: 'LINK',    name: 'Chainlink',    category: 'crypto',    pair: 'LINK/USDT',    note: 'Long-term watchlist' },
   { token: 'HYPE',    name: 'Hyperliquid',  category: 'crypto',    pair: 'HYPE/USDT',    note: 'Long-term watchlist' },
   { token: 'VIRTUAL', name: 'Virtual',      category: 'crypto',    pair: 'VIRTUAL/USDT', note: 'Long-term watchlist' },
+  // DegenDave swing picks
+  { token: 'APT',     name: 'Aptos',        category: 'crypto',    pair: 'APT/USDT',     note: 'DegenDave pick' },
+  { token: 'ONDO',    name: 'Ondo Finance', category: 'crypto',    pair: 'ONDO/USDT',    note: 'DegenDave pick' },
+  { token: 'JUP',     name: 'Jupiter',      category: 'crypto',    pair: 'JUP/USDT',     note: 'DegenDave pick' },
   // Stocks
   { token: 'AAPL',   name: 'Apple',        category: 'stock',     pair: 'AAPL/USDT',    note: 'Long-term watchlist' },
   { token: 'NVDA',   name: 'Nvidia',       category: 'stock',     pair: 'NVDA/USDT',    note: 'Long-term watchlist' },
