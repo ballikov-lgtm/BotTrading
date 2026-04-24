@@ -1,0 +1,163 @@
+{
+  "generated": "2026-04-24T02:04:40.045Z",
+  "date": "2026-04-24",
+  "summary": "Markets exhibit mixed sentiment amid ongoing Iran conflict and geopolitical tensions in the Middle East, with crypto showing resilience and partial risk-off strength while commodities like gold remain supported. Forex pairs lean neutral with bearish biases, and Brent oil faces downward pressure below key resistance. Overall mood is cautious, prioritizing fundamental factors and upcoming economic data.",
+  "signals": [
+    {
+      "token": "BTC",
+      "name": "Bitcoin",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "BTC holds above 74,000 confirming breakout from sideways range with targets at 80,000-85,000 amid risk-off resilience during Iran conflict.",
+      "source": "MQL5 forecast[2]; BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "ETH",
+      "name": "Ethereum",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "low",
+      "reason": "ETH returned +6% from conflict Day 0 outperforming S&P 500 and commodities, showing strong risk-off resilience.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "XAU",
+      "name": "Gold",
+      "category": "commodity",
+      "signal": "bull",
+      "risk": "low",
+      "reason": "XAU/USD stays neutral-to-bullish above 4,750 near local highs despite geopolitical pressures.",
+      "source": "MQL5 forecast[2]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "UKO",
+      "name": "Brent Crude Oil",
+      "category": "commodity",
+      "signal": "bear",
+      "risk": "medium",
+      "reason": "Brent remains neutral-to-bearish below 94-95 resistance under pressure from optimistic US statements despite Middle East risks.",
+      "source": "MQL5 forecast[2]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "EURUSD",
+      "name": "EUR/USD",
+      "category": "forex",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "EUR/USD neutral with bearish bias above 1.1600-1.1620 support amid sideways trend and potential Strait of Hormuz escalation.",
+      "source": "MQL5 forecast[2]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "SOL",
+      "name": "Solana",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No specific mentions today amid broader crypto market edging higher by 1.8% in March despite tensions.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "XRP",
+      "name": "XRP",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "Lacking direct commentary in recent posts with overall crypto outlook neutral due to geopolitical uncertainty.",
+      "source": "Charting Crypto Report[6]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "LINK",
+      "name": "Chainlink",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No targeted signals today as market focuses on BTC/ETH resilience in risk-off environment.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "AAPL",
+      "name": "Apple",
+      "category": "stock",
+      "signal": "bear",
+      "risk": "high",
+      "reason": "Mag 7 stocks including AAPL down -10% from Iran conflict Day 0, underperforming crypto.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "NVDA",
+      "name": "Nvidia",
+      "category": "stock",
+      "signal": "bear",
+      "risk": "high",
+      "reason": "Mag 7 and semiconductor indices like SOXX down amid broader equities weakness in geopolitical shock.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "GOOGL",
+      "name": "Alphabet/Google",
+      "category": "stock",
+      "signal": "bear",
+      "risk": "high",
+      "reason": "Part of Mag 7 underperformance at -10% since conflict onset compared to crypto gains.",
+      "source": "BNB Monthly Insights[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "HYPE",
+      "name": "Hyperliquid",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No specific discussion in today's sources amid neutral 2Q26 crypto outlook.",
+      "source": "Charting Crypto Report[6]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "VIRTUAL",
+      "name": "Virtual Protocol",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "Absent from recent commentary with focus on major coins like BTC and ETH.",
+      "source": "Kraken Blog[7]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    }
+  ]
+}
