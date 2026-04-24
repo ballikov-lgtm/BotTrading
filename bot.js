@@ -306,37 +306,11 @@ async function placeOrder(side, price, quantity, symbol) {
   });
 }
 
-// ── Session Clock ─────────────────────────────────────────────────────────────
-// During session opens the market actually moves — switch to 15min candles
-// so RSI3 hits extremes more often and we catch real directional momentum.
-// Outside these windows the 4H timeframe keeps things conservative.
-
-function getSessionInfo() {
-  const now      = new Date();
-  const totalMins = now.getUTCHours() * 60 + now.getUTCMinutes();
-
-  // Asia open  23:45–00:30 UTC (spans midnight)
-  if (totalMins >= 23 * 60 + 45 || totalMins <= 30) {
-    return { session: 'Asia Open 🌏',   timeframe: '15m', sizeMultiplier: 0.5, isOpen: true };
-  }
-  // London open  07:45–08:45 UTC
-  if (totalMins >= 7 * 60 + 45 && totalMins <= 8 * 60 + 45) {
-    return { session: 'London Open 🏙️', timeframe: '15m', sizeMultiplier: 0.5, isOpen: true };
-  }
-  // NY open  13:15–14:30 UTC
-  if (totalMins >= 13 * 60 + 15 && totalMins <= 14 * 60 + 30) {
-    return { session: 'NY Open 🗽',     timeframe: '15m', sizeMultiplier: 0.5, isOpen: true };
-  }
-
-  // Outside session opens — use configured timeframe at full size
-  return { session: 'Off-Hours', timeframe: CONFIG.timeframe, sizeMultiplier: 1.0, isOpen: false };
-}
-
 // ── Position Sizing ───────────────────────────────────────────────────────────
 
-function calcQuantity(price, sizeMultiplier = 1.0) {
+function calcQuantity(price) {
   const riskUsd = CONFIG.portfolioUsd * 0.01;
-  const sizeUsd = Math.min(riskUsd, CONFIG.maxTradeUsd) * sizeMultiplier;
+  const sizeUsd = Math.min(riskUsd, CONFIG.maxTradeUsd);
   return parseFloat((sizeUsd / price).toFixed(6));
 }
 
@@ -356,15 +330,14 @@ async function run() {
     return;
   }
 
-  const rules          = loadRules();
-  const researchData   = loadResearchSignals();
-  const sessionInfo    = getSessionInfo();
-  const SYMBOLS        = buildSymbolList(researchData);
+  const rules        = loadRules();
+  const researchData = loadResearchSignals();
+  const SYMBOLS      = buildSymbolList(researchData);
 
   console.log(`\n── Bot run ${new Date().toISOString()} ──`);
   console.log(`Strategy  : ${rules.strategy}`);
   console.log(`Symbols   : ${SYMBOLS.join(', ')}`);
-  console.log(`Session   : ${sessionInfo.session}${sessionInfo.isOpen ? ` — 15min candles, ${sessionInfo.sizeMultiplier * 100}% position size` : ` — ${CONFIG.timeframe} candles, full size`}`);
+  console.log(`Timeframe : ${CONFIG.timeframe}`);
   console.log(`Mode      : ${CONFIG.mode}${CONFIG.mode === 'futures' ? `  Leverage: ${CONFIG.leverage}x` : ''}`);
   console.log(`Paper     : ${CONFIG.paperTrading}`);
   console.log(`Research  : ${researchData ? `${researchData.signals.length} signals loaded from ${researchData.generated}` : 'No signal file — running on technicals only'}`);
@@ -380,13 +353,10 @@ async function run() {
       continue;
     }
 
-    // Use session timeframe — 15min at market opens, configured TF otherwise
-    const activeTimeframe = sessionInfo.timeframe;
-
     // Fetch candles and run safety check
     let candles;
     try {
-      candles = await fetchCandles(symbol, activeTimeframe, 100);
+      candles = await fetchCandles(symbol, CONFIG.timeframe, 100);
     } catch (err) {
       console.log(`  ✗ Could not fetch candles: ${err.message}`);
       continue;
@@ -399,8 +369,7 @@ async function run() {
     const logEntry = {
       timestamp: new Date().toISOString(),
       symbol,
-      session:    sessionInfo.session,
-      timeframe:  activeTimeframe,
+      timeframe:  CONFIG.timeframe,
       indicators,
       direction,
       passed,
@@ -426,9 +395,9 @@ async function run() {
       continue;
     }
 
-    console.log(`  ✓ Safety check PASSED + Research aligned — placing ${direction} order (${sessionInfo.sizeMultiplier * 100}% size, ${activeTimeframe})`);
+    console.log(`  ✓ Safety check PASSED + Research aligned — placing ${direction} order`);
 
-    const qty   = calcQuantity(indicators.price, sessionInfo.sizeMultiplier);
+    const qty   = calcQuantity(indicators.price);
     const order = await placeOrder(direction, indicators.price, qty, symbol);
 
     logEntry.action = direction;
