@@ -27,25 +27,72 @@ const WATCHLIST = [
 
 // ── DegenDave / ChartHackers YouTube Transcript ──────────────────────────────
 
-// Known video IDs — updated manually or automatically when new videos are found
-// DegenDave posts every Thursday on ChartHackers
-const DEGENDAVE_VIDEOS = [
-  { id: 'oAH36N9X7pA', title: 'Latest ChartHackers — DegenDave', date: '2026-04-22' },
-];
+// ChartHackers channel ID — DegenDave posts every Thursday ~11pm UK time
+// The Friday 8am UTC research run picks this up automatically
+const CHARTHACKERS_CHANNEL_ID = 'UCybasP-2D2b5kTLAb_kvhWQ';
+const CHARTHACKERS_RSS         = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHARTHACKERS_CHANNEL_ID}`;
+
+// How far back to look for videos (10 days catches any late Thursday uploads)
+const VIDEO_LOOKBACK_DAYS = 10;
+
+async function fetchLatestChartHackersVideos() {
+  try {
+    console.log('Fetching ChartHackers RSS feed...');
+    const res  = await fetch(CHARTHACKERS_RSS);
+    const xml  = await res.text();
+
+    // Parse entries from YouTube Atom feed using regex (no XML parser needed)
+    const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map(m => m[1]);
+
+    const cutoff  = Date.now() - VIDEO_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    const videos  = [];
+
+    for (const entry of entries) {
+      const idMatch      = entry.match(/yt:videoId>([^<]+)/);
+      const titleMatch   = entry.match(/<title>([^<]+)<\/title>/);
+      const pubMatch     = entry.match(/<published>([^<]+)<\/published>/);
+      if (!idMatch || !titleMatch || !pubMatch) continue;
+
+      const published = new Date(pubMatch[1]);
+      if (published.getTime() < cutoff) continue; // Too old
+
+      videos.push({
+        id:    idMatch[1].trim(),
+        title: titleMatch[1].trim(),
+        date:  pubMatch[1].slice(0, 10),
+      });
+    }
+
+    if (videos.length) {
+      console.log(`  Found ${videos.length} recent ChartHackers video(s):`);
+      videos.forEach(v => console.log(`    • [${v.date}] ${v.title} (${v.id})`));
+    } else {
+      console.log(`  No ChartHackers videos in the last ${VIDEO_LOOKBACK_DAYS} days`);
+    }
+
+    return videos;
+  } catch (err) {
+    console.log(`  Could not fetch ChartHackers RSS: ${err.message}`);
+    return [];
+  }
+}
 
 async function fetchDegenDaveTranscript() {
+  const videos  = await fetchLatestChartHackersVideos();
   const results = [];
-  for (const video of DEGENDAVE_VIDEOS) {
+
+  for (const video of videos) {
     try {
-      console.log(`Fetching DegenDave transcript: ${video.id}...`);
+      console.log(`Fetching transcript: ${video.title} (${video.id})...`);
       const transcript = await YoutubeTranscript.fetchTranscript(video.id);
       const fullText   = transcript.map(t => t.text).join(' ');
-      results.push({ ...video, transcript: fullText.slice(0, 8000) }); // Limit size
+      results.push({ ...video, transcript: fullText.slice(0, 8000) }); // Cap at 8k chars
       console.log(`  Got ${fullText.length} chars of transcript`);
     } catch (err) {
       console.log(`  Could not fetch transcript for ${video.id}: ${err.message}`);
     }
   }
+
   return results;
 }
 
