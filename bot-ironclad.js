@@ -360,18 +360,25 @@ async function setLeverage(symbol, leverage) {
   }
 }
 
-async function placeOrder(symbol, side, quantity, entry) {
+async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
   if (CONFIG.paperTrading) {
     console.log(`  [IRONCLAD PAPER ${CONFIG.leverage}x] ${side.toUpperCase()} ${quantity} ${symbol} @ $${entry}`);
+    console.log(`  SL: $${stopLoss}  TP1: $${tp1}  (TP2/TP3 logged — trail SL manually or via BitGet app)`);
     return { orderId: 'IRONCLAD-PAPER-' + Date.now() };
   }
   await setLeverage(symbol, CONFIG.leverage);
   const futuresSide = side === 'long' ? 'open_long' : 'open_short';
-  return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {
+  const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'crossed', side: futuresSide,
     orderType: 'market', size: quantity.toString(),
-  });
+    // SL and TP1 set natively on BitGet — exchange manages these automatically.
+    // TP2 and TP3 are logged separately; move SL to BE manually after TP1 hits,
+    // or use the BitGet app to set trailing stop after entry.
+    presetStopLossPrice:    stopLoss.toString(),
+    presetStopSurplusPrice: tp1.toString(),
+  };
+  return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', body);
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────
@@ -484,7 +491,7 @@ async function run() {
     }
 
     const qty   = calcQuantity(entry.entry, entry.stopLoss);
-    const order = await placeOrder(symbol, entry.signal, qty, entry.entry);
+    const order = await placeOrder(symbol, entry.signal, qty, entry.entry, entry.stopLoss, tps.tp1);
 
     writeLog({
       timestamp: new Date().toISOString(),

@@ -127,7 +127,7 @@ function countTodayTrades(symbol = null) {
 }
 
 function appendTrade(row) {
-  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Price,Total USD,Fee,Net Amount,Order ID,Mode,Notes';
+  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Price,Stop Loss,Take Profit,RR,Total USD,Fee,Order ID,Mode,Notes';
   if (!fs.existsSync(TRADES_PATH)) fs.writeFileSync(TRADES_PATH, header + '\n');
   fs.appendFileSync(TRADES_PATH, row + '\n');
 }
@@ -184,6 +184,38 @@ function calcRSI(closes, period) {
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
   return 100 - 100 / (1 + rs);
+}
+
+function calcATR(candles, period = 14) {
+  if (candles.length < period + 1) return candles[candles.length - 1].close * 0.01;
+  const trs = candles.slice(1).map((c, i) => {
+    const prev = candles[i];
+    return Math.max(
+      c.high - c.low,
+      Math.abs(c.high - prev.close),
+      Math.abs(c.low  - prev.close)
+    );
+  });
+  return trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+}
+
+// Scalping exits — appropriate for choppy/ranging VWAP reversion trades.
+// TP = mean reversion back to VWAP (the natural target for this strategy).
+// SL = 1× ATR against the trade (not too wide, not too tight).
+// NOT the 3-TP / EMA swing system — that belongs to Ironclad only.
+function calcScalpingExits(price, direction, vwap, atr) {
+  let stopLoss, takeProfit;
+  if (direction === 'long') {
+    stopLoss   = parseFloat((price - atr * 1.0).toFixed(4));
+    takeProfit = parseFloat((Math.max(vwap, price + atr * 1.5)).toFixed(4));
+  } else {
+    stopLoss   = parseFloat((price + atr * 1.0).toFixed(4));
+    takeProfit = parseFloat((Math.min(vwap, price - atr * 1.5)).toFixed(4));
+  }
+  const risk   = Math.abs(price - stopLoss);
+  const reward = Math.abs(takeProfit - price);
+  const rr     = reward > 0 ? parseFloat((reward / risk).toFixed(2)) : 0;
+  return { stopLoss, takeProfit, rr };
 }
 
 function calcVWAP(candles) {
@@ -275,19 +307,22 @@ async function setLeverage(symbol, leverage) {
   }
 }
 
-async function placeOrder(side, price, quantity, symbol) {
+async function placeOrder(side, price, quantity, symbol, exits) {
   if (CONFIG.paperTrading) {
     const label = CONFIG.mode === 'futures'
       ? `[PAPER FUTURES ${CONFIG.leverage}x] ${side.toUpperCase()}`
       : `[PAPER SPOT] ${side.toUpperCase()}`;
     console.log(`  ${label} ${quantity} ${symbol} @ ${price}`);
+    if (exits) {
+      console.log(`  SL: $${exits.stopLoss}  TP: $${exits.takeProfit}  R:R 1:${exits.rr}`);
+    }
     return { orderId: 'PAPER-' + Date.now(), paper: true };
   }
 
   if (CONFIG.mode === 'futures') {
     await setLeverage(symbol, CONFIG.leverage);
     const futuresSide = side === 'long' ? 'open_long' : 'open_short';
-    return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {
+    const body = {
       symbol,
       productType: 'USDT-FUTURES',
       marginCoin:  'USDT',
@@ -295,7 +330,11 @@ async function placeOrder(side, price, quantity, symbol) {
       side:        futuresSide,
       orderType:   'market',
       size:        quantity.toString(),
-    });
+    };
+    // Attach SL and TP to the order natively — BitGet manages these on the exchange
+    if (exits?.stopLoss)   body.presetStopLossPrice    = exits.stopLoss.toString();
+    if (exits?.takeProfit) body.presetStopSurplusPrice = exits.takeProfit.toString();
+    return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', body);
   }
 
   return bitgetRequest('POST', '/api/v2/spot/trade/placeOrder', {
@@ -395,13 +434,22 @@ async function run() {
       continue;
     }
 
+    // Calculate ATR-based scalping exits — simple SL + VWAP reversion TP
+    // (NOT the 3-TP swing system — that belongs to Ironclad only)
+    const atr   = calcATR(candles);
+    const exits = calcScalpingExits(indicators.price, direction, indicators.vwap, atr);
+
     console.log(`  ✓ Safety check PASSED + Research aligned — placing ${direction} order`);
+    console.log(`    SL: $${exits.stopLoss}  TP: $${exits.takeProfit}  R:R 1:${exits.rr}  (ATR=$${atr.toFixed(4)})`);
 
     const qty   = calcQuantity(indicators.price);
-    const order = await placeOrder(direction, indicators.price, qty, symbol);
+    const order = await placeOrder(direction, indicators.price, qty, symbol, exits);
 
-    logEntry.action = direction;
-    logEntry.order  = order;
+    logEntry.action    = direction;
+    logEntry.order     = order;
+    logEntry.stopLoss  = exits.stopLoss;
+    logEntry.takeProfit = exits.takeProfit;
+    logEntry.rr        = exits.rr;
     writeSafetyLog(logEntry);
 
     // Log to CSV
@@ -416,9 +464,11 @@ async function run() {
       direction,
       qty,
       indicators.price.toFixed(2),
+      exits.stopLoss,
+      exits.takeProfit,
+      exits.rr,
       totalUsd,
       fee,
-      totalUsd,
       order.orderId || order.data?.orderId || 'unknown',
       CONFIG.paperTrading ? 'paper' : 'live',
       rules.strategy,
