@@ -223,67 +223,102 @@ function readSafetyLog() {
   } catch { return []; }
 }
 
-function buildTradeSection(trades, safetyLog) {
-  const today = new Date().toISOString().slice(0, 10);
-  const todayTrades  = trades.filter(t => t.date === today);
-  const todayChecks  = safetyLog.filter(e => e.timestamp?.startsWith(today));
-  const passed  = todayChecks.filter(e => e.passed).length;
-  const failed  = todayChecks.filter(e => !e.passed).length;
+// Calculate estimated P&L for a single trade using the most recent
+// price seen in the safety log after the trade was entered.
+function calcTradePnl(trade, safetyLog) {
+  const LEVERAGE = 3;
+  const tradeTs  = `${trade.date}T${trade.time}`;
+  const later    = safetyLog
+    .filter(e => e.symbol === trade.symbol && e.timestamp > tradeTs && e.indicators?.price)
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  if (!later.length) return null;
+  const currentPrice = later[0].indicators.price;
+  const pnl = trade.side === 'long'
+    ? (currentPrice - trade.price) * trade.quantity * LEVERAGE
+    : (trade.price - currentPrice) * trade.quantity * LEVERAGE;
+  return { pnl, currentPrice };
+}
 
-  // Today's unrealised P&L — compare entry price vs most recent safety-log price
-  let winCount = 0, lossCount = 0, todayPnl = 0;
-  todayTrades.forEach(t => {
-    const latest = safetyLog.find(e => e.symbol === t.symbol && e.timestamp > `${t.date}T${t.time}`);
-    if (latest?.indicators?.price) {
-      const currentPrice = latest.indicators.price;
-      const leverage = 3; // 3x futures leverage
-      const pnl = t.side === 'long'
-        ? (currentPrice - t.price) * t.quantity * leverage
-        : (t.price - currentPrice) * t.quantity * leverage;
-      todayPnl += pnl;
-      if (pnl >= 0) winCount++; else lossCount++;
+function pnlCell(pnlResult) {
+  if (pnlResult === null) return '<td style="color:#484f58">—</td>';
+  const { pnl } = pnlResult;
+  const color = pnl >= 0 ? '#3fb950' : '#f85149';
+  const sign  = pnl >= 0 ? '+' : '';
+  return `<td style="color:${color};font-weight:600">${sign}$${Math.abs(pnl).toFixed(2)}</td>`;
+}
+
+function buildTradeSection(trades, safetyLog) {
+  const today       = new Date().toISOString().slice(0, 10);
+  const todayTrades = trades.filter(t => t.date === today);
+  const todayChecks = safetyLog.filter(e => e.timestamp?.startsWith(today));
+  const passed      = todayChecks.filter(e => e.passed).length;
+  const failed      = todayChecks.filter(e => !e.passed).length;
+
+  // ── P&L for every trade (chronological order for cumulative calc) ──────────
+  let cumulative = 0;
+  let totalPnl   = 0;
+  let wins = 0, losses = 0, bestTrade = 0, worstTrade = 0;
+
+  const tradesWithPnl = trades.map(t => {
+    const result = calcTradePnl(t, safetyLog);
+    let tradeP   = null;
+    if (result !== null) {
+      tradeP      = result.pnl;
+      cumulative += result.pnl;
+      totalPnl   += result.pnl;
+      if (result.pnl >= 0) wins++;   else losses++;
+      if (result.pnl > bestTrade)  bestTrade  = result.pnl;
+      if (result.pnl < worstTrade) worstTrade = result.pnl;
     }
+    return { ...t, tradePnl: tradeP, cumulativePnl: result !== null ? cumulative : null, currentPrice: result?.currentPrice };
   });
 
-  // All-time stats
-  const totalVolume   = trades.reduce((s, t) => s + (t.totalUsd || 0), 0);
-  const totalFees     = trades.reduce((s, t) => s + (parseFloat(t.fee) || 0), 0);
-  const paperCount    = trades.filter(t => t.mode === 'paper').length;
-  const liveCount     = trades.filter(t => t.mode === 'live').length;
+  // Today's P&L subset
+  const todayPnl  = tradesWithPnl
+    .filter(t => t.date === today && t.tradePnl !== null)
+    .reduce((s, t) => s + t.tradePnl, 0);
+  const todayWins = tradesWithPnl.filter(t => t.date === today && t.tradePnl !== null && t.tradePnl >= 0).length;
+  const todayLoss = tradesWithPnl.filter(t => t.date === today && t.tradePnl !== null && t.tradePnl < 0).length;
+  const winRate   = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
-  // By symbol breakdown
+  // All-time stats
+  const totalVolume = trades.reduce((s, t) => s + (t.totalUsd || 0), 0);
+  const totalFees   = trades.reduce((s, t) => s + (parseFloat(t.fee) || 0), 0);
+  const paperCount  = trades.filter(t => t.mode === 'paper').length;
+  const liveCount   = trades.filter(t => t.mode === 'live').length;
+
+  // By symbol breakdown (with P&L)
   const bySymbol = {};
-  trades.forEach(t => {
-    if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { count: 0, volume: 0, longs: 0, shorts: 0 };
+  tradesWithPnl.forEach(t => {
+    if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { count: 0, volume: 0, longs: 0, shorts: 0, pnl: 0, hasPnl: false };
     bySymbol[t.symbol].count++;
     bySymbol[t.symbol].volume += t.totalUsd || 0;
     if (t.side === 'long')  bySymbol[t.symbol].longs++;
     if (t.side === 'short') bySymbol[t.symbol].shorts++;
+    if (t.tradePnl !== null) { bySymbol[t.symbol].pnl += t.tradePnl; bySymbol[t.symbol].hasPnl = true; }
   });
 
   // Recommendations based on failed checks
   const failReasons = {};
   todayChecks.filter(e => !e.passed).forEach(e => {
-    (e.reasons || []).forEach(r => {
-      failReasons[r] = (failReasons[r] || 0) + 1;
-    });
+    (e.reasons || []).forEach(r => { failReasons[r] = (failReasons[r] || 0) + 1; });
   });
   const recommendations = Object.entries(failReasons)
     .sort((a, b) => b[1] - a[1])
     .map(([reason, count]) => {
       let tip = '';
-      if (reason.includes('VWAP'))        tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
+      if (reason.includes('VWAP'))          tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
       else if (reason.includes('trending')) tip = 'Market is trending — Ironclad swing strategy will handle this. VWAP scalper correctly sitting out';
-      else if (reason.includes('RSI'))    tip = 'RSI3 is staying mid-range — market may be consolidating. Consider sitting out until a clear reversal signal';
+      else if (reason.includes('RSI'))      tip = 'RSI3 is staying mid-range — market may be consolidating. Consider sitting out until a clear reversal signal';
       else if (reason.includes('directional')) tip = 'No clear signal detected — market may be choppy. This is correct behaviour';
       else tip = 'Review strategy conditions — this rule is blocking most trades';
       return `<li><strong>${reason}</strong> (${count}× today)<br><span class="tip">💡 ${tip}</span></li>`;
     }).join('');
 
-  // Today's trades table rows
+  // Today's trade rows (with P&L)
   const todayTradeRows = todayTrades.length === 0
     ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades executed today</td></tr>'
-    : todayTrades.map(t => {
+    : tradesWithPnl.filter(t => t.date === today).map(t => {
         const modeLabel = t.mode === 'paper'
           ? '<span style="color:#d29922">📄 Paper</span>'
           : '<span style="color:#3fb950">💰 Live</span>';
@@ -292,49 +327,58 @@ function buildTradeSection(trades, safetyLog) {
           <td>${t.symbol}</td>
           <td>${t.side === 'long' ? '🟢 Long' : '🔴 Short'}</td>
           <td>$${t.price?.toFixed(2)}</td>
+          <td>${t.currentPrice ? '$' + t.currentPrice.toFixed(2) : '—'}</td>
           <td>${t.quantity}</td>
-          <td>$${t.totalUsd?.toFixed(2)}</td>
-          <td>${t.notes || '—'}</td>
+          ${pnlCell(t.tradePnl !== null ? { pnl: t.tradePnl } : null)}
           <td>${modeLabel}</td>
         </tr>`;
       }).join('');
 
-  // All trades history table — most recent first, capped at 50 rows
-  const recentTrades = [...trades].reverse().slice(0, 50);
+  // All trades history — most recent first, with P&L and cumulative
+  const recentTrades = [...tradesWithPnl].reverse().slice(0, 50);
   const allTradeRows = recentTrades.length === 0
-    ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades recorded yet — bot is running in safety-check mode</td></tr>'
+    ? '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">No trades recorded yet — bot is running in safety-check mode</td></tr>'
     : recentTrades.map(t => {
         const modeLabel = t.mode === 'paper'
           ? '<span style="color:#d29922">📄 Paper</span>'
           : '<span style="color:#3fb950">💰 Live</span>';
+        const cumColor  = t.cumulativePnl === null ? '#484f58' : t.cumulativePnl >= 0 ? '#3fb950' : '#f85149';
+        const cumLabel  = t.cumulativePnl === null ? '—' : `${t.cumulativePnl >= 0 ? '+' : ''}$${Math.abs(t.cumulativePnl).toFixed(2)}`;
         return `<tr>
           <td>${t.date}</td>
           <td>${t.time}</td>
           <td>${t.symbol}</td>
           <td>${t.side === 'long' ? '🟢 Long' : '🔴 Short'}</td>
           <td>$${t.price?.toFixed(2)}</td>
+          <td>${t.currentPrice ? '$' + t.currentPrice.toFixed(2) : '—'}</td>
           <td>${t.quantity}</td>
-          <td>$${t.totalUsd?.toFixed(2)}</td>
+          ${pnlCell(t.tradePnl !== null ? { pnl: t.tradePnl } : null)}
+          <td style="color:${cumColor};font-weight:600">${cumLabel}</td>
           <td>${modeLabel}</td>
         </tr>`;
       }).join('');
 
-  // Symbol breakdown rows
+  // Symbol breakdown rows (with P&L)
   const symbolRows = Object.entries(bySymbol)
     .sort((a, b) => b[1].count - a[1].count)
-    .map(([sym, d]) => `<tr>
-      <td>${sym}</td>
-      <td>${d.count}</td>
-      <td>${d.longs}</td>
-      <td>${d.shorts}</td>
-      <td>$${d.volume.toFixed(2)}</td>
-    </tr>`).join('');
+    .map(([sym, d]) => {
+      const pnlColor = d.pnl >= 0 ? '#3fb950' : '#f85149';
+      const pnlStr   = d.hasPnl ? `<span style="color:${pnlColor}">${d.pnl >= 0 ? '+' : ''}$${Math.abs(d.pnl).toFixed(2)}</span>` : '—';
+      return `<tr>
+        <td>${sym}</td>
+        <td>${d.count}</td>
+        <td>${d.longs}</td>
+        <td>${d.shorts}</td>
+        <td>$${d.volume.toFixed(2)}</td>
+        <td>${pnlStr}</td>
+      </tr>`;
+    }).join('');
 
-  const pnlColor  = todayPnl >= 0 ? '#3fb950' : '#f85149';
-  const pnlSign   = todayPnl >= 0 ? '+' : '';
-  const winRate   = (winCount + lossCount) > 0
-    ? Math.round((winCount / (winCount + lossCount)) * 100)
-    : 0;
+  // Summary colour helpers
+  const todayPnlColor = todayPnl >= 0 ? '#3fb950' : '#f85149';
+  const totalPnlColor = totalPnl >= 0 ? '#3fb950' : '#f85149';
+  const bestColor     = '#3fb950';
+  const worstColor    = '#f85149';
 
   return `
   <!-- ── Today's Activity ── -->
@@ -344,15 +388,16 @@ function buildTradeSection(trades, safetyLog) {
     <div class="stat"><div class="num" style="color:#3fb950">${passed}</div><div class="label">Checks Passed</div></div>
     <div class="stat"><div class="num" style="color:#f85149">${failed}</div><div class="label">Checks Failed</div></div>
     <div class="stat"><div class="num" style="color:#58a6ff">${todayTrades.length}</div><div class="label">Trades Today</div></div>
-    <div class="stat"><div class="num" style="color:${pnlColor}">${pnlSign}$${Math.abs(todayPnl).toFixed(2)}</div><div class="label">Today's P&L (est.)</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate Today</div></div>
+    <div class="stat"><div class="num" style="color:${todayPnlColor}">${todayPnl >= 0 ? '+' : ''}$${Math.abs(todayPnl).toFixed(2)}</div><div class="label">Today's P&L (est.)</div></div>
+    <div class="stat"><div class="num" style="color:#3fb950">${todayWins}</div><div class="label">Wins Today</div></div>
+    <div class="stat"><div class="num" style="color:#f85149">${todayLoss}</div><div class="label">Losses Today</div></div>
   </div>
 
   <table style="margin-bottom:24px">
     <thead>
       <tr>
         <th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry Price</th><th>Qty</th><th>Total</th><th>Strategy</th><th>Mode</th>
+        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Mode</th>
       </tr>
     </thead>
     <tbody>${todayTradeRows}</tbody>
@@ -369,16 +414,20 @@ function buildTradeSection(trades, safetyLog) {
 
   <div class="stats">
     <div class="stat"><div class="num" style="color:#58a6ff">${trades.length}</div><div class="label">Total Trades</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">$${totalVolume.toFixed(2)}</div><div class="label">Total Volume</div></div>
-    <div class="stat"><div class="num" style="color:#d29922">${paperCount}</div><div class="label">Paper Trades</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">${liveCount}</div><div class="label">Live Trades</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">$${totalFees.toFixed(4)}</div><div class="label">Total Fees</div></div>
+    <div class="stat"><div class="num" style="color:${totalPnlColor}">${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}</div><div class="label">Total P&amp;L (est.)</div></div>
+    <div class="stat"><div class="num" style="color:#3fb950">${wins}</div><div class="label">Wins</div></div>
+    <div class="stat"><div class="num" style="color:#f85149">${losses}</div><div class="label">Losses</div></div>
+    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate</div></div>
+    <div class="stat"><div class="num" style="color:${bestColor}">+$${Math.abs(bestTrade).toFixed(2)}</div><div class="label">Best Trade</div></div>
+    <div class="stat"><div class="num" style="color:${worstColor}">-$${Math.abs(worstTrade).toFixed(2)}</div><div class="label">Worst Trade</div></div>
+    <div class="stat"><div class="num" style="color:#d29922">${paperCount}</div><div class="label">Paper</div></div>
+    <div class="stat"><div class="num" style="color:#3fb950">${liveCount}</div><div class="label">Live</div></div>
   </div>
 
   ${Object.keys(bySymbol).length > 0 ? `
   <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
   <table style="margin-bottom:24px">
-    <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th></tr></thead>
+    <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th><th>P&amp;L (est.)</th></tr></thead>
     <tbody>${symbolRows}</tbody>
   </table>` : ''}
 
@@ -387,7 +436,7 @@ function buildTradeSection(trades, safetyLog) {
     <thead>
       <tr>
         <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry Price</th><th>Qty</th><th>Total</th><th>Mode</th>
+        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
       </tr>
     </thead>
     <tbody>${allTradeRows}</tbody>
