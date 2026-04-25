@@ -17,6 +17,10 @@ const CONFIG = {
   paperTrading: process.env.IRONCLAD_PAPER !== 'false',  // Separate paper flag
 };
 
+// ── Bot identity (bumped with every meaningful strategy change) ───────────────
+const BOT_NAME    = 'Ironclad';
+const BOT_VERSION = 'v1.2'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels
+
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
 const SAFETY_LOG_PATH = './ironclad-log.json';
@@ -568,7 +572,7 @@ async function run() {
       (qty * entry.entry).toFixed(2),
       order.orderId || order.data?.orderId || 'unknown',
       CONFIG.paperTrading ? 'paper' : 'live',
-      'Ironclad',
+      `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
     appendTrade(row);
 

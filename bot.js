@@ -21,6 +21,10 @@ const CONFIG = {
   paperTrading: process.env.PAPER_TRADING !== 'false',
 };
 
+// ── Bot identity (bumped with every meaningful strategy change) ───────────────
+const BOT_NAME    = 'VWAP Scalper';
+const BOT_VERSION = 'v1.3'; // v1.0 initial · v1.1 crypto-only+VWAP tweak · v1.2 APT/ONDO/JUP+dynamic symbols · v1.3 ATR SL/TP exits
+
 // Strategy 1 — VWAP + RSI3 + EMA8 scalping
 // CRYPTO ONLY — works best in ranging/choppy markets
 // Stocks and commodities are handled by the Ironclad bot
@@ -127,7 +131,7 @@ function countTodayTrades(symbol = null) {
 }
 
 function appendTrade(row) {
-  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Price,Stop Loss,Take Profit,RR,Total USD,Fee,Order ID,Mode,Notes';
+  const header = 'Date,Time,Exchange,Symbol,Side,Quantity,Price,Stop Loss,Take Profit,RR,Total USD,Fee,Order ID,Mode,Strategy';
   if (!fs.existsSync(TRADES_PATH)) fs.writeFileSync(TRADES_PATH, header + '\n');
   fs.appendFileSync(TRADES_PATH, row + '\n');
 }
@@ -471,7 +475,7 @@ async function run() {
       fee,
       order.orderId || order.data?.orderId || 'unknown',
       CONFIG.paperTrading ? 'paper' : 'live',
-      rules.strategy,
+      `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
     appendTrade(row);
 

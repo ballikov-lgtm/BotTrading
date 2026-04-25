@@ -331,6 +331,20 @@ function pnlCell(pnlResult) {
   return `<td style="color:${color};font-weight:600">${sign}$${Math.abs(pnl).toFixed(2)}</td>`;
 }
 
+// ── Parse "Strategy Name vX.Y" into separate name + version parts ─────────────
+// Handles new format ("VWAP Scalper v1.3", "Ironclad v1.2") and legacy strings
+
+function parseStrategy(str) {
+  if (!str) return { stratName: 'Unknown', stratVersion: '—' };
+  // Match "Some Name v1.2" or "Some Name v1.2.3"
+  const match = str.match(/^(.+?)\s+(v\d+\.\d+(?:\.\d+)?)$/);
+  if (match) return { stratName: match[1].trim(), stratVersion: match[2] };
+  // Legacy fallback — infer from keywords
+  if (/ironclad/i.test(str))                    return { stratName: 'Ironclad',     stratVersion: 'v1.0' };
+  if (/vwap|scalp|rsi|ema/i.test(str))          return { stratName: 'VWAP Scalper', stratVersion: 'v1.0' };
+  return { stratName: str.slice(0, 30), stratVersion: '—' };
+}
+
 // ── Build all trade data — returns structured object for HTML generation ──────
 
 function buildTradeData(trades, safetyLog, livePrices = {}) {
@@ -445,22 +459,27 @@ function buildTradeData(trades, safetyLog, livePrices = {}) {
     bySymbol,
     recommendations,
     // JSON array embedded in HTML for client-side filtering + pagination
-    tradesJson: tradesWithPnl.map(t => ({
-      date:     t.date,
-      time:     t.time,
-      symbol:   t.symbol,
-      token:    t.token,
-      category: t.category,
-      month:    t.month,
-      side:     t.side,
-      entry:    t.price     || null,
-      current:  t.currentPrice || null,
-      qty:      t.quantity,
-      pnl:      t.tradePnl,
-      cumPnl:   t.cumPnl,
-      mode:     t.mode,
-      strategy: t.notes || '',
-    })),
+    tradesJson: tradesWithPnl.map(t => {
+      const { stratName, stratVersion } = parseStrategy(t.notes);
+      return {
+        date:        t.date,
+        time:        t.time,
+        symbol:      t.symbol,
+        token:       t.token,
+        category:    t.category,
+        month:       t.month,
+        side:        t.side,
+        entry:       t.price        || null,
+        current:     t.currentPrice || null,
+        qty:         t.quantity,
+        pnl:         t.tradePnl,
+        cumPnl:      t.cumPnl,
+        mode:        t.mode,
+        strategy:    t.notes        || '',
+        stratName,
+        stratVersion,
+      };
+    }),
   };
 }
 
@@ -964,6 +983,9 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       <label>Strategy</label>
       <select id="filter-strategy" onchange="onFilterChange()"><option value="">All Strategies</option></select>
 
+      <label>Version</label>
+      <select id="filter-version" onchange="onFilterChange()"><option value="">All Versions</option></select>
+
       <label>Mode</label>
       <select id="filter-mode" onchange="onFilterChange()">
         <option value="">All Modes</option>
@@ -980,10 +1002,11 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
           <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
           <th>Entry</th><th>Current</th><th>Qty</th>
           <th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
+          <th>Strategy</th><th>Version</th>
         </tr>
       </thead>
       <tbody id="history-tbody">
-        <tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+        <tr><td colspan="12" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -1025,7 +1048,8 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     populateSelect('filter-pair',     new Set(TRADES.map(t => t.symbol)));
     populateSelect('filter-month',    [...new Set(TRADES.map(t => t.month))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
     populateSelect('filter-category', new Set(TRADES.map(t => t.category)), v => catLabel[v] || v);
-    populateSelect('filter-strategy', new Set(TRADES.map(t => t.strategy).filter(Boolean)));
+    populateSelect('filter-strategy', new Set(TRADES.map(t => t.stratName).filter(Boolean)));
+    populateSelect('filter-version',  [...new Set(TRADES.map(t => t.stratVersion).filter(v => v && v !== '—'))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
 
     // ── Filtering logic ───────────────────────────────────────────────────────
     function getFiltered() {
@@ -1033,15 +1057,17 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       const month    = document.getElementById('filter-month').value;
       const category = document.getElementById('filter-category').value;
       const strategy = document.getElementById('filter-strategy').value;
+      const version  = document.getElementById('filter-version').value;
       const mode     = document.getElementById('filter-mode').value;
 
       // Most recent first
       return [...TRADES].reverse().filter(t => {
-        if (pair     && t.symbol   !== pair)     return false;
-        if (month    && t.month    !== month)    return false;
-        if (category && t.category !== category) return false;
-        if (strategy && t.strategy !== strategy) return false;
-        if (mode     && t.mode     !== mode)     return false;
+        if (pair     && t.symbol      !== pair)     return false;
+        if (month    && t.month       !== month)    return false;
+        if (category && t.category    !== category) return false;
+        if (strategy && t.stratName   !== strategy) return false;
+        if (version  && t.stratVersion !== version) return false;
+        if (mode     && t.mode        !== mode)     return false;
         return true;
       });
     }
@@ -1068,7 +1094,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       const tbody = document.getElementById('history-tbody');
 
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
       } else {
         tbody.innerHTML = page.map(t => {
           const modeLabel = t.mode === 'paper'
@@ -1085,6 +1111,8 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
             '<td>' + fmtPnl(t.pnl)    + '</td>' +
             '<td>' + fmtPnl(t.cumPnl) + '</td>' +
             '<td>' + modeLabel + '</td>' +
+            '<td style="font-size:13px;color:#c9d1d9">' + (t.stratName || '—') + '</td>' +
+            '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#1f2d3d;color:#58a6ff">' + (t.stratVersion || '—') + '</span></td>' +
             '</tr>';
         }).join('');
       }
@@ -1129,7 +1157,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     }
 
     function resetFilters() {
-      ['filter-pair','filter-month','filter-category','filter-strategy','filter-mode']
+      ['filter-pair','filter-month','filter-category','filter-strategy','filter-version','filter-mode']
         .forEach(id => { document.getElementById(id).value = ''; });
       currentPage = 1;
       renderTable();
