@@ -205,15 +205,59 @@ ${combined}`;
 
 // ── Read local trade logs ─────────────────────────────────────────────────────
 
-function readTrades() {
+// Parse CSV using the header row so column changes never break parsing again
+function parseCSV(filePath) {
   try {
-    if (!fs.existsSync('./trades.csv')) return [];
-    const lines = fs.readFileSync('./trades.csv', 'utf8').trim().split('\n');
-    return lines.slice(1).filter(l => l.trim()).map(l => {
-      const [date, time, exchange, symbol, side, quantity, price, totalUsd, fee, netAmount, orderId, mode, notes] = l.split(',');
-      return { date, time, exchange, symbol, side, quantity: parseFloat(quantity), price: parseFloat(price), totalUsd: parseFloat(totalUsd), fee, netAmount: parseFloat(netAmount), orderId, mode, notes };
+    if (!fs.existsSync(filePath)) return [];
+    const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''));
+    return lines.slice(1).map(line => {
+      const vals = line.split(',');
+      const obj  = {};
+      headers.forEach((h, i) => { obj[h] = vals[i]?.trim() ?? ''; });
+      return obj;
     });
   } catch { return []; }
+}
+
+function readTrades() {
+  const rows = parseCSV('./trades.csv');
+  return rows.map(r => ({
+    date:     r.date     || '',
+    time:     r.time     || '',
+    exchange: r.exchange || '',
+    symbol:   r.symbol   || '',
+    side:     r.side     || '',
+    quantity: parseFloat(r.quantity)   || 0,
+    price:    parseFloat(r.price || r.entry_price) || 0,
+    stopLoss: parseFloat(r.stop_loss)  || null,
+    takeProfit: parseFloat(r.take_profit || r.tp1) || null,
+    rr:       parseFloat(r.rr || r.rr1) || null,
+    totalUsd: parseFloat(r.total_usd)  || 0,
+    fee:      r.fee      || '0',
+    orderId:  r.order_id || r.orderId  || '',
+    mode:     r.mode     || '',
+    notes:    r.notes || r.strategy   || '',
+  }));
+}
+
+// ── Fetch current live prices from BitGet for all traded symbols ──────────────
+
+async function fetchLivePrices(symbols) {
+  const prices = {};
+  if (!symbols.length) return prices;
+  try {
+    const res  = await fetch(`${BITGET_BASE}/api/v2/mix/market/tickers?productType=USDT-FUTURES`);
+    const json = await res.json();
+    for (const ticker of (json.data || [])) {
+      const sym = ticker.symbol?.replace('_UMCBL', '');
+      if (sym && symbols.includes(sym)) {
+        prices[sym] = parseFloat(ticker.lastPr || ticker.close || 0);
+      }
+    }
+  } catch { /* silently skip — P&L will show as — */ }
+  return prices;
 }
 
 function readSafetyLog() {
@@ -223,16 +267,25 @@ function readSafetyLog() {
   } catch { return []; }
 }
 
-// Calculate estimated P&L for a single trade using the most recent
-// price seen in the safety log after the trade was entered.
-function calcTradePnl(trade, safetyLog) {
+// Calculate estimated P&L for a single trade.
+// Priority: live BitGet price → safety log → null (shows —)
+function calcTradePnl(trade, safetyLog, livePrices = {}) {
   const LEVERAGE = 3;
-  const tradeTs  = `${trade.date}T${trade.time}`;
-  const later    = safetyLog
-    .filter(e => e.symbol === trade.symbol && e.timestamp > tradeTs && e.indicators?.price)
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  if (!later.length) return null;
-  const currentPrice = later[0].indicators.price;
+
+  // 1. Use live price from BitGet ticker (most accurate)
+  let currentPrice = livePrices[trade.symbol] || null;
+
+  // 2. Fall back to most recent safety log entry for this symbol after trade time
+  if (!currentPrice) {
+    const tradeTs = `${trade.date}T${trade.time}`;
+    const later   = safetyLog
+      .filter(e => e.symbol === trade.symbol && e.timestamp > tradeTs && e.indicators?.price)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    if (later.length) currentPrice = later[0].indicators.price;
+  }
+
+  if (!currentPrice || !trade.price) return null;
+
   const pnl = trade.side === 'long'
     ? (currentPrice - trade.price) * trade.quantity * LEVERAGE
     : (trade.price - currentPrice) * trade.quantity * LEVERAGE;
@@ -247,7 +300,7 @@ function pnlCell(pnlResult) {
   return `<td style="color:${color};font-weight:600">${sign}$${Math.abs(pnl).toFixed(2)}</td>`;
 }
 
-function buildTradeSection(trades, safetyLog) {
+function buildTradeSection(trades, safetyLog, livePrices = {}) {
   const today       = new Date().toISOString().slice(0, 10);
   const todayTrades = trades.filter(t => t.date === today);
   const todayChecks = safetyLog.filter(e => e.timestamp?.startsWith(today));
@@ -260,7 +313,7 @@ function buildTradeSection(trades, safetyLog) {
   let wins = 0, losses = 0, bestTrade = 0, worstTrade = 0;
 
   const tradesWithPnl = trades.map(t => {
-    const result = calcTradePnl(t, safetyLog);
+    const result = calcTradePnl(t, safetyLog, livePrices);
     let tradeP   = null;
     if (result !== null) {
       tradeP      = result.pnl;
@@ -799,9 +852,16 @@ async function run() {
   });
 
   // Read trade logs
-  const trades      = readTrades();
-  const safetyLog   = readSafetyLog();
-  const tradeSection = buildTradeSection(trades, safetyLog);
+  const trades    = readTrades();
+  const safetyLog = readSafetyLog();
+
+  // Fetch live prices for every symbol we've ever traded — gives accurate P&L
+  // for all historical trades, not just ones with recent safety log entries
+  const tradedSymbols = [...new Set(trades.map(t => t.symbol).filter(Boolean))];
+  const livePrices    = await fetchLivePrices(tradedSymbols);
+  console.log(`Live prices fetched for: ${Object.keys(livePrices).join(', ') || 'none'}`);
+
+  const tradeSection = buildTradeSection(trades, safetyLog, livePrices);
 
   // Save machine-readable signal file for the trading bots to read
   const signalFile = {
