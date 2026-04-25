@@ -224,21 +224,21 @@ function parseCSV(filePath) {
 function readTrades() {
   const rows = parseCSV('./trades.csv');
   return rows.map(r => ({
-    date:     r.date     || '',
-    time:     r.time     || '',
-    exchange: r.exchange || '',
-    symbol:   r.symbol   || '',
-    side:     r.side     || '',
-    quantity: parseFloat(r.quantity)   || 0,
-    price:    parseFloat(r.price || r.entry_price) || 0,
-    stopLoss: parseFloat(r.stop_loss)  || null,
+    date:       r.date     || '',
+    time:       r.time     || '',
+    exchange:   r.exchange || '',
+    symbol:     r.symbol   || '',
+    side:       r.side     || '',
+    quantity:   parseFloat(r.quantity)   || 0,
+    price:      parseFloat(r.price || r.entry_price) || 0,
+    stopLoss:   parseFloat(r.stop_loss)  || null,
     takeProfit: parseFloat(r.take_profit || r.tp1) || null,
-    rr:       parseFloat(r.rr || r.rr1) || null,
-    totalUsd: parseFloat(r.total_usd)  || 0,
-    fee:      r.fee      || '0',
-    orderId:  r.order_id || r.orderId  || '',
-    mode:     r.mode     || '',
-    notes:    r.notes || r.strategy   || '',
+    rr:         parseFloat(r.rr || r.rr1) || null,
+    totalUsd:   parseFloat(r.total_usd)  || 0,
+    fee:        r.fee      || '0',
+    orderId:    r.order_id || r.orderId  || '',
+    mode:       r.mode     || '',
+    notes:      r.notes || r.strategy   || '',
   }));
 }
 
@@ -300,47 +300,60 @@ function pnlCell(pnlResult) {
   return `<td style="color:${color};font-weight:600">${sign}$${Math.abs(pnl).toFixed(2)}</td>`;
 }
 
-function buildTradeSection(trades, safetyLog, livePrices = {}) {
+// ── Build all trade data — returns structured object for HTML generation ──────
+
+function buildTradeData(trades, safetyLog, livePrices = {}) {
   const today       = new Date().toISOString().slice(0, 10);
   const todayTrades = trades.filter(t => t.date === today);
   const todayChecks = safetyLog.filter(e => e.timestamp?.startsWith(today));
   const passed      = todayChecks.filter(e => e.passed).length;
   const failed      = todayChecks.filter(e => !e.passed).length;
 
-  // ── P&L for every trade (chronological order for cumulative calc) ──────────
+  // Category lookup — strip USDT suffix and check against watchlist
+  const watchlistCat = {};
+  WATCHLIST.forEach(w => { watchlistCat[w.token.toUpperCase()] = w.category; });
+  const getCategory = (symbol) => watchlistCat[symbol.replace(/USDT$/, '').toUpperCase()] || 'crypto';
+
+  // P&L for every trade (in chronological order for cumulative running total)
   let cumulative = 0;
   let totalPnl   = 0;
   let wins = 0, losses = 0, bestTrade = 0, worstTrade = 0;
 
   const tradesWithPnl = trades.map(t => {
-    const result = calcTradePnl(t, safetyLog, livePrices);
-    let tradeP   = null;
+    const result   = calcTradePnl(t, safetyLog, livePrices);
+    let tradePnl   = null;
+    let cumPnl     = null;
     if (result !== null) {
-      tradeP      = result.pnl;
+      tradePnl    = result.pnl;
       cumulative += result.pnl;
+      cumPnl      = cumulative;
       totalPnl   += result.pnl;
-      if (result.pnl >= 0) wins++;   else losses++;
+      if (result.pnl >= 0) wins++; else losses++;
       if (result.pnl > bestTrade)  bestTrade  = result.pnl;
       if (result.pnl < worstTrade) worstTrade = result.pnl;
     }
-    return { ...t, tradePnl: tradeP, cumulativePnl: result !== null ? cumulative : null, currentPrice: result?.currentPrice };
+    return {
+      ...t,
+      tradePnl,
+      cumPnl,
+      currentPrice: result?.currentPrice,
+      category:     getCategory(t.symbol),
+      month:        t.date ? t.date.slice(0, 7) : '',
+      token:        t.symbol.replace(/USDT$/, ''),
+    };
   });
 
-  // Today's P&L subset
-  const todayPnl  = tradesWithPnl
-    .filter(t => t.date === today && t.tradePnl !== null)
-    .reduce((s, t) => s + t.tradePnl, 0);
+  // Today's subset
+  const todayPnl  = tradesWithPnl.filter(t => t.date === today && t.tradePnl !== null).reduce((s, t) => s + t.tradePnl, 0);
   const todayWins = tradesWithPnl.filter(t => t.date === today && t.tradePnl !== null && t.tradePnl >= 0).length;
   const todayLoss = tradesWithPnl.filter(t => t.date === today && t.tradePnl !== null && t.tradePnl < 0).length;
   const winRate   = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
-  // All-time stats
   const totalVolume = trades.reduce((s, t) => s + (t.totalUsd || 0), 0);
-  const totalFees   = trades.reduce((s, t) => s + (parseFloat(t.fee) || 0), 0);
   const paperCount  = trades.filter(t => t.mode === 'paper').length;
   const liveCount   = trades.filter(t => t.mode === 'live').length;
 
-  // By symbol breakdown (with P&L)
+  // By symbol
   const bySymbol = {};
   tradesWithPnl.forEach(t => {
     if (!bySymbol[t.symbol]) bySymbol[t.symbol] = { count: 0, volume: 0, longs: 0, shorts: 0, pnl: 0, hasPnl: false };
@@ -351,7 +364,7 @@ function buildTradeSection(trades, safetyLog, livePrices = {}) {
     if (t.tradePnl !== null) { bySymbol[t.symbol].pnl += t.tradePnl; bySymbol[t.symbol].hasPnl = true; }
   });
 
-  // Recommendations based on failed checks
+  // Fail reason recommendations
   const failReasons = {};
   todayChecks.filter(e => !e.passed).forEach(e => {
     (e.reasons || []).forEach(r => { failReasons[r] = (failReasons[r] || 0) + 1; });
@@ -360,15 +373,15 @@ function buildTradeSection(trades, safetyLog, livePrices = {}) {
     .sort((a, b) => b[1] - a[1])
     .map(([reason, count]) => {
       let tip = '';
-      if (reason.includes('VWAP'))          tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
-      else if (reason.includes('trending')) tip = 'Market is trending — Ironclad swing strategy will handle this. VWAP scalper correctly sitting out';
-      else if (reason.includes('RSI'))      tip = 'RSI3 is staying mid-range — market may be consolidating. Consider sitting out until a clear reversal signal';
+      if (reason.includes('VWAP'))           tip = 'Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions';
+      else if (reason.includes('trending'))  tip = 'Market is trending — Ironclad swing strategy will handle this. VWAP scalper correctly sitting out';
+      else if (reason.includes('RSI'))       tip = 'RSI3 is staying mid-range — market may be consolidating. Consider sitting out until a clear reversal signal';
       else if (reason.includes('directional')) tip = 'No clear signal detected — market may be choppy. This is correct behaviour';
-      else tip = 'Review strategy conditions — this rule is blocking most trades';
-      return `<li><strong>${reason}</strong> (${count}× today)<br><span class="tip">💡 ${tip}</span></li>`;
-    }).join('');
+      else                                   tip = 'Review strategy conditions — this rule is blocking most trades';
+      return { reason, count, tip };
+    });
 
-  // Today's trade rows (with P&L)
+  // Today's trade rows (HTML) for the quick widget on Tab 1
   const todayTradeRows = todayTrades.length === 0
     ? '<tr><td colspan="8" style="text-align:center;color:#8b949e;padding:20px">No trades executed today</td></tr>'
     : tradesWithPnl.filter(t => t.date === today).map(t => {
@@ -387,113 +400,37 @@ function buildTradeSection(trades, safetyLog, livePrices = {}) {
         </tr>`;
       }).join('');
 
-  // All trades history — most recent first, with P&L and cumulative
-  const recentTrades = [...tradesWithPnl].reverse().slice(0, 50);
-  const allTradeRows = recentTrades.length === 0
-    ? '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">No trades recorded yet — bot is running in safety-check mode</td></tr>'
-    : recentTrades.map(t => {
-        const modeLabel = t.mode === 'paper'
-          ? '<span style="color:#d29922">📄 Paper</span>'
-          : '<span style="color:#3fb950">💰 Live</span>';
-        const cumColor  = t.cumulativePnl === null ? '#484f58' : t.cumulativePnl >= 0 ? '#3fb950' : '#f85149';
-        const cumLabel  = t.cumulativePnl === null ? '—' : `${t.cumulativePnl >= 0 ? '+' : ''}$${Math.abs(t.cumulativePnl).toFixed(2)}`;
-        return `<tr>
-          <td>${t.date}</td>
-          <td>${t.time}</td>
-          <td>${t.symbol}</td>
-          <td>${t.side === 'long' ? '🟢 Long' : '🔴 Short'}</td>
-          <td>$${t.price?.toFixed(2)}</td>
-          <td>${t.currentPrice ? '$' + t.currentPrice.toFixed(2) : '—'}</td>
-          <td>${t.quantity}</td>
-          ${pnlCell(t.tradePnl !== null ? { pnl: t.tradePnl } : null)}
-          <td style="color:${cumColor};font-weight:600">${cumLabel}</td>
-          <td>${modeLabel}</td>
-        </tr>`;
-      }).join('');
-
-  // Symbol breakdown rows (with P&L)
-  const symbolRows = Object.entries(bySymbol)
-    .sort((a, b) => b[1].count - a[1].count)
-    .map(([sym, d]) => {
-      const pnlColor = d.pnl >= 0 ? '#3fb950' : '#f85149';
-      const pnlStr   = d.hasPnl ? `<span style="color:${pnlColor}">${d.pnl >= 0 ? '+' : ''}$${Math.abs(d.pnl).toFixed(2)}</span>` : '—';
-      return `<tr>
-        <td>${sym}</td>
-        <td>${d.count}</td>
-        <td>${d.longs}</td>
-        <td>${d.shorts}</td>
-        <td>$${d.volume.toFixed(2)}</td>
-        <td>${pnlStr}</td>
-      </tr>`;
-    }).join('');
-
-  // Summary colour helpers
-  const todayPnlColor = todayPnl >= 0 ? '#3fb950' : '#f85149';
-  const totalPnlColor = totalPnl >= 0 ? '#3fb950' : '#f85149';
-  const bestColor     = '#3fb950';
-  const worstColor    = '#f85149';
-
-  return `
-  <!-- ── Today's Activity ── -->
-  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
-
-  <div class="stats">
-    <div class="stat"><div class="num" style="color:#3fb950">${passed}</div><div class="label">Checks Passed</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">${failed}</div><div class="label">Checks Failed</div></div>
-    <div class="stat"><div class="num" style="color:#58a6ff">${todayTrades.length}</div><div class="label">Trades Today</div></div>
-    <div class="stat"><div class="num" style="color:${todayPnlColor}">${todayPnl >= 0 ? '+' : ''}$${Math.abs(todayPnl).toFixed(2)}</div><div class="label">Today's P&L (est.)</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">${todayWins}</div><div class="label">Wins Today</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">${todayLoss}</div><div class="label">Losses Today</div></div>
-  </div>
-
-  <table style="margin-bottom:24px">
-    <thead>
-      <tr>
-        <th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Mode</th>
-      </tr>
-    </thead>
-    <tbody>${todayTradeRows}</tbody>
-  </table>
-
-  ${recommendations ? `
-  <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">💡 Why Checks Are Failing</h2>
-  <div class="summary">
-    <ul style="padding-left:20px;line-height:2">${recommendations}</ul>
-  </div>` : ''}
-
-  <!-- ── All-Time Summary ── -->
-  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Trade Summary</h2>
-
-  <div class="stats">
-    <div class="stat"><div class="num" style="color:#58a6ff">${trades.length}</div><div class="label">Total Trades</div></div>
-    <div class="stat"><div class="num" style="color:${totalPnlColor}">${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}</div><div class="label">Total P&amp;L (est.)</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">${wins}</div><div class="label">Wins</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">${losses}</div><div class="label">Losses</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">${winRate}%</div><div class="label">Win Rate</div></div>
-    <div class="stat"><div class="num" style="color:${bestColor}">+$${Math.abs(bestTrade).toFixed(2)}</div><div class="label">Best Trade</div></div>
-    <div class="stat"><div class="num" style="color:${worstColor}">-$${Math.abs(worstTrade).toFixed(2)}</div><div class="label">Worst Trade</div></div>
-    <div class="stat"><div class="num" style="color:#d29922">${paperCount}</div><div class="label">Paper</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">${liveCount}</div><div class="label">Live</div></div>
-  </div>
-
-  ${Object.keys(bySymbol).length > 0 ? `
-  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
-  <table style="margin-bottom:24px">
-    <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th><th>P&amp;L (est.)</th></tr></thead>
-    <tbody>${symbolRows}</tbody>
-  </table>` : ''}
-
-  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Recent Trade Log ${trades.length > 50 ? '(last 50)' : ''}</h3>
-  <table style="margin-bottom:24px">
-    <thead>
-      <tr>
-        <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
-      </tr>
-    </thead>
-    <tbody>${allTradeRows}</tbody>
-  </table>`;
+  return {
+    today: {
+      passed, failed,
+      tradeCount: todayTrades.length,
+      pnl: todayPnl, wins: todayWins, losses: todayLoss,
+      tradeRows: todayTradeRows,
+    },
+    allTime: {
+      total: trades.length, pnl: totalPnl, wins, losses, winRate,
+      bestTrade, worstTrade, volume: totalVolume, paper: paperCount, live: liveCount,
+    },
+    bySymbol,
+    recommendations,
+    // JSON array embedded in HTML for client-side filtering + pagination
+    tradesJson: tradesWithPnl.map(t => ({
+      date:     t.date,
+      time:     t.time,
+      symbol:   t.symbol,
+      token:    t.token,
+      category: t.category,
+      month:    t.month,
+      side:     t.side,
+      entry:    t.price     || null,
+      current:  t.currentPrice || null,
+      qty:      t.quantity,
+      pnl:      t.tradePnl,
+      cumPnl:   t.cumPnl,
+      mode:     t.mode,
+      strategy: t.notes || '',
+    })),
+  };
 }
 
 // ── Fetch available BitGet futures pairs ──────────────────────────────────────
@@ -563,9 +500,7 @@ Rules:
     },
     body: JSON.stringify({
       model:    'sonar-pro',
-      messages: [
-        { role: 'user', content: prompt }
-      ],
+      messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
     }),
   });
@@ -573,7 +508,6 @@ Rules:
   const json    = await res.json();
   const content = json.choices?.[0]?.message?.content || '';
 
-  // Extract JSON from response
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) throw new Error(`Could not parse Perplexity response: ${content.slice(0, 200)}`);
   return JSON.parse(match[0]);
@@ -598,8 +532,11 @@ function categoryBadge(cat) {
   return map[cat] || '📊';
 }
 
-function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
-  // Watchlist rows — always shown, pinned at top
+function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
+  const td = tradeData.today;
+  const at = tradeData.allTime;
+
+  // ── Watchlist rows (pinned, always shown) ──────────────────────────────────
   const watchlistTokens = new Set(WATCHLIST.map(w => w.token.toUpperCase()));
   const watchlistSignals = WATCHLIST.map(w => {
     const found    = signals.find(s => s.token.toUpperCase() === w.token.toUpperCase());
@@ -620,7 +557,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
       </tr>`;
   }).join('');
 
-  // Main signal rows — exclude tokens already in watchlist
+  // ── Additional signal rows (non-watchlist) ─────────────────────────────────
   const rows = signals
     .filter(s => !watchlistTokens.has(s.token.toUpperCase()))
     .map(s => {
@@ -642,17 +579,53 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
       </tr>`;
     }).join('');
 
-  const bulls   = signals.filter(s => s.signal === 'bull').length;
-  const bears   = signals.filter(s => s.signal === 'bear').length;
-  const neutral = signals.filter(s => s.signal === 'neutral').length;
+  const bulls    = signals.filter(s => s.signal === 'bull').length;
+  const bears    = signals.filter(s => s.signal === 'bear').length;
+  const neutral  = signals.filter(s => s.signal === 'neutral').length;
   const tradable = signals.filter(s => bitgetPairs.has(s.token.toUpperCase())).length;
+
+  // ── Today's P&L colour ─────────────────────────────────────────────────────
+  const todayPnlColor  = td.pnl  >= 0 ? '#3fb950' : '#f85149';
+  const totalPnlColor  = at.pnl  >= 0 ? '#3fb950' : '#f85149';
+
+  // ── Recommendations HTML ───────────────────────────────────────────────────
+  const recommendationsHtml = tradeData.recommendations.length ? `
+  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">💡 Why Checks Are Failing</h2>
+  <div class="summary">
+    <ul style="padding-left:20px;line-height:2">
+      ${tradeData.recommendations.map(r =>
+        `<li><strong>${r.reason}</strong> (${r.count}× today)<br><span class="tip">💡 ${r.tip}</span></li>`
+      ).join('')}
+    </ul>
+  </div>` : '';
+
+  // ── By-symbol table rows ───────────────────────────────────────────────────
+  const symbolRows = Object.entries(tradeData.bySymbol)
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([sym, d]) => {
+      const pnlColor = d.pnl >= 0 ? '#3fb950' : '#f85149';
+      const pnlStr   = d.hasPnl
+        ? `<span style="color:${pnlColor}">${d.pnl >= 0 ? '+' : ''}$${Math.abs(d.pnl).toFixed(2)}</span>`
+        : '—';
+      return `<tr>
+        <td>${sym}</td>
+        <td>${d.count}</td>
+        <td>${d.longs}</td>
+        <td>${d.shorts}</td>
+        <td>$${d.volume.toFixed(2)}</td>
+        <td>${pnlStr}</td>
+      </tr>`;
+    }).join('');
+
+  // ── Embedded trade JSON for client-side filtering ──────────────────────────
+  const tradesJsonStr = JSON.stringify(tradeData.tradesJson);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Market Research — ${date}</title>
+  <title>Trading Dashboard — ${date}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -665,12 +638,39 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid #30363d;
     }
     h1 { font-size: 22px; font-weight: 600; }
     .date { color: #8b949e; font-size: 14px; }
+
+    /* ── Tab navigation ── */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 20px;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover  { color: #e6edf3; }
+    .tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Shared components ── */
     .summary {
       background: #161b22;
       border: 1px solid #30363d;
@@ -694,12 +694,8 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
       text-align: center;
       min-width: 100px;
     }
-    .stat .num { font-size: 28px; font-weight: 700; }
+    .stat .num   { font-size: 28px; font-weight: 700; }
     .stat .label { font-size: 12px; color: #8b949e; margin-top: 4px; }
-    .bull-num  { color: #3fb950; }
-    .bear-num  { color: #f85149; }
-    .neu-num   { color: #d29922; }
-    .trade-num { color: #58a6ff; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -746,7 +742,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
     .risk.low    { background: #1a4a2e; color: #3fb950; }
     .risk.medium { background: #3d3100; color: #d29922; }
     .risk.high   { background: #4a1a1a; color: #f85149; }
-    .tradable { font-size: 13px; }
+    .tradable     { font-size: 13px; }
     .tradable.yes { color: #3fb950; }
     .tradable.no  { color: #f85149; }
     .reason { color: #8b949e; font-size: 13px; max-width: 280px; }
@@ -754,8 +750,74 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
     .watchlist-row td { background: #1a1f2e; border-left: 3px solid #58a6ff; }
     .watchlist-row:hover td { background: #1f2535; }
     .tip { color: #8b949e; font-size: 13px; font-weight: 400; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .filter-bar label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .filter-bar select {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 6px 10px;
+      cursor: pointer;
+      min-width: 130px;
+    }
+    .filter-bar select:focus { outline: none; border-color: #58a6ff; }
+    .btn-reset {
+      background: none;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 6px 12px;
+      margin-left: auto;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-reset:hover { color: #e6edf3; border-color: #58a6ff; }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+    .pagination button {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      cursor: pointer;
+      font-size: 13px;
+      min-width: 36px;
+      padding: 5px 10px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pagination button:hover:not(:disabled) { background: #21262d; border-color: #58a6ff; }
+    .pagination button.active { background: #1f4477; border-color: #58a6ff; color: #58a6ff; font-weight: 600; }
+    .pagination button:disabled { color: #484f58; cursor: default; }
+    .pagination .ellipsis { color: #484f58; padding: 0 4px; }
+    .pagination .page-info { color: #8b949e; font-size: 12px; margin-left: 8px; }
+
     footer {
-      margin-top: 24px;
+      margin-top: 32px;
       text-align: center;
       color: #484f58;
       font-size: 12px;
@@ -765,41 +827,286 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeSection) {
 <body>
   <header>
     <div>
-      <h1>📊 Daily Market Research</h1>
+      <h1>📊 Trading Dashboard</h1>
       <div class="date">Generated ${date} · Powered by Perplexity Sonar Pro</div>
     </div>
     <div class="date">⏱ Updated 9am &amp; 6pm UK time daily</div>
   </header>
 
-  <div class="summary">${summary}</div>
+  <!-- ── Tab Navigation ── -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="research">📊 Market Research</button>
+    <button class="tab-btn"        data-tab="history">📈 Trade History</button>
+  </nav>
 
-  <div class="stats">
-    <div class="stat"><div class="num bull-num">${bulls}</div><div class="label">Bullish</div></div>
-    <div class="stat"><div class="num bear-num">${bears}</div><div class="label">Bearish</div></div>
-    <div class="stat"><div class="num neu-num">${neutral}</div><div class="label">Neutral</div></div>
-    <div class="stat"><div class="num trade-num">${tradable}</div><div class="label">On BitGet</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">${signals.length}</div><div class="label">Total Signals</div></div>
-  </div>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1 — Market Research                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-research" class="tab-pane active">
 
-  <table>
-    <thead>
-      <tr>
-        <th>Token</th>
-        <th>Name</th>
-        <th>BitGet Pair</th>
-        <th>Signal</th>
-        <th>Risk</th>
-        <th>BitGet</th>
-        <th>Reason</th>
-        <th>Source</th>
-      </tr>
-    </thead>
-    <tbody>${watchlistSignals}${rows}</tbody>
-  </table>
+    <div class="summary">${summary}</div>
 
-  ${tradeSection}
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#3fb950">${bulls}</div><div class="label">Bullish</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">${bears}</div><div class="label">Bearish</div></div>
+      <div class="stat"><div class="num" style="color:#d29922">${neutral}</div><div class="label">Neutral</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">${tradable}</div><div class="label">On BitGet</div></div>
+      <div class="stat"><div class="num" style="color:#e6edf3">${signals.length}</div><div class="label">Total Signals</div></div>
+    </div>
+
+    <table style="margin-bottom:32px">
+      <thead>
+        <tr>
+          <th>Token</th><th>Name</th><th>BitGet Pair</th>
+          <th>Signal</th><th>Risk</th><th>BitGet</th><th>Reason</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody>${watchlistSignals}${rows}</tbody>
+    </table>
+
+    <!-- Today's Bot Activity widget -->
+    <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#3fb950">${td.passed}</div><div class="label">Checks Passed</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">${td.failed}</div><div class="label">Checks Failed</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">${td.tradeCount}</div><div class="label">Trades Today</div></div>
+      <div class="stat"><div class="num" style="color:${todayPnlColor}">${td.pnl >= 0 ? '+' : ''}$${Math.abs(td.pnl).toFixed(2)}</div><div class="label">Today's P&amp;L (est.)</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">${td.wins}</div><div class="label">Wins Today</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">${td.losses}</div><div class="label">Losses Today</div></div>
+    </div>
+
+    <table style="margin-bottom:24px">
+      <thead>
+        <tr>
+          <th>Time</th><th>Symbol</th><th>Side</th>
+          <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Mode</th>
+        </tr>
+      </thead>
+      <tbody>${td.tradeRows}</tbody>
+    </table>
+
+    ${recommendationsHtml}
+
+  </div><!-- /tab-research -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 2 — Trade History                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-history" class="tab-pane">
+
+    <!-- All-time summary stats -->
+    <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Performance</h2>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#58a6ff">${at.total}</div><div class="label">Total Trades</div></div>
+      <div class="stat"><div class="num" style="color:${totalPnlColor}">${at.pnl >= 0 ? '+' : ''}$${Math.abs(at.pnl).toFixed(2)}</div><div class="label">Total P&amp;L (est.)</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">${at.wins}</div><div class="label">Wins</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">${at.losses}</div><div class="label">Losses</div></div>
+      <div class="stat"><div class="num" style="color:#e6edf3">${at.winRate}%</div><div class="label">Win Rate</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">+$${Math.abs(at.bestTrade).toFixed(2)}</div><div class="label">Best Trade</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">-$${Math.abs(at.worstTrade).toFixed(2)}</div><div class="label">Worst Trade</div></div>
+      <div class="stat"><div class="num" style="color:#d29922">${at.paper}</div><div class="label">Paper</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">${at.live}</div><div class="label">Live</div></div>
+    </div>
+
+    ${Object.keys(tradeData.bySymbol).length > 0 ? `
+    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
+    <table style="margin-bottom:32px">
+      <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th><th>P&amp;L (est.)</th></tr></thead>
+      <tbody>${symbolRows}</tbody>
+    </table>` : ''}
+
+    <!-- Filter bar -->
+    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Trade Log</h3>
+
+    <div class="filter-bar">
+      <label>Pair</label>
+      <select id="filter-pair" onchange="onFilterChange()"><option value="">All Pairs</option></select>
+
+      <label>Month</label>
+      <select id="filter-month" onchange="onFilterChange()"><option value="">All Months</option></select>
+
+      <label>Category</label>
+      <select id="filter-category" onchange="onFilterChange()"><option value="">All Categories</option></select>
+
+      <label>Strategy</label>
+      <select id="filter-strategy" onchange="onFilterChange()"><option value="">All Strategies</option></select>
+
+      <label>Mode</label>
+      <select id="filter-mode" onchange="onFilterChange()">
+        <option value="">All Modes</option>
+        <option value="paper">Paper</option>
+        <option value="live">Live</option>
+      </select>
+
+      <button class="btn-reset" onclick="resetFilters()">✕ Reset</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+          <th>Entry</th><th>Current</th><th>Qty</th>
+          <th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div id="pagination"></div>
+
+  </div><!-- /tab-history -->
 
   <footer>Data sourced from public trader commentary · Not financial advice · Paper trading mode active</footer>
+
+  <script>
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ── Trade data (embedded at build time) ───────────────────────────────────
+    const TRADES = ${tradesJsonStr};
+
+    // ── Pagination state ──────────────────────────────────────────────────────
+    const PAGE_SIZE = 25;
+    let currentPage = 1;
+
+    // ── Populate filter dropdowns from data ───────────────────────────────────
+    function populateSelect(id, values, labelFn) {
+      const sel = document.getElementById(id);
+      const existing = sel.querySelector('option[value=""]');
+      const placeholder = existing ? existing.textContent : '';
+      sel.innerHTML = '<option value="">' + placeholder + '</option>' +
+        [...values].sort().map(v => '<option value="' + v + '">' + (labelFn ? labelFn(v) : v) + '</option>').join('');
+    }
+
+    const catLabel = { crypto: '🪙 Crypto', stock: '📈 Stock', forex: '💱 Forex', commodity: '🛢️ Commodity' };
+
+    populateSelect('filter-pair',     new Set(TRADES.map(t => t.symbol)));
+    populateSelect('filter-month',    [...new Set(TRADES.map(t => t.month))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
+    populateSelect('filter-category', new Set(TRADES.map(t => t.category)), v => catLabel[v] || v);
+    populateSelect('filter-strategy', new Set(TRADES.map(t => t.strategy).filter(Boolean)));
+
+    // ── Filtering logic ───────────────────────────────────────────────────────
+    function getFiltered() {
+      const pair     = document.getElementById('filter-pair').value;
+      const month    = document.getElementById('filter-month').value;
+      const category = document.getElementById('filter-category').value;
+      const strategy = document.getElementById('filter-strategy').value;
+      const mode     = document.getElementById('filter-mode').value;
+
+      // Most recent first
+      return [...TRADES].reverse().filter(t => {
+        if (pair     && t.symbol   !== pair)     return false;
+        if (month    && t.month    !== month)    return false;
+        if (category && t.category !== category) return false;
+        if (strategy && t.strategy !== strategy) return false;
+        if (mode     && t.mode     !== mode)     return false;
+        return true;
+      });
+    }
+
+    // ── Render helpers ────────────────────────────────────────────────────────
+    function fmtPnl(val) {
+      if (val === null || val === undefined) return '<span style="color:#484f58">—</span>';
+      const color = val >= 0 ? '#3fb950' : '#f85149';
+      const sign  = val >= 0 ? '+' : '';
+      return '<span style="color:' + color + ';font-weight:600">' + sign + '$' + Math.abs(val).toFixed(2) + '</span>';
+    }
+
+    const catIcon = { crypto: '🪙', stock: '📈', forex: '💱', commodity: '🛢️' };
+
+    // ── Render table for current page ─────────────────────────────────────────
+    function renderTable() {
+      const filtered = getFiltered();
+      const total    = filtered.length;
+      const pages    = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      if (currentPage > pages) currentPage = pages;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const page  = filtered.slice(start, start + PAGE_SIZE);
+      const tbody = document.getElementById('history-tbody');
+
+      if (page.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+      } else {
+        tbody.innerHTML = page.map(t => {
+          const modeLabel = t.mode === 'paper'
+            ? '<span style="color:#d29922">📄 Paper</span>'
+            : '<span style="color:#3fb950">💰 Live</span>';
+          return '<tr>' +
+            '<td>' + t.date + '</td>' +
+            '<td>' + t.time + '</td>' +
+            '<td>' + (catIcon[t.category] || '📊') + ' ' + t.symbol + '</td>' +
+            '<td>' + (t.side === 'long' ? '🟢 Long' : '🔴 Short') + '</td>' +
+            '<td>' + (t.entry   ? '$' + t.entry.toFixed(2)   : '—') + '</td>' +
+            '<td>' + (t.current ? '$' + t.current.toFixed(2) : '—') + '</td>' +
+            '<td>' + t.qty + '</td>' +
+            '<td>' + fmtPnl(t.pnl)    + '</td>' +
+            '<td>' + fmtPnl(t.cumPnl) + '</td>' +
+            '<td>' + modeLabel + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      renderPagination(pages, total);
+    }
+
+    // ── Pagination controls ───────────────────────────────────────────────────
+    function renderPagination(pages, total) {
+      const el = document.getElementById('pagination');
+      if (pages <= 1) { el.innerHTML = ''; return; }
+
+      let html = '<div class="pagination">';
+      html += '<button onclick="goPage(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+
+      for (let i = 1; i <= pages; i++) {
+        if (i === 1 || i === pages || Math.abs(i - currentPage) <= 2) {
+          html += '<button onclick="goPage(' + i + ')"' + (i === currentPage ? ' class="active"' : '') + '>' + i + '</button>';
+        } else if (Math.abs(i - currentPage) === 3) {
+          html += '<span class="ellipsis">…</span>';
+        }
+      }
+
+      html += '<button onclick="goPage(' + (currentPage + 1) + ')"' + (currentPage >= pages ? ' disabled' : '') + '>Next →</button>';
+      html += '<span class="page-info">Page ' + currentPage + ' of ' + pages + ' · ' + total + ' trades</span>';
+      html += '</div>';
+
+      el.innerHTML = html;
+    }
+
+    function goPage(p) {
+      const filtered = getFiltered();
+      const pages    = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      currentPage    = Math.max(1, Math.min(p, pages));
+      renderTable();
+      document.querySelector('table').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function onFilterChange() {
+      currentPage = 1;
+      renderTable();
+    }
+
+    function resetFilters() {
+      ['filter-pair','filter-month','filter-category','filter-strategy','filter-mode']
+        .forEach(id => { document.getElementById(id).value = ''; });
+      currentPage = 1;
+      renderTable();
+    }
+
+    // Initial render
+    renderTable();
+  </script>
 </body>
 </html>`;
 }
@@ -855,13 +1162,13 @@ async function run() {
   const trades    = readTrades();
   const safetyLog = readSafetyLog();
 
-  // Fetch live prices for every symbol we've ever traded — gives accurate P&L
-  // for all historical trades, not just ones with recent safety log entries
+  // Fetch live prices for every symbol we've ever traded
   const tradedSymbols = [...new Set(trades.map(t => t.symbol).filter(Boolean))];
   const livePrices    = await fetchLivePrices(tradedSymbols);
   console.log(`Live prices fetched for: ${Object.keys(livePrices).join(', ') || 'none'}`);
 
-  const tradeSection = buildTradeSection(trades, safetyLog, livePrices);
+  // Build structured trade data (stats + JSON for client-side filtering)
+  const tradeData = buildTradeData(trades, safetyLog, livePrices);
 
   // Save machine-readable signal file for the trading bots to read
   const signalFile = {
@@ -872,8 +1179,8 @@ async function run() {
       token:         s.token?.toUpperCase(),
       name:          s.name,
       category:      s.category,
-      signal:        s.signal,        // bull / bear / neutral
-      risk:          s.risk,          // low / medium / high
+      signal:        s.signal,
+      risk:          s.risk,
       reason:        s.reason,
       source:        s.source,
       price_level:   s.price_level   || null,
@@ -886,7 +1193,7 @@ async function run() {
 
   // Generate and save HTML dashboard
   if (!fs.existsSync('./docs')) fs.mkdirSync('./docs');
-  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeSection);
+  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeData);
   fs.writeFileSync('./docs/index.html', html);
   console.log(`\nDashboard saved to docs/index.html`);
 }
