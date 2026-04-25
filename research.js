@@ -129,18 +129,28 @@ async function fetchYouTubeTranscript(videoId) {
 }
 
 async function fetchDegenDaveTranscript() {
-  const videos  = await fetchLatestChartHackersVideos();
-  const results = [];
+  const videos       = await fetchLatestChartHackersVideos();
+  const withTranscript = [];
+  const titleOnly      = [];
 
   for (const video of videos) {
     try {
       console.log(`Fetching transcript: ${video.title} (${video.id})...`);
       const fullText = await fetchYouTubeTranscript(video.id);
-      results.push({ ...video, transcript: fullText.slice(0, 8000) }); // Cap at 8k chars
+      withTranscript.push({ ...video, transcript: fullText.slice(0, 8000), titleOnly: false });
       console.log(`  Got ${fullText.length} chars of transcript`);
     } catch (err) {
-      console.log(`  Could not fetch transcript for ${video.id}: ${err.message}`);
+      console.log(`  No transcript for ${video.id} (${err.message}) — will use title`);
+      titleOnly.push({ ...video, transcript: null, titleOnly: true });
     }
+  }
+
+  // For videos where we only have the title, group them and let Perplexity
+  // search for what DegenDave said, guided by the title as context.
+  const results = [...withTranscript];
+  if (titleOnly.length) {
+    console.log(`  ${titleOnly.length} video(s) without transcript — using title-based analysis`);
+    results.push(...titleOnly);
   }
 
   return results;
@@ -148,11 +158,25 @@ async function fetchDegenDaveTranscript() {
 
 async function analyseDegenDaveTranscript(videos) {
   if (!videos.length) return [];
-  const combined = videos.map(v => `Video: ${v.title}\nDate: ${v.date}\n\n${v.transcript}`).join('\n\n---\n\n');
 
-  const prompt = `You are a crypto trading analyst. Below are transcripts from DegenDave (X: @DavidSendsIt) who appears on the ChartHackers YouTube channel. He is well respected for chart reading and swing trade analysis.
+  // Separate full transcripts from title-only videos
+  const fullVideos  = videos.filter(v => !v.titleOnly);
+  const titleVideos = videos.filter(v => v.titleOnly);
 
-Analyse these transcripts and extract every crypto token or coin he mentions with a clear view on it.
+  // For title-only videos, use Perplexity to search for what DegenDave discussed
+  // in that video based on the title — better than nothing
+  const titleContext = titleVideos.length
+    ? `\n\nNote: For the following videos only the title is available (captions unavailable). Use your knowledge of DegenDave's style and the title to infer likely setups, or search for community discussion of these videos:\n` +
+      titleVideos.map(v => `- [${v.date}] "${v.title}"`).join('\n')
+    : '';
+
+  const combined = fullVideos.length
+    ? fullVideos.map(v => `Video: ${v.title}\nDate: ${v.date}\n\n${v.transcript}`).join('\n\n---\n\n')
+    : '(No transcripts available — analyse based on video titles only)';
+
+  const prompt = `You are a crypto trading analyst with access to real-time search. DegenDave (X: @DavidSendsIt) appears on the ChartHackers YouTube channel and is well respected for chart reading and swing trade analysis.
+
+Analyse the content below and extract every crypto token or coin DegenDave mentions with a clear directional view. Where transcripts are unavailable, use Perplexity's real-time search to find community discussion of those videos (Reddit, Twitter/X, YouTube comments) to infer his views from the video title and date.${titleContext}
 
 Return ONLY valid JSON, no other text:
 {
