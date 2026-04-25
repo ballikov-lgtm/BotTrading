@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Market Research — Friday, 24 April 2026</title>
+  <title>Trading Dashboard — Saturday, 25 April 2026</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -16,12 +16,39 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid #30363d;
     }
     h1 { font-size: 22px; font-weight: 600; }
     .date { color: #8b949e; font-size: 14px; }
+
+    /* ── Tab navigation ── */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 20px;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover  { color: #e6edf3; }
+    .tab-btn.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Shared components ── */
     .summary {
       background: #161b22;
       border: 1px solid #30363d;
@@ -45,12 +72,8 @@
       text-align: center;
       min-width: 100px;
     }
-    .stat .num { font-size: 28px; font-weight: 700; }
+    .stat .num   { font-size: 28px; font-weight: 700; }
     .stat .label { font-size: 12px; color: #8b949e; margin-top: 4px; }
-    .bull-num  { color: #3fb950; }
-    .bear-num  { color: #f85149; }
-    .neu-num   { color: #d29922; }
-    .trade-num { color: #58a6ff; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -97,7 +120,7 @@
     .risk.low    { background: #1a4a2e; color: #3fb950; }
     .risk.medium { background: #3d3100; color: #d29922; }
     .risk.high   { background: #4a1a1a; color: #f85149; }
-    .tradable { font-size: 13px; }
+    .tradable     { font-size: 13px; }
     .tradable.yes { color: #3fb950; }
     .tradable.no  { color: #f85149; }
     .reason { color: #8b949e; font-size: 13px; max-width: 280px; }
@@ -105,8 +128,74 @@
     .watchlist-row td { background: #1a1f2e; border-left: 3px solid #58a6ff; }
     .watchlist-row:hover td { background: #1f2535; }
     .tip { color: #8b949e; font-size: 13px; font-weight: 400; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .filter-bar label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .filter-bar select {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 6px 10px;
+      cursor: pointer;
+      min-width: 130px;
+    }
+    .filter-bar select:focus { outline: none; border-color: #58a6ff; }
+    .btn-reset {
+      background: none;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 6px 12px;
+      margin-left: auto;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-reset:hover { color: #e6edf3; border-color: #58a6ff; }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+    .pagination button {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      cursor: pointer;
+      font-size: 13px;
+      min-width: 36px;
+      padding: 5px 10px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pagination button:hover:not(:disabled) { background: #21262d; border-color: #58a6ff; }
+    .pagination button.active { background: #1f4477; border-color: #58a6ff; color: #58a6ff; font-weight: 600; }
+    .pagination button:disabled { color: #484f58; cursor: default; }
+    .pagination .ellipsis { color: #484f58; padding: 0 4px; }
+    .pagination .page-info { color: #8b949e; font-size: 12px; margin-left: 8px; }
+
     footer {
-      margin-top: 24px;
+      margin-top: 32px;
       text-align: center;
       color: #484f58;
       font-size: 12px;
@@ -116,45 +205,50 @@
 <body>
   <header>
     <div>
-      <h1>📊 Daily Market Research</h1>
-      <div class="date">Generated Friday, 24 April 2026 · Powered by Perplexity Sonar Pro</div>
+      <h1>📊 Trading Dashboard</h1>
+      <div class="date">Generated Saturday, 25 April 2026 · Powered by Perplexity Sonar Pro</div>
     </div>
     <div class="date">⏱ Updated 9am &amp; 6pm UK time daily</div>
   </header>
 
-  <div class="summary">Markets show mixed sentiment on April 24, 2026, with crypto pausing after recent gains and gold maintaining strength near highs amid technical supply zones. Forex pairs exhibit neutral-to-bearish biases, while commodities like Brent lean bearish under pressure. Overall volatility persists due to geopolitical risks and upcoming economic data.</div>
+  <!-- ── Tab Navigation ── -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="research">📊 Market Research</button>
+    <button class="tab-btn"        data-tab="history">📈 Trade History</button>
+  </nav>
 
-  <div class="stats">
-    <div class="stat"><div class="num bull-num">1</div><div class="label">Bullish</div></div>
-    <div class="stat"><div class="num bear-num">2</div><div class="label">Bearish</div></div>
-    <div class="stat"><div class="num neu-num">10</div><div class="label">Neutral</div></div>
-    <div class="stat"><div class="num trade-num">9</div><div class="label">On BitGet</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">13</div><div class="label">Total Signals</div></div>
-  </div>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1 — Market Research                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-research" class="tab-pane active">
 
-  <table>
-    <thead>
-      <tr>
-        <th>Token</th>
-        <th>Name</th>
-        <th>BitGet Pair</th>
-        <th>Signal</th>
-        <th>Risk</th>
-        <th>BitGet</th>
-        <th>Reason</th>
-        <th>Source</th>
-      </tr>
-    </thead>
-    <tbody>
+    <div class="summary">Markets exhibit mixed sentiment on April 25, 2026, with gold facing bearish pressures from high inflation indicators and no rate cuts, while Bitcoin holds steady above key levels per prediction markets. Forex and crypto signals remain subdued amid FOMC blackout, and stocks linger at highs without fresh breakdowns. Overall mood leans neutral to cautious across crypto, commodities, and forex.</div>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#3fb950">4</div><div class="label">Bullish</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">1</div><div class="label">Bearish</div></div>
+      <div class="stat"><div class="num" style="color:#d29922">6</div><div class="label">Neutral</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">8</div><div class="label">On BitGet</div></div>
+      <div class="stat"><div class="num" style="color:#e6edf3">11</div><div class="label">Total Signals</div></div>
+    </div>
+
+    <table style="margin-bottom:32px">
+      <thead>
+        <tr>
+          <th>Token</th><th>Name</th><th>BitGet Pair</th>
+          <th>Signal</th><th>Risk</th><th>BitGet</th><th>Reason</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
       <tr class="watchlist-row">
         <td>⭐ 🪙 BTC</td>
         <td>Bitcoin</td>
         <td>BTC/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk medium">Medium</span></td>
+        <td><span class="badge bull">🟢 Bull</span></td>
+        <td><span class="risk low">Low</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">Late-week pause in bitcoin futures with neutral-to-bullish outlook above 74,000 support amid high volatility.</td>
-        <td class="source">Kitco News [5], MQL5 [2]</td>
+        <td class="reason">Polymarket assigns 100% probability to BTC above $66,000 on April 25, reflecting strong trader consensus.</td>
+        <td class="source">Polymarket[2]</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🪙 ETH</td>
@@ -163,38 +257,38 @@
         <td><span class="badge neutral">🟡 Neutral</span></td>
         <td><span class="risk medium">Medium</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral amid broader crypto pause.</td>
-        <td class="source">General market context</td>
+        <td class="reason">No recent mentions from top sources, aligning with broader crypto lull.</td>
+        <td class="source">General search</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🪙 SOL</td>
         <td>Solana</td>
         <td>SOL/USDT</td>
         <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk medium">Medium</span></td>
+        <td><span class="risk high">High</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral amid broader crypto pause.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Absent from today's top trader commentary amid quiet 24-hour period.</td>
+        <td class="source">General search</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🪙 XRP</td>
         <td>XRP</td>
         <td>XRP/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk medium">Medium</span></td>
+        <td><span class="badge neutral">🟡 Pending</span></td>
+        <td><span class="risk medium">—</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral amid broader crypto pause.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Awaiting today's signal</td>
+        <td class="source">Long-term watchlist</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🪙 LINK</td>
         <td>Chainlink</td>
         <td>LINK/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk medium">Medium</span></td>
+        <td><span class="badge neutral">🟡 Pending</span></td>
+        <td><span class="risk medium">—</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral amid broader crypto pause.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Awaiting today's signal</td>
+        <td class="source">Long-term watchlist</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🪙 HYPE</td>
@@ -250,285 +344,393 @@
         <td>⭐ 📈 AAPL</td>
         <td>Apple</td>
         <td>AAPL/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
+        <td><span class="badge bull">🟢 Bull</span></td>
         <td><span class="risk low">Low</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Benefits from stock market at all-time highs with no reversal signals yet.</td>
+        <td class="source">Sangam Agarwal FX YouTube[1]</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 📈 NVDA</td>
         <td>Nvidia</td>
         <td>NVDA/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk low">Low</span></td>
+        <td><span class="badge bull">🟢 Bull</span></td>
+        <td><span class="risk medium">Medium</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Supported by ongoing stock highs, though vulnerable if broader indices correct.</td>
+        <td class="source">Sangam Agarwal FX YouTube[1]</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 📈 GOOGL</td>
         <td>Alphabet</td>
         <td>GOOGL/USDT</td>
-        <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk low">Low</span></td>
+        <td><span class="badge neutral">🟡 Pending</span></td>
+        <td><span class="risk medium">—</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">No specific mentions today, defaulting to neutral.</td>
-        <td class="source">General market context</td>
+        <td class="reason">Awaiting today's signal</td>
+        <td class="source">Long-term watchlist</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🛢️ XAU</td>
         <td>Gold</td>
         <td>XAU/USDT</td>
-        <td><span class="badge bull">🟢 Bull</span></td>
-        <td><span class="risk low">Low</span></td>
+        <td><span class="badge bear">🔴 Bear</span></td>
+        <td><span class="risk medium">Medium</span></td>
         <td><span class="tradable yes">✅ Yes</span></td>
-        <td class="reason">Neutral-to-bullish above 4,750 with recent jump above 4,800 and pullbacks getting bought toward 5,000 target.</td>
-        <td class="source">DailyForex [3], MQL5 [2], YouTube [1]</td>
+        <td class="reason">High 4% PPI, all-time high stocks, and positive NFP prevent rate cuts, risking breakdown below $4600 support toward $4000.</td>
+        <td class="source">Sangam Agarwal FX YouTube[1]</td>
       </tr>
       <tr class="watchlist-row">
         <td>⭐ 🛢️ UKO</td>
         <td>Brent Crude</td>
         <td>UKO/USD</td>
-        <td><span class="badge bear">🔴 Bear</span></td>
-        <td><span class="risk medium">Medium</span></td>
+        <td><span class="badge neutral">🟡 Neutral</span></td>
+        <td><span class="risk high">High</span></td>
         <td><span class="tradable no">❌ No</span></td>
-        <td class="reason">Neutral-to-bearish below 94.00-95.00 resistance under pressure from US president statements despite geopolitical risks.</td>
-        <td class="source">MQL5 [2]</td>
+        <td class="reason">No specific signals in recent commodity or forex commentary today.</td>
+        <td class="source">General search</td>
       </tr>
       <tr>
         <td>💱 EURUSD</td>
         <td>EUR/USD</td>
         <td>—</td>
         <td><span class="badge neutral">🟡 Neutral</span></td>
-        <td><span class="risk low">Low</span></td>
+        <td><span class="risk medium">Medium</span></td>
         <td><span class="tradable no">❌ No</span></td>
-        <td class="reason">Neutral with bearish bias above key support at 1.1600-1.1620 amid sideways trend.</td>
-        <td class="source">MQL5 [2]</td>
+        <td class="reason">No specific directional bias amid FOMC blackout period in recent forex analysis.</td>
+        <td class="source">Sangam Agarwal FX YouTube[3]</td>
       </tr>
       <tr>
         <td>💱 GBPUSD</td>
         <td>GBP/USD</td>
         <td>—</td>
-        <td><span class="badge bear">🔴 Bear</span></td>
-        <td><span class="risk medium">Medium</span></td>
-        <td><span class="tradable no">❌ No</span></td>
-        <td class="reason">Re-entered verified supply zone attractive for sellers to push price down.</td>
-        <td class="source">YouTube Daily Market Analysis [1]</td>
-      </tr>
-      <tr>
-        <td>💱 USDJPY</td>
-        <td>USD/JPY</td>
-        <td>—</td>
         <td><span class="badge neutral">🟡 Neutral</span></td>
         <td><span class="risk medium">Medium</span></td>
         <td><span class="tradable no">❌ No</span></td>
-        <td class="reason">Included in today's multi-timeframe analysis with potential setups but no clear directional bias specified.</td>
-        <td class="source">YouTube [1]</td>
-      </tr></tbody>
-  </table>
-
-  
-  <!-- ── Today's Activity ── -->
-  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
-
-  <div class="stats">
-    <div class="stat"><div class="num" style="color:#3fb950">3</div><div class="label">Checks Passed</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">64</div><div class="label">Checks Failed</div></div>
-    <div class="stat"><div class="num" style="color:#58a6ff">3</div><div class="label">Trades Today</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">$1.09</div><div class="label">Today's P&L (est.)</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">0</div><div class="label">Wins Today</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">3</div><div class="label">Losses Today</div></div>
-  </div>
-
-  <table style="margin-bottom:24px">
-    <thead>
-      <tr>
-        <th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Mode</th>
+        <td class="reason">Covered in macro analysis without clear bullish or bearish call during FOMC news week.</td>
+        <td class="source">Sangam Agarwal FX YouTube[3]</td>
       </tr>
-    </thead>
-    <tbody><tr>
-          <td>06:30:13</td>
-          <td>APTUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.95</td>
-          <td>$0.97</td>
-          <td>5.289886</td>
-          <td style="color:#f85149;font-weight:600">$0.30</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>07:24:28</td>
-          <td>APTUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.94</td>
-          <td>$0.97</td>
-          <td>5.299979</td>
-          <td style="color:#f85149;font-weight:600">$0.46</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>07:24:28</td>
-          <td>ONDOUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.26</td>
-          <td>$0.27</td>
-          <td>19.164431</td>
-          <td style="color:#f85149;font-weight:600">$0.32</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
+      <tr>
+        <td>🛢️ XAG</td>
+        <td>Silver</td>
+        <td>XAG/USDT</td>
+        <td><span class="badge neutral">🟡 Neutral</span></td>
+        <td><span class="risk high">High</span></td>
+        <td><span class="tradable yes">✅ Yes</span></td>
+        <td class="reason">Mentioned in forex technical analysis but lacks specific sentiment amid rate pause expectations.</td>
+        <td class="source">Sangam Agarwal FX YouTube[3]</td>
+      </tr>
+      <tr>
+        <td>📈 SPX</td>
+        <td>S&P 500</td>
+        <td>SPX/USDT</td>
+        <td><span class="badge bull">🟢 Bull</span></td>
+        <td><span class="risk low">Low</span></td>
+        <td><span class="tradable yes">✅ Yes</span></td>
+        <td class="reason">Trading at all-time highs, supporting no-rate-cut environment despite gold pressures.</td>
+        <td class="source">Sangam Agarwal FX YouTube[1][3]</td>
+      </tr></tbody>
+    </table>
+
+    <!-- Today's Bot Activity widget -->
+    <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">🤖 Today's Bot Activity</h2>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#3fb950">1</div><div class="label">Checks Passed</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">9</div><div class="label">Checks Failed</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">1</div><div class="label">Trades Today</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">+$0.13</div><div class="label">Today's P&amp;L (est.)</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">1</div><div class="label">Wins Today</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">0</div><div class="label">Losses Today</div></div>
+    </div>
+
+    <table style="margin-bottom:24px">
+      <thead>
+        <tr>
+          <th>Time</th><th>Symbol</th><th>Side</th>
+          <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Mode</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+          <td>06:06:01</td>
+          <td>HYPEUSDT</td>
+          <td>🟢 Long</td>
+          <td>$41.18</td>
+          <td>$41.54</td>
+          <td>0.121406</td>
+          <td style="color:#3fb950;font-weight:600">+$0.13</td>
+          <td><span style="color:#3fb950">💰 Live</span></td>
         </tr></tbody>
-  </table>
+    </table>
 
-  
-  <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">💡 Why Checks Are Failing</h2>
+    
+  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">💡 Why Checks Are Failing</h2>
   <div class="summary">
-    <ul style="padding-left:20px;line-height:2"><li><strong>No clear directional signal from VWAP/EMA8/RSI3</strong> (64× today)<br><span class="tip">💡 Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions</span></li></ul>
+    <ul style="padding-left:20px;line-height:2">
+      <li><strong>No clear directional signal from VWAP/EMA8/RSI3</strong> (9× today)<br><span class="tip">💡 Consider widening the VWAP distance threshold or switching to a shorter timeframe during volatile sessions</span></li>
+    </ul>
   </div>
 
-  <!-- ── All-Time Summary ── -->
-  <h2 style="margin:32px 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Trade Summary</h2>
+  </div><!-- /tab-research -->
 
-  <div class="stats">
-    <div class="stat"><div class="num" style="color:#58a6ff">7</div><div class="label">Total Trades</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">$1.18</div><div class="label">Total P&amp;L (est.)</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">0</div><div class="label">Wins</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">4</div><div class="label">Losses</div></div>
-    <div class="stat"><div class="num" style="color:#e6edf3">0%</div><div class="label">Win Rate</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">+$0.00</div><div class="label">Best Trade</div></div>
-    <div class="stat"><div class="num" style="color:#f85149">-$0.46</div><div class="label">Worst Trade</div></div>
-    <div class="stat"><div class="num" style="color:#d29922">7</div><div class="label">Paper</div></div>
-    <div class="stat"><div class="num" style="color:#3fb950">0</div><div class="label">Live</div></div>
-  </div>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 2 — Trade History                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-history" class="tab-pane">
 
-  
-  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
-  <table style="margin-bottom:24px">
-    <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th><th>P&amp;L (est.)</th></tr></thead>
-    <tbody><tr>
+    <!-- All-time summary stats -->
+    <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Performance</h2>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#58a6ff">8</div><div class="label">Total Trades</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">$1.44</div><div class="label">Total P&amp;L (est.)</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">1</div><div class="label">Wins</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">7</div><div class="label">Losses</div></div>
+      <div class="stat"><div class="num" style="color:#e6edf3">13%</div><div class="label">Win Rate</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">+$0.13</div><div class="label">Best Trade</div></div>
+      <div class="stat"><div class="num" style="color:#f85149">-$0.44</div><div class="label">Worst Trade</div></div>
+      <div class="stat"><div class="num" style="color:#d29922">7</div><div class="label">Paper</div></div>
+      <div class="stat"><div class="num" style="color:#3fb950">0</div><div class="label">Live</div></div>
+    </div>
+
+    
+    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
+    <table style="margin-bottom:32px">
+      <thead><tr><th>Symbol</th><th>Trades</th><th>Longs</th><th>Shorts</th><th>Volume</th><th>P&amp;L (est.)</th></tr></thead>
+      <tbody><tr>
         <td>AAPLUSDT</td>
         <td>2</td>
         <td>0</td>
         <td>2</td>
         <td>$10.00</td>
-        <td>—</td>
+        <td><span style="color:#f85149">$0.33</span></td>
       </tr><tr>
         <td>APTUSDT</td>
         <td>2</td>
         <td>0</td>
         <td>2</td>
         <td>$10.00</td>
-        <td><span style="color:#f85149">$0.77</span></td>
+        <td><span style="color:#f85149">$0.71</span></td>
       </tr><tr>
         <td>GOOGLUSDT</td>
         <td>1</td>
         <td>0</td>
         <td>1</td>
         <td>$5.00</td>
-        <td>—</td>
+        <td><span style="color:#f85149">$0.38</span></td>
       </tr><tr>
         <td>BTCUSDT</td>
         <td>1</td>
         <td>1</td>
         <td>0</td>
         <td>$5.00</td>
-        <td><span style="color:#f85149">$0.10</span></td>
+        <td><span style="color:#f85149">$0.09</span></td>
       </tr><tr>
         <td>ONDOUSDT</td>
         <td>1</td>
         <td>0</td>
         <td>1</td>
         <td>$5.00</td>
-        <td><span style="color:#f85149">$0.32</span></td>
+        <td><span style="color:#f85149">$0.07</span></td>
+      </tr><tr>
+        <td>HYPEUSDT</td>
+        <td>1</td>
+        <td>1</td>
+        <td>0</td>
+        <td>$40.61</td>
+        <td><span style="color:#3fb950">+$0.13</span></td>
       </tr></tbody>
-  </table>
+    </table>
 
-  <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Recent Trade Log </h3>
-  <table style="margin-bottom:24px">
-    <thead>
-      <tr>
-        <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
-        <th>Entry</th><th>Current</th><th>Qty</th><th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
-      </tr>
-    </thead>
-    <tbody><tr>
-          <td>2026-04-24</td>
-          <td>07:24:28</td>
-          <td>ONDOUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.26</td>
-          <td>$0.27</td>
-          <td>19.164431</td>
-          <td style="color:#f85149;font-weight:600">$0.32</td>
-          <td style="color:#f85149;font-weight:600">$1.18</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-24</td>
-          <td>07:24:28</td>
-          <td>APTUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.94</td>
-          <td>$0.97</td>
-          <td>5.299979</td>
-          <td style="color:#f85149;font-weight:600">$0.46</td>
-          <td style="color:#f85149;font-weight:600">$0.86</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-24</td>
-          <td>06:30:13</td>
-          <td>APTUSDT</td>
-          <td>🔴 Short</td>
-          <td>$0.95</td>
-          <td>$0.97</td>
-          <td>5.289886</td>
-          <td style="color:#f85149;font-weight:600">$0.30</td>
-          <td style="color:#f85149;font-weight:600">$0.40</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-23</td>
-          <td>07:17:30</td>
-          <td>BTCUSDT</td>
-          <td>🟢 Long</td>
-          <td>$78085.60</td>
-          <td>$77584.50</td>
-          <td>0.000064</td>
-          <td style="color:#f85149;font-weight:600">$0.10</td>
-          <td style="color:#f85149;font-weight:600">$0.10</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-22</td>
-          <td>10:51:55</td>
-          <td>AAPLUSDT</td>
-          <td>🔴 Short</td>
-          <td>$268.00</td>
-          <td>—</td>
-          <td>0.018657</td>
-          <td style="color:#484f58">—</td>
-          <td style="color:#484f58;font-weight:600">—</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-22</td>
-          <td>06:24:10</td>
-          <td>GOOGLUSDT</td>
-          <td>🔴 Short</td>
-          <td>$334.57</td>
-          <td>—</td>
-          <td>0.014945</td>
-          <td style="color:#484f58">—</td>
-          <td style="color:#484f58;font-weight:600">—</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr><tr>
-          <td>2026-04-22</td>
-          <td>06:24:10</td>
-          <td>AAPLUSDT</td>
-          <td>🔴 Short</td>
-          <td>$267.98</td>
-          <td>—</td>
-          <td>0.018658</td>
-          <td style="color:#484f58">—</td>
-          <td style="color:#484f58;font-weight:600">—</td>
-          <td><span style="color:#d29922">📄 Paper</span></td>
-        </tr></tbody>
-  </table>
+    <!-- Filter bar -->
+    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Trade Log</h3>
+
+    <div class="filter-bar">
+      <label>Pair</label>
+      <select id="filter-pair" onchange="onFilterChange()"><option value="">All Pairs</option></select>
+
+      <label>Month</label>
+      <select id="filter-month" onchange="onFilterChange()"><option value="">All Months</option></select>
+
+      <label>Category</label>
+      <select id="filter-category" onchange="onFilterChange()"><option value="">All Categories</option></select>
+
+      <label>Strategy</label>
+      <select id="filter-strategy" onchange="onFilterChange()"><option value="">All Strategies</option></select>
+
+      <label>Mode</label>
+      <select id="filter-mode" onchange="onFilterChange()">
+        <option value="">All Modes</option>
+        <option value="paper">Paper</option>
+        <option value="live">Live</option>
+      </select>
+
+      <button class="btn-reset" onclick="resetFilters()">✕ Reset</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+          <th>Entry</th><th>Current</th><th>Qty</th>
+          <th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div id="pagination"></div>
+
+  </div><!-- /tab-history -->
 
   <footer>Data sourced from public trader commentary · Not financial advice · Paper trading mode active</footer>
+
+  <script>
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // ── Trade data (embedded at build time) ───────────────────────────────────
+    const TRADES = [{"date":"2026-04-22","time":"06:24:10","symbol":"AAPLUSDT","token":"AAPL","category":"stock","month":"2026-04","side":"short","entry":267.98,"current":270.9,"qty":0.018658,"pnl":-0.16344407999999772,"cumPnl":-0.16344407999999772,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-22","time":"06:24:10","symbol":"GOOGLUSDT","token":"GOOGL","category":"stock","month":"2026-04","side":"short","entry":334.57,"current":342.95,"qty":0.014945,"pnl":-0.3757172999999998,"cumPnl":-0.5391613799999975,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-22","time":"10:51:55","symbol":"AAPLUSDT","token":"AAPL","category":"stock","month":"2026-04","side":"short","entry":268,"current":270.9,"qty":0.018657,"pnl":-0.16231589999999874,"cumPnl":-0.7014772799999962,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-23","time":"07:17:30","symbol":"BTCUSDT","token":"BTC","category":"crypto","month":"2026-04","side":"long","entry":78085.6,"current":77625.2,"qty":0.000064,"pnl":-0.08839680000000166,"cumPnl":-0.7898740799999979,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-24","time":"06:30:13","symbol":"APTUSDT","token":"APT","category":"crypto","month":"2026-04","side":"short","entry":0.95,"current":0.9674,"qty":5.289886,"pnl":-0.27613204920000134,"cumPnl":-1.0660061291999994,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-24","time":"07:24:28","symbol":"APTUSDT","token":"APT","category":"crypto","month":"2026-04","side":"short","entry":0.94,"current":0.9674,"qty":5.299979,"pnl":-0.43565827380000155,"cumPnl":-1.5016644030000008,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-24","time":"07:24:28","symbol":"ONDOUSDT","token":"ONDO","category":"crypto","month":"2026-04","side":"short","entry":0.26,"current":0.2612,"qty":19.164431,"pnl":-0.0689919515999988,"cumPnl":-1.5706563545999996,"mode":"paper","strategy":"VWAP + RSI(3) + EMA(8) Scalping"},{"date":"2026-04-25","time":"06:06:01","symbol":"HYPEUSDT","token":"HYPE","category":"crypto","month":"2026-04","side":"long","entry":41.18,"current":41.542,"qty":0.121406,"pnl":0.13184691600000067,"cumPnl":-1.438809438599999,"mode":"0","strategy":"PAPER-1777097161176"}];
+
+    // ── Pagination state ──────────────────────────────────────────────────────
+    const PAGE_SIZE = 25;
+    let currentPage = 1;
+
+    // ── Populate filter dropdowns from data ───────────────────────────────────
+    function populateSelect(id, values, labelFn) {
+      const sel = document.getElementById(id);
+      const existing = sel.querySelector('option[value=""]');
+      const placeholder = existing ? existing.textContent : '';
+      sel.innerHTML = '<option value="">' + placeholder + '</option>' +
+        [...values].sort().map(v => '<option value="' + v + '">' + (labelFn ? labelFn(v) : v) + '</option>').join('');
+    }
+
+    const catLabel = { crypto: '🪙 Crypto', stock: '📈 Stock', forex: '💱 Forex', commodity: '🛢️ Commodity' };
+
+    populateSelect('filter-pair',     new Set(TRADES.map(t => t.symbol)));
+    populateSelect('filter-month',    [...new Set(TRADES.map(t => t.month))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
+    populateSelect('filter-category', new Set(TRADES.map(t => t.category)), v => catLabel[v] || v);
+    populateSelect('filter-strategy', new Set(TRADES.map(t => t.strategy).filter(Boolean)));
+
+    // ── Filtering logic ───────────────────────────────────────────────────────
+    function getFiltered() {
+      const pair     = document.getElementById('filter-pair').value;
+      const month    = document.getElementById('filter-month').value;
+      const category = document.getElementById('filter-category').value;
+      const strategy = document.getElementById('filter-strategy').value;
+      const mode     = document.getElementById('filter-mode').value;
+
+      // Most recent first
+      return [...TRADES].reverse().filter(t => {
+        if (pair     && t.symbol   !== pair)     return false;
+        if (month    && t.month    !== month)    return false;
+        if (category && t.category !== category) return false;
+        if (strategy && t.strategy !== strategy) return false;
+        if (mode     && t.mode     !== mode)     return false;
+        return true;
+      });
+    }
+
+    // ── Render helpers ────────────────────────────────────────────────────────
+    function fmtPnl(val) {
+      if (val === null || val === undefined) return '<span style="color:#484f58">—</span>';
+      const color = val >= 0 ? '#3fb950' : '#f85149';
+      const sign  = val >= 0 ? '+' : '';
+      return '<span style="color:' + color + ';font-weight:600">' + sign + '$' + Math.abs(val).toFixed(2) + '</span>';
+    }
+
+    const catIcon = { crypto: '🪙', stock: '📈', forex: '💱', commodity: '🛢️' };
+
+    // ── Render table for current page ─────────────────────────────────────────
+    function renderTable() {
+      const filtered = getFiltered();
+      const total    = filtered.length;
+      const pages    = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      if (currentPage > pages) currentPage = pages;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const page  = filtered.slice(start, start + PAGE_SIZE);
+      const tbody = document.getElementById('history-tbody');
+
+      if (page.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+      } else {
+        tbody.innerHTML = page.map(t => {
+          const modeLabel = t.mode === 'paper'
+            ? '<span style="color:#d29922">📄 Paper</span>'
+            : '<span style="color:#3fb950">💰 Live</span>';
+          return '<tr>' +
+            '<td>' + t.date + '</td>' +
+            '<td>' + t.time + '</td>' +
+            '<td>' + (catIcon[t.category] || '📊') + ' ' + t.symbol + '</td>' +
+            '<td>' + (t.side === 'long' ? '🟢 Long' : '🔴 Short') + '</td>' +
+            '<td>' + (t.entry   ? '$' + t.entry.toFixed(2)   : '—') + '</td>' +
+            '<td>' + (t.current ? '$' + t.current.toFixed(2) : '—') + '</td>' +
+            '<td>' + t.qty + '</td>' +
+            '<td>' + fmtPnl(t.pnl)    + '</td>' +
+            '<td>' + fmtPnl(t.cumPnl) + '</td>' +
+            '<td>' + modeLabel + '</td>' +
+            '</tr>';
+        }).join('');
+      }
+
+      renderPagination(pages, total);
+    }
+
+    // ── Pagination controls ───────────────────────────────────────────────────
+    function renderPagination(pages, total) {
+      const el = document.getElementById('pagination');
+      if (pages <= 1) { el.innerHTML = ''; return; }
+
+      let html = '<div class="pagination">';
+      html += '<button onclick="goPage(' + (currentPage - 1) + ')"' + (currentPage <= 1 ? ' disabled' : '') + '>← Prev</button>';
+
+      for (let i = 1; i <= pages; i++) {
+        if (i === 1 || i === pages || Math.abs(i - currentPage) <= 2) {
+          html += '<button onclick="goPage(' + i + ')"' + (i === currentPage ? ' class="active"' : '') + '>' + i + '</button>';
+        } else if (Math.abs(i - currentPage) === 3) {
+          html += '<span class="ellipsis">…</span>';
+        }
+      }
+
+      html += '<button onclick="goPage(' + (currentPage + 1) + ')"' + (currentPage >= pages ? ' disabled' : '') + '>Next →</button>';
+      html += '<span class="page-info">Page ' + currentPage + ' of ' + pages + ' · ' + total + ' trades</span>';
+      html += '</div>';
+
+      el.innerHTML = html;
+    }
+
+    function goPage(p) {
+      const filtered = getFiltered();
+      const pages    = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      currentPage    = Math.max(1, Math.min(p, pages));
+      renderTable();
+      document.querySelector('table').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function onFilterChange() {
+      currentPage = 1;
+      renderTable();
+    }
+
+    function resetFilters() {
+      ['filter-pair','filter-month','filter-category','filter-strategy','filter-mode']
+        .forEach(id => { document.getElementById(id).value = ''; });
+      currentPage = 1;
+      renderTable();
+    }
+
+    // Initial render
+    renderTable();
+  </script>
 </body>
 </html>
