@@ -261,7 +261,14 @@ function readTrades() {
     totalUsd:   parseFloat(r.total_usd)  || 0,
     fee:        r.fee      || '0',
     orderId:    r.order_id || r.orderId  || '',
-    mode:       r.mode     || '',
+    // If mode column is misaligned (e.g. old/new CSV format mismatch), fall back
+    // to checking whether the Order ID starts with PAPER- as the source of truth
+    mode:       (() => {
+      const m = r.mode || '';
+      if (m === 'paper' || m === 'live') return m;
+      const id = r.order_id || r.orderId || r.notes || '';
+      return id.startsWith('PAPER-') ? 'paper' : (m || 'paper');
+    })(),
     notes:      r.notes || r.strategy   || '',
   }));
 }
