@@ -1,5 +1,195 @@
 [
   {
+    "timestamp": "2026-04-26T18:02:50.580Z",
+    "symbol": "XAUUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:50.431Z",
+    "symbol": "GOOGLUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:50.262Z",
+    "symbol": "NVDAUSDT",
+    "htfTrend": "bull",
+    "signal": "long",
+    "entry": 207.79,
+    "stopLoss": 207.3157,
+    "tp1": 210.98,
+    "tp2": 208.9758,
+    "tp3": 209.6872,
+    "rr1": 6.73,
+    "rr2": 2.5,
+    "rr3": 4,
+    "slAfterTp1": 207.79,
+    "slAfterTp2": 210.98,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 180.93994728047306,
+      "ema50": 185.11459999999997,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        181.9833,
+        183.2783,
+        184.325,
+        185.3717,
+        186.8618,
+        188.76,
+        191.1726,
+        194.2417
+      ]
+    },
+    "swingHigh": 188.76,
+    "swingLow": 179.89,
+    "reason": "HTF bullish + 15m swing low breakout above $207.78",
+    "orderId": "IRONCLAD-PAPER-1777226570261"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:50.084Z",
+    "symbol": "AAPLUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.930Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.737Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "bear",
+    "signal": "short",
+    "entry": 0.2581,
+    "stopLoss": 0.2597,
+    "tp1": 0.2551,
+    "tp2": 0.2492,
+    "tp3": 0.2415,
+    "rr1": 1.88,
+    "rr2": 5.56,
+    "rr3": 10.38,
+    "slAfterTp1": 0.2581,
+    "slAfterTp2": 0.2551,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 0.2611665846094936,
+      "ema50": 0.2606280000000001,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        0.2688,
+        0.2636,
+        0.2593,
+        0.2551,
+        0.2491,
+        0.2415,
+        0.2318,
+        0.2194
+      ]
+    },
+    "swingHigh": 0.2772,
+    "swingLow": 0.2415,
+    "reason": "HTF bearish + 15m swing high breakdown below $0.26",
+    "orderId": "IRONCLAD-PAPER-1777226569737"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.399Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.275Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.147Z",
+    "symbol": "HYPEUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:49.022Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:48.896Z",
+    "symbol": "XRPUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:48.768Z",
+    "symbol": "SOLUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:48.641Z",
+    "symbol": "ETHUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-26T18:02:48.516Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
     "timestamp": "2026-04-26T14:29:32.084Z",
     "symbol": "XAUUSDT",
     "htfTrend": "neutral",
@@ -2362,123 +2552,5 @@
     "htfTrend": "bear",
     "signal": null,
     "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-22T20:14:36.853Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-22T20:14:36.668Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:49.170Z",
-    "symbol": "XAUUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 4739.03,
-    "stopLoss": 4688.6114,
-    "takeProfit": 4814.6579,
-    "reason": "HTF bullish trend + 15m swing low breakout above $4721.41",
-    "orderId": "IRONCLAD-PAPER-1776875989170"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:49.038Z",
-    "symbol": "GOOGLUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:48.338Z",
-    "symbol": "NVDAUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:48.190Z",
-    "symbol": "AAPLUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 266.72,
-    "stopLoss": 265.0729,
-    "takeProfit": 269.1907,
-    "reason": "HTF bullish trend + 15m swing low breakout above $266.22",
-    "orderId": "IRONCLAD-PAPER-1776875988190"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:48.066Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.939Z",
-    "symbol": "HYPEUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.811Z",
-    "symbol": "LINKUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.683Z",
-    "symbol": "XRPUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.554Z",
-    "symbol": "SOLUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.426Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "bear",
-    "signal": "short",
-    "entry": 2309.37,
-    "stopLoss": 2331.8136,
-    "takeProfit": 2275.7046,
-    "reason": "HTF bearish trend + 15m swing high breakdown below $2310.61",
-    "orderId": "IRONCLAD-PAPER-1776875987426"
-  },
-  {
-    "timestamp": "2026-04-22T16:39:47.297Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bear",
-    "signal": "short",
-    "entry": 75803,
-    "stopLoss": 76346.6857,
-    "takeProfit": 74987.4714,
-    "reason": "HTF bearish trend + 15m swing high breakdown below $75806.80",
-    "orderId": "IRONCLAD-PAPER-1776875987297"
-  },
-  {
-    "timestamp": "2026-04-22T15:12:13.197Z",
-    "symbol": "XAUUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 4770.71,
-    "stopLoss": 4711.5393,
-    "takeProfit": 4859.4661,
-    "reason": "HTF bullish trend + 15m swing low breakout above $4743.83",
-    "orderId": "IRONCLAD-PAPER-1776870733197"
   }
 ]
