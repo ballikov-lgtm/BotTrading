@@ -1,5 +1,149 @@
 [
   {
+    "timestamp": "2026-04-27T17:50:43.505Z",
+    "symbol": "XAUUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:43.374Z",
+    "symbol": "GOOGLUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:43.243Z",
+    "symbol": "NVDAUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:43.014Z",
+    "symbol": "AAPLUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.839Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.712Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "bear",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.580Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.451Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "bear",
+    "signal": "short",
+    "entry": 0.7072,
+    "stopLoss": 0.7163,
+    "tp1": 0.7043,
+    "tp2": 0.6969,
+    "tp3": 0.6895,
+    "rr1": 0.32,
+    "rr2": 1.13,
+    "rr3": 1.95,
+    "slAfterTp1": 0.7072,
+    "slAfterTp2": 0.7043,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 0.7080301019212656,
+      "ema50": 0.68947,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        0.7458,
+        0.7188,
+        0.6969,
+        0.675,
+        0.6439,
+        0.6042,
+        0.5538,
+        0.4896
+      ]
+    },
+    "swingHigh": 0.7896,
+    "swingLow": 0.6042,
+    "reason": "HTF bearish + 15m swing high breakdown below $0.71",
+    "orderId": "IRONCLAD-PAPER-1777312242451"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.323Z",
+    "symbol": "HYPEUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.197Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:42.070Z",
+    "symbol": "XRPUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:41.939Z",
+    "symbol": "SOLUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:41.807Z",
+    "symbol": "ETHUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-04-27T17:50:41.671Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
     "timestamp": "2026-04-27T16:09:52.852Z",
     "symbol": "XAUUSDT",
     "htfTrend": "neutral",
@@ -2583,112 +2727,6 @@
   {
     "timestamp": "2026-04-23T16:20:09.790Z",
     "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.663Z",
-    "symbol": "HYPEUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 41.008,
-    "stopLoss": 40.5984,
-    "takeProfit": 41.6224,
-    "reason": "HTF bullish trend + 15m swing low breakout above $40.94",
-    "orderId": "IRONCLAD-PAPER-1776961209663"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.536Z",
-    "symbol": "LINKUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.409Z",
-    "symbol": "XRPUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.282Z",
-    "symbol": "SOLUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.153Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T16:20:09.025Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.988Z",
-    "symbol": "XAUUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.808Z",
-    "symbol": "GOOGLUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.633Z",
-    "symbol": "NVDAUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.453Z",
-    "symbol": "AAPLUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 267.75,
-    "stopLoss": 267.1025,
-    "takeProfit": 268.7212,
-    "reason": "HTF bullish trend + 15m swing low breakout above $267.74",
-    "orderId": "IRONCLAD-PAPER-1776941908453"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.287Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:28.112Z",
-    "symbol": "HYPEUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:27.945Z",
-    "symbol": "LINKUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-23T10:58:27.763Z",
-    "symbol": "XRPUSDT",
     "htfTrend": "neutral",
     "signal": null,
     "reason": "No clear daily trend"
