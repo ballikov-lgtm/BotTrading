@@ -212,7 +212,7 @@ ${combined}`;
       'Content-Type':  'application/json',
     },
     body: JSON.stringify({
-      model:    'sonar-pro',
+      model:    'sonar',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
     }),
@@ -623,7 +623,7 @@ Rules:
       'Content-Type':  'application/json',
     },
     body: JSON.stringify({
-      model:    'sonar-pro',
+      model:    'sonar',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
     }),
@@ -1326,8 +1326,14 @@ async function run() {
   console.log(`Found ${bitgetPairs.size} BitGet futures pairs`);
 
   console.log(`Querying Perplexity for today's signals...`);
-  const research = await fetchMarketResearch(date);
-  console.log(`Got ${research.signals?.length || 0} signals from Perplexity`);
+  let research = { summary: '⚠️ Market research unavailable — Perplexity did not return valid data. Trade history and signals will update on the next run.', signals: [] };
+  try {
+    research = await fetchMarketResearch(date);
+    console.log(`Got ${research.signals?.length || 0} signals from Perplexity`);
+  } catch (err) {
+    console.log(`Perplexity research failed (non-fatal): ${err.message}`);
+    console.log(`Continuing to build dashboard with trade data only...`);
+  }
 
   // Fetch DegenDave transcript signals — auto-discovers latest ChartHackers video via RSS
   let degenDaveSignals = [];
