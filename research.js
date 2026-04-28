@@ -245,15 +245,16 @@ function parseCSV(filePath) {
   } catch { return []; }
 }
 
-function readTrades() {
-  const rows = parseCSV('./trades.csv');
-  return rows.map(r => ({
+function mapTradeRow(r, botName) {
+  return {
     date:       r.date     || '',
     time:       r.time     || '',
     exchange:   r.exchange || '',
     symbol:     r.symbol   || '',
     side:       r.side     || '',
-    quantity:   parseFloat(r.quantity)   || 0,
+    // SID uses "shares" column; VWAP uses "quantity"; Ironclad uses "quantity"
+    quantity:   parseFloat(r.quantity || r.shares) || 0,
+    // VWAP has "price", Ironclad has "entry_price", SID has "entry_price"
     price:      parseFloat(r.price || r.entry_price) || 0,
     stopLoss:   parseFloat(r.stop_loss)  || null,
     takeProfit: parseFloat(r.take_profit || r.tp1) || null,
@@ -261,16 +262,29 @@ function readTrades() {
     totalUsd:   parseFloat(r.total_usd)  || 0,
     fee:        r.fee      || '0',
     orderId:    r.order_id || r.orderId  || '',
-    // If mode column is misaligned (e.g. old/new CSV format mismatch), fall back
-    // to checking whether the Order ID starts with PAPER- as the source of truth
+    // Fallback mode detection — check Order ID prefix if the column is missing/wrong
     mode:       (() => {
-      const m = r.mode || '';
+      const m  = r.mode || '';
       if (m === 'paper' || m === 'live') return m;
-      const id = r.order_id || r.orderId || r.notes || '';
-      return id.startsWith('PAPER-') ? 'paper' : (m || 'paper');
+      const id = r.order_id || r.orderId || '';
+      return (id.startsWith('PAPER-') || id.startsWith('IRONCLAD-PAPER-') || id.startsWith('SID-PAPER-')) ? 'paper' : (m || 'paper');
     })(),
-    notes:      r.notes || r.strategy   || '',
-  }));
+    notes:      r.notes || r.strategy || '',
+    bot:        botName,
+  };
+}
+
+function readTrades() {
+  // Read all three bots' trade logs and merge into a single chronological list
+  const vwapRows     = parseCSV('./trades.csv').map(r => mapTradeRow(r, 'VWAP Scalper'));
+  const ironcladRows = parseCSV('./trades-ironclad.csv').map(r => mapTradeRow(r, 'Ironclad'));
+  const sidRows      = parseCSV('./trades-sid.csv').map(r => mapTradeRow(r, 'SID'));
+
+  return [...vwapRows, ...ironcladRows, ...sidRows].sort((a, b) => {
+    const ta = `${a.date}T${a.time || '00:00:00'}`;
+    const tb = `${b.date}T${b.time || '00:00:00'}`;
+    return ta.localeCompare(tb);
+  });
 }
 
 // ── Fetch current live prices from BitGet for all traded symbols ──────────────
@@ -298,15 +312,60 @@ function readSafetyLog() {
   } catch { return []; }
 }
 
-// Calculate estimated P&L for a single trade.
-// Priority: live BitGet price → safety log → null (shows —)
-function calcTradePnl(trade, safetyLog, livePrices = {}) {
+// Read realized P&L from all position monitors' closed-positions files.
+// Returns a Map keyed by order ID → { realizedPnl, exitLevel, exitPrice, closeDate, outcome }
+function readClosedPositions() {
+  const map = new Map();
+  const files = [
+    './closed-positions-ironclad.json',
+    './closed-positions-sid.json',
+  ];
+  for (const file of files) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const positions = JSON.parse(fs.readFileSync(file, 'utf8'));
+      for (const pos of positions) {
+        map.set(pos.id, pos);
+      }
+    } catch {}
+  }
+  return map;
+}
+
+// Read SID account state for dashboard display
+function readSidAccount() {
+  try {
+    if (fs.existsSync('./sid-account.json')) {
+      return JSON.parse(fs.readFileSync('./sid-account.json', 'utf8'));
+    }
+  } catch {}
+  return null;
+}
+
+// Calculate P&L for a single trade.
+// Priority order:
+//   1. Realized P&L from position monitor (locked-in — never changes)
+//   2. Unrealized P&L from live BitGet price (changes with market)
+//   3. Unrealized P&L from safety log (historical fallback)
+function calcTradePnl(trade, safetyLog, livePrices = {}, closedPositions = new Map()) {
   const LEVERAGE = 3;
 
-  // 1. Use live price from BitGet ticker (most accurate)
+  // 1. Realized — use if the position monitor has already closed this trade
+  const closed = closedPositions.get(trade.orderId);
+  if (closed) {
+    return {
+      pnl:          closed.realizedPnl,
+      currentPrice: closed.exitPrice,
+      realized:     true,
+      exitLevel:    closed.exitLevel,
+      outcome:      closed.outcome,
+    };
+  }
+
+  // 2. Unrealized — live BitGet ticker price
   let currentPrice = livePrices[trade.symbol] || null;
 
-  // 2. Fall back to most recent safety log entry for this symbol after trade time
+  // 3. Unrealized — safety log fallback
   if (!currentPrice) {
     const tradeTs = `${trade.date}T${trade.time}`;
     const later   = safetyLog
@@ -320,7 +379,7 @@ function calcTradePnl(trade, safetyLog, livePrices = {}) {
   const pnl = trade.side === 'long'
     ? (currentPrice - trade.price) * trade.quantity * LEVERAGE
     : (trade.price - currentPrice) * trade.quantity * LEVERAGE;
-  return { pnl, currentPrice };
+  return { pnl, currentPrice, realized: false };
 }
 
 function pnlCell(pnlResult) {
@@ -347,7 +406,7 @@ function parseStrategy(str) {
 
 // ── Build all trade data — returns structured object for HTML generation ──────
 
-function buildTradeData(trades, safetyLog, livePrices = {}) {
+function buildTradeData(trades, safetyLog, livePrices = {}, closedPositions = new Map(), sidAccount = null) {
   const today       = new Date().toISOString().slice(0, 10);
   const todayTrades = trades.filter(t => t.date === today);
   const todayChecks = safetyLog.filter(e => e.timestamp?.startsWith(today));
@@ -365,11 +424,17 @@ function buildTradeData(trades, safetyLog, livePrices = {}) {
   let wins = 0, losses = 0, bestTrade = 0, worstTrade = 0;
 
   const tradesWithPnl = trades.map(t => {
-    const result   = calcTradePnl(t, safetyLog, livePrices);
+    const result   = calcTradePnl(t, safetyLog, livePrices, closedPositions);
     let tradePnl   = null;
     let cumPnl     = null;
+    let realized   = false;
+    let exitLevel  = null;
+    let outcome    = null;
     if (result !== null) {
       tradePnl    = result.pnl;
+      realized    = result.realized || false;
+      exitLevel   = result.exitLevel || null;
+      outcome     = result.outcome   || null;
       cumulative += result.pnl;
       cumPnl      = cumulative;
       totalPnl   += result.pnl;
@@ -381,6 +446,9 @@ function buildTradeData(trades, safetyLog, livePrices = {}) {
       ...t,
       tradePnl,
       cumPnl,
+      realized,
+      exitLevel,
+      outcome,
       currentPrice: result?.currentPrice,
       category:     getCategory(t.symbol),
       month:        t.date ? t.date.slice(0, 7) : '',
@@ -458,6 +526,7 @@ function buildTradeData(trades, safetyLog, livePrices = {}) {
     },
     bySymbol,
     recommendations,
+    sidAccount,
     // JSON array embedded in HTML for client-side filtering + pagination
     tradesJson: tradesWithPnl.map(t => {
       const { stratName, stratVersion } = parseStrategy(t.notes);
@@ -470,14 +539,19 @@ function buildTradeData(trades, safetyLog, livePrices = {}) {
         month:       t.month,
         side:        t.side,
         entry:       t.price        || null,
+        sl:          t.stopLoss     || null,
         current:     t.currentPrice || null,
         qty:         t.quantity,
         pnl:         t.tradePnl,
         cumPnl:      t.cumPnl,
+        realized:    t.realized,
+        exitLevel:   t.exitLevel,
+        outcome:     t.outcome,
         mode:        t.mode,
         strategy:    t.notes        || '',
         stratName,
         stratVersion,
+        bot:         t.bot          || '',
       };
     }),
   };
@@ -948,17 +1022,23 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     <!-- All-time summary stats -->
     <h2 style="margin:0 0 16px;font-size:16px;color:#e6edf3">📈 All-Time Performance</h2>
 
-    <div class="stats">
-      <div class="stat"><div class="num" style="color:#58a6ff">${at.total}</div><div class="label">Total Trades</div></div>
-      <div class="stat"><div class="num" style="color:${totalPnlColor}">${at.pnl >= 0 ? '+' : ''}$${Math.abs(at.pnl).toFixed(2)}</div><div class="label">Total P&amp;L (est.)</div></div>
-      <div class="stat"><div class="num" style="color:#3fb950">${at.wins}</div><div class="label">Wins</div></div>
-      <div class="stat"><div class="num" style="color:#f85149">${at.losses}</div><div class="label">Losses</div></div>
-      <div class="stat"><div class="num" style="color:#e6edf3">${at.winRate}%</div><div class="label">Win Rate</div></div>
-      <div class="stat"><div class="num" style="color:#3fb950">+$${Math.abs(at.bestTrade).toFixed(2)}</div><div class="label">Best Trade</div></div>
-      <div class="stat"><div class="num" style="color:#f85149">-$${Math.abs(at.worstTrade).toFixed(2)}</div><div class="label">Worst Trade</div></div>
-      <div class="stat"><div class="num" style="color:#d29922">${at.paper}</div><div class="label">Paper</div></div>
-      <div class="stat"><div class="num" style="color:#3fb950">${at.live}</div><div class="label">Live</div></div>
-    </div>
+    <div id="history-stats"><!-- populated by renderStats() on load and every filter change --></div>
+
+    ${tradeData.sidAccount ? (() => {
+      const sa        = tradeData.sidAccount;
+      const growth    = sa.accountUsd - sa.startingUsd;
+      const growthPct = ((growth / sa.startingUsd) * 100).toFixed(2);
+      const color     = growth >= 0 ? '#3fb950' : '#f85149';
+      return `
+    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">📈 SID Compound Account</h3>
+    <div class="stats" style="margin-bottom:32px">
+      <div class="stat"><div class="num" style="color:#e6edf3">$${sa.startingUsd.toFixed(2)}</div><div class="label">Starting Capital</div></div>
+      <div class="stat"><div class="num" style="color:${color}">$${sa.accountUsd.toFixed(2)}</div><div class="label">Current Balance</div></div>
+      <div class="stat"><div class="num" style="color:${color}">${growth >= 0 ? '+' : ''}$${Math.abs(growth).toFixed(2)}</div><div class="label">Total Growth</div></div>
+      <div class="stat"><div class="num" style="color:${color}">${growth >= 0 ? '+' : ''}${growthPct}%</div><div class="label">Return</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">${sa.tradeCount}</div><div class="label">Closed Trades</div></div>
+    </div>`;
+    })() : ''}
 
     ${Object.keys(tradeData.bySymbol).length > 0 ? `
     <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">By Symbol</h3>
@@ -986,6 +1066,9 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       <label>Version</label>
       <select id="filter-version" onchange="onFilterChange()"><option value="">All Versions</option></select>
 
+      <label>Bot</label>
+      <select id="filter-bot" onchange="onFilterChange()"><option value="">All Bots</option></select>
+
       <label>Mode</label>
       <select id="filter-mode" onchange="onFilterChange()">
         <option value="">All Modes</option>
@@ -1000,13 +1083,13 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       <thead>
         <tr>
           <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
-          <th>Entry</th><th>Current</th><th>Qty</th>
-          <th>P&amp;L (est.)</th><th>Cumulative</th><th>Mode</th>
-          <th>Strategy</th><th>Version</th>
+          <th>Entry</th><th>Stop Loss</th><th>Exit / Live</th><th>Qty</th>
+          <th>P&amp;L</th><th>Cumulative</th><th>Mode</th>
+          <th>Bot</th><th>Strategy</th><th>Version</th>
         </tr>
       </thead>
       <tbody id="history-tbody">
-        <tr><td colspan="12" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+        <tr><td colspan="14" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -1048,6 +1131,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     populateSelect('filter-pair',     new Set(TRADES.map(t => t.symbol)));
     populateSelect('filter-month',    [...new Set(TRADES.map(t => t.month))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
     populateSelect('filter-category', new Set(TRADES.map(t => t.category)), v => catLabel[v] || v);
+    populateSelect('filter-bot',      new Set(TRADES.map(t => t.bot).filter(Boolean)));
     populateSelect('filter-strategy', new Set(TRADES.map(t => t.stratName).filter(Boolean)));
     populateSelect('filter-version',  [...new Set(TRADES.map(t => t.stratVersion).filter(v => v && v !== '—'))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
 
@@ -1056,28 +1140,33 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       const pair     = document.getElementById('filter-pair').value;
       const month    = document.getElementById('filter-month').value;
       const category = document.getElementById('filter-category').value;
+      const bot      = document.getElementById('filter-bot').value;
       const strategy = document.getElementById('filter-strategy').value;
       const version  = document.getElementById('filter-version').value;
       const mode     = document.getElementById('filter-mode').value;
 
       // Most recent first
       return [...TRADES].reverse().filter(t => {
-        if (pair     && t.symbol      !== pair)     return false;
-        if (month    && t.month       !== month)    return false;
-        if (category && t.category    !== category) return false;
-        if (strategy && t.stratName   !== strategy) return false;
-        if (version  && t.stratVersion !== version) return false;
-        if (mode     && t.mode        !== mode)     return false;
+        if (pair     && t.symbol       !== pair)     return false;
+        if (month    && t.month        !== month)    return false;
+        if (category && t.category     !== category) return false;
+        if (bot      && t.bot          !== bot)      return false;
+        if (strategy && t.stratName    !== strategy) return false;
+        if (version  && t.stratVersion !== version)  return false;
+        if (mode     && t.mode         !== mode)     return false;
         return true;
       });
     }
 
     // ── Render helpers ────────────────────────────────────────────────────────
-    function fmtPnl(val) {
+    function fmtPnl(val, realized, exitLevel) {
       if (val === null || val === undefined) return '<span style="color:#484f58">—</span>';
       const color = val >= 0 ? '#3fb950' : '#f85149';
       const sign  = val >= 0 ? '+' : '';
-      return '<span style="color:' + color + ';font-weight:600">' + sign + '$' + Math.abs(val).toFixed(2) + '</span>';
+      const label = realized
+        ? '<span title="Realized — position closed at ' + (exitLevel || 'exit') + '" style="font-size:10px;opacity:0.7"> 🔒</span>'
+        : '<span title="Unrealized — based on current live price" style="font-size:10px;opacity:0.5"> 📊</span>';
+      return '<span style="color:' + color + ';font-weight:600">' + sign + '$' + Math.abs(val).toFixed(2) + label + '</span>';
     }
 
     const catIcon = { crypto: '🪙', stock: '📈', forex: '💱', commodity: '🛢️' };
@@ -1094,23 +1183,42 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       const tbody = document.getElementById('history-tbody');
 
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
       } else {
         tbody.innerHTML = page.map(t => {
           const modeLabel = t.mode === 'paper'
             ? '<span style="color:#d29922">📄 Paper</span>'
             : '<span style="color:#3fb950">💰 Live</span>';
+          const botColor  = t.bot === 'Ironclad' ? '#d29922' : '#58a6ff';
+
+          // Exit / Live price cell — for closed trades show exit level badge
+          let priceCell;
+          if (t.realized && t.current) {
+            const lvlColor = t.exitLevel === 'sl' ? '#f85149'
+                           : t.exitLevel === 'tp3' ? '#3fb950'
+                           : '#58a6ff';
+            const lvlLabel = (t.exitLevel || 'exit').toUpperCase();
+            priceCell = '<span style="color:#8b949e;font-size:11px">' + lvlLabel + ' </span>' +
+                        '<span style="color:' + lvlColor + ';font-weight:600">$' + t.current.toFixed(2) + '</span>';
+          } else if (t.current) {
+            priceCell = '<span style="color:#8b949e;font-size:11px">live </span>$' + t.current.toFixed(2);
+          } else {
+            priceCell = '<span style="color:#484f58">—</span>';
+          }
+
           return '<tr>' +
             '<td>' + t.date + '</td>' +
             '<td>' + t.time + '</td>' +
             '<td>' + (catIcon[t.category] || '📊') + ' ' + t.symbol + '</td>' +
             '<td>' + (t.side === 'long' ? '🟢 Long' : '🔴 Short') + '</td>' +
-            '<td>' + (t.entry   ? '$' + t.entry.toFixed(2)   : '—') + '</td>' +
-            '<td>' + (t.current ? '$' + t.current.toFixed(2) : '—') + '</td>' +
-            '<td>' + t.qty + '</td>' +
-            '<td>' + fmtPnl(t.pnl)    + '</td>' +
+            '<td>$' + (t.entry ? t.entry.toFixed(2) : '—') + '</td>' +
+            '<td style="color:#f85149;font-size:13px">' + (t.sl ? '$' + t.sl.toFixed(2) : '—') + '</td>' +
+            '<td>' + priceCell + '</td>' +
+            '<td style="color:#8b949e;font-size:13px">' + t.qty + '</td>' +
+            '<td>' + fmtPnl(t.pnl, t.realized, t.exitLevel) + '</td>' +
             '<td>' + fmtPnl(t.cumPnl) + '</td>' +
             '<td>' + modeLabel + '</td>' +
+            '<td style="font-size:13px;font-weight:500;color:' + botColor + '">' + (t.bot || '—') + '</td>' +
             '<td style="font-size:13px;color:#c9d1d9">' + (t.stratName || '—') + '</td>' +
             '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#1f2d3d;color:#58a6ff">' + (t.stratVersion || '—') + '</span></td>' +
             '</tr>';
@@ -1151,19 +1259,53 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       document.querySelector('table').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    // ── Dynamic all-time stats (recalculates on every filter change) ──────────
+    function renderStats(filteredTrades) {
+      let total = filteredTrades.length;
+      let pnl = 0, wins = 0, losses = 0, bestTrade = 0, worstTrade = 0;
+      let paper = 0, live = 0;
+      filteredTrades.forEach(t => {
+        if (t.mode === 'paper') paper++; else if (t.mode === 'live') live++;
+        if (t.pnl !== null && t.pnl !== undefined) {
+          pnl += t.pnl;
+          if (t.pnl >= 0) wins++; else losses++;
+          if (t.pnl > bestTrade)  bestTrade  = t.pnl;
+          if (t.pnl < worstTrade) worstTrade = t.pnl;
+        }
+      });
+      const winRate  = (wins + losses) > 0 ? Math.round(wins / (wins + losses) * 100) : 0;
+      const pnlColor = pnl >= 0 ? '#3fb950' : '#f85149';
+      const pnlSign  = pnl >= 0 ? '+' : '';
+      document.getElementById('history-stats').innerHTML =
+        '<div class="stats">' +
+        '<div class="stat"><div class="num" style="color:#58a6ff">' + total + '</div><div class="label">Total Trades</div></div>' +
+        '<div class="stat"><div class="num" style="color:' + pnlColor + '">' + pnlSign + '$' + Math.abs(pnl).toFixed(2) + '</div><div class="label">Total P&amp;L (est.)</div></div>' +
+        '<div class="stat"><div class="num" style="color:#3fb950">' + wins + '</div><div class="label">Wins</div></div>' +
+        '<div class="stat"><div class="num" style="color:#f85149">' + losses + '</div><div class="label">Losses</div></div>' +
+        '<div class="stat"><div class="num" style="color:#e6edf3">' + winRate + '%</div><div class="label">Win Rate</div></div>' +
+        '<div class="stat"><div class="num" style="color:#3fb950">+$' + Math.abs(bestTrade).toFixed(2) + '</div><div class="label">Best Trade</div></div>' +
+        '<div class="stat"><div class="num" style="color:#f85149">-$' + Math.abs(worstTrade).toFixed(2) + '</div><div class="label">Worst Trade</div></div>' +
+        '<div class="stat"><div class="num" style="color:#d29922">' + paper + '</div><div class="label">Paper</div></div>' +
+        '<div class="stat"><div class="num" style="color:#3fb950">' + live + '</div><div class="label">Live</div></div>' +
+        '</div>';
+    }
+
     function onFilterChange() {
       currentPage = 1;
+      renderStats(getFiltered());
       renderTable();
     }
 
     function resetFilters() {
-      ['filter-pair','filter-month','filter-category','filter-strategy','filter-version','filter-mode']
+      ['filter-pair','filter-month','filter-category','filter-bot','filter-strategy','filter-version','filter-mode']
         .forEach(id => { document.getElementById(id).value = ''; });
       currentPage = 1;
+      renderStats(TRADES);
       renderTable();
     }
 
     // Initial render
+    renderStats(TRADES);
     renderTable();
   </script>
 </body>
@@ -1217,9 +1359,16 @@ async function run() {
     console.log(`  ${s.token.padEnd(8)} ${s.signal.padEnd(8)} Risk:${s.risk.padEnd(8)} BitGet:${onBitget ? 'YES' : 'NO'}`);
   });
 
-  // Read trade logs
-  const trades    = readTrades();
-  const safetyLog = readSafetyLog();
+  // Read trade logs + realized P&L from position monitor
+  const trades          = readTrades();
+  const safetyLog       = readSafetyLog();
+  const closedPositions = readClosedPositions();
+  const sidAccount      = readSidAccount();
+  console.log(`Closed positions loaded: ${closedPositions.size} realized P&L record(s)`);
+  if (sidAccount) {
+    const growth = ((sidAccount.accountUsd - sidAccount.startingUsd) / sidAccount.startingUsd * 100).toFixed(2);
+    console.log(`SID account: $${sidAccount.accountUsd.toFixed(2)} (${growth >= 0 ? '+' : ''}${growth}% from $${sidAccount.startingUsd})`);
+  }
 
   // Fetch live prices for every symbol we've ever traded
   const tradedSymbols = [...new Set(trades.map(t => t.symbol).filter(Boolean))];
@@ -1227,7 +1376,7 @@ async function run() {
   console.log(`Live prices fetched for: ${Object.keys(livePrices).join(', ') || 'none'}`);
 
   // Build structured trade data (stats + JSON for client-side filtering)
-  const tradeData = buildTradeData(trades, safetyLog, livePrices);
+  const tradeData = buildTradeData(trades, safetyLog, livePrices, closedPositions, sidAccount);
 
   // Save machine-readable signal file for the trading bots to read
   const signalFile = {

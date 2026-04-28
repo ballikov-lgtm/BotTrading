@@ -19,10 +19,12 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.2'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels
+const BOT_VERSION = 'v1.3'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
+const POSITIONS_PATH  = './open-positions-ironclad.json';
+const CLOSED_PATH     = './closed-positions-ironclad.json';
 const SAFETY_LOG_PATH = './ironclad-log.json';
 const SIGNALS_PATH    = './research-signals.json';
 const BITGET_BASE     = 'https://api.bitget.com';
@@ -237,9 +239,19 @@ function calcTakeProfitLevels(direction, entry, stopLoss, emaLevels, htfSwingHig
     ? [entry + risk * 1.5, entry + risk * 2.5, entry + risk * 4.0]
     : [entry - risk * 1.5, entry - risk * 2.5, entry - risk * 4.0];
 
-  const tp1 = parseFloat((deduped[0] ?? fallbacks[0]).toFixed(4));
-  const tp2 = parseFloat((deduped[1] ?? fallbacks[1]).toFixed(4));
-  const tp3 = parseFloat((deduped[2] ?? fallbacks[2]).toFixed(4));
+  // Pick the 3 nearest candidates (or fallbacks), then sort them to guarantee
+  // correct ordering: nearest → furthest from entry.
+  // Without this, a single real S/R level far from entry (e.g. a Fib extension)
+  // could land at TP1 while the closer fallback values end up at TP2/TP3,
+  // producing absurd R:R ratios like 20x at TP1.
+  const rawTp1 = deduped[0] ?? fallbacks[0];
+  const rawTp2 = deduped[1] ?? fallbacks[1];
+  const rawTp3 = deduped[2] ?? fallbacks[2];
+  const sortedTps = [rawTp1, rawTp2, rawTp3]
+    .sort(direction === 'long' ? (a, b) => a - b : (a, b) => b - a);
+  const tp1 = parseFloat(sortedTps[0].toFixed(4));
+  const tp2 = parseFloat(sortedTps[1].toFixed(4));
+  const tp3 = parseFloat(sortedTps[2].toFixed(4));
 
   // R:R ratios for logging
   const rr = (tp) => parseFloat((Math.abs(tp - entry) / risk).toFixed(2));
@@ -327,13 +339,21 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
   const currentPrice = ltfCandles[ltfCandles.length - 1].close;
   const atr = calcATR(ltfCandles);
 
+  // Minimum stop distance: 0.3% of price.
+  // Prevents unrealistically tight stops on low-volatility stocks (GOOGL, AAPL)
+  // where 15m ATR can be smaller than a typical bid/ask spread move.
+  const MIN_STOP_PCT = 0.003;
+
   // Long entry: HTF bullish + price breaks above recent 15m swing low
   if (htfTrend === 'bull' && swingLows.length >= 1) {
     const recentSwingLow = swingLows[swingLows.length - 1];
     const swingLowHigh   = ltfCandles[recentSwingLow.index].high;
 
     if (currentPrice > swingLowHigh) {
-      const stopLoss = parseFloat((recentSwingLow.price - atr * 0.5).toFixed(4));
+      const rawStop  = recentSwingLow.price - atr * 0.5;
+      const minStop  = currentPrice * (1 - MIN_STOP_PCT);
+      // Use the lower of the two — whichever gives the wider (safer) stop
+      const stopLoss = parseFloat(Math.min(rawStop, minStop).toFixed(4));
       return {
         signal:   'long',
         entry:    currentPrice,
@@ -350,7 +370,10 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
     const swingHighLow    = ltfCandles[recentSwingHigh.index].low;
 
     if (currentPrice < swingHighLow) {
-      const stopLoss = parseFloat((recentSwingHigh.price + atr * 0.5).toFixed(4));
+      const rawStop  = recentSwingHigh.price + atr * 0.5;
+      const maxStop  = currentPrice * (1 + MIN_STOP_PCT);
+      // Use the higher of the two — whichever gives the wider (safer) stop
+      const stopLoss = parseFloat(Math.max(rawStop, maxStop).toFixed(4));
       return {
         signal:   'short',
         entry:    currentPrice,
@@ -431,6 +454,307 @@ function calcQuantity(entry, stopLoss) {
   return parseFloat((sizeUsd / entry).toFixed(6));
 }
 
+// ── Paper Position Monitor ────────────────────────────────────────────────────
+// Tracks open paper positions between bot runs using candle OHLC data.
+// On each run it walks 15m candles since the position was opened and detects
+// the first SL or TP breach — simulating the 3-TP split management plan:
+//   TP1 → close 40%, move SL to break-even
+//   TP2 → close 35%, trail SL to TP1 price
+//   TP3 → close final 25%, position fully closed
+// Results are written to closed-positions-ironclad.json for the dashboard
+// to use as locked-in realized P&L (no longer changes with the market).
+
+function loadOpenPositions() {
+  try {
+    if (fs.existsSync(POSITIONS_PATH)) return JSON.parse(fs.readFileSync(POSITIONS_PATH, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveOpenPositions(positions) {
+  fs.writeFileSync(POSITIONS_PATH, JSON.stringify(positions, null, 2));
+}
+
+function loadClosedPositions() {
+  try {
+    if (fs.existsSync(CLOSED_PATH)) return JSON.parse(fs.readFileSync(CLOSED_PATH, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveClosedPositions(positions) {
+  fs.writeFileSync(CLOSED_PATH, JSON.stringify(positions, null, 2));
+}
+
+// First-run bootstrap: seeds open-positions-ironclad.json from the CSV so
+// all historical trades are immediately tracked without manual entry.
+function bootstrapFromCsv() {
+  if (fs.existsSync(POSITIONS_PATH)) return;   // Already initialised
+
+  console.log('  Bootstrapping open positions from trades CSV (first run)...');
+  const closedIds = new Set(loadClosedPositions().map(p => p.id));
+
+  try {
+    const lines   = fs.readFileSync(TRADES_PATH, 'utf8').trim().split('\n');
+    const headers = lines[0].split(',').map(h =>
+      h.trim().toLowerCase().replace(/[→\s]+/g, '_').replace(/[^a-z0-9_]/g, '')
+    );
+
+    const positions = lines.slice(1)
+      .map(line => {
+        const vals = line.split(',');
+        const r    = {};
+        headers.forEach((h, i) => { r[h] = vals[i]?.trim() ?? ''; });
+        return r;
+      })
+      .filter(r => {
+        // Only rows with enough data to monitor — need entry, SL, and at least TP1
+        const id    = r.order_id || '';
+        const entry = parseFloat(r.entry_price) || 0;
+        const sl    = parseFloat(r.stop_loss)   || 0;
+        const tp1   = parseFloat(r.tp1)         || 0;
+        return id && entry > 0 && sl > 0 && tp1 > 0 && !closedIds.has(id);
+      })
+      .map(r => {
+        const entry = parseFloat(r.entry_price);
+        const sl    = parseFloat(r.stop_loss);
+        return {
+          id:            r.order_id,
+          symbol:        r.symbol,
+          side:          r.side,
+          entry,
+          stopLoss:      sl,
+          tp1:           parseFloat(r.tp1) || null,
+          tp2:           parseFloat(r.tp2) || null,
+          tp3:           parseFloat(r.tp3) || null,
+          qty:           parseFloat(r.quantity),
+          totalUsd:      parseFloat(r.total_usd),
+          openDate:      r.date,
+          openTime:      r.time,
+          strategy:      r.strategy,
+          // Mutable state — updated as TPs are partially hit
+          tp1Hit:        false,
+          tp2Hit:        false,
+          currentSl:     sl,       // Starts at original SL; moves to BE after TP1, TP1 after TP2
+          partialCloses: [],       // Locked-in partial exits so far
+        };
+      });
+
+    saveOpenPositions(positions);
+    console.log(`  Bootstrapped ${positions.length} open position(s) from CSV`);
+  } catch (err) {
+    console.log(`  Bootstrap error: ${err.message}`);
+    saveOpenPositions([]);
+  }
+}
+
+// Register a newly placed trade as an open position.
+function addOpenPosition(pos) {
+  const open = loadOpenPositions();
+  if (open.some(p => p.id === pos.id)) return; // No duplicates
+  open.push({
+    ...pos,
+    tp1Hit:        false,
+    tp2Hit:        false,
+    currentSl:     pos.stopLoss,
+    partialCloses: [],
+  });
+  saveOpenPositions(open);
+}
+
+// Walk candles through a position's lifecycle, simulating the 3-TP split plan.
+// Returns the updated mutable state and whether the position is now fully closed.
+// Convention: on a candle where both SL and TP can be reached, SL is checked
+// first (pessimistic / realistic for worst-case backtesting).
+function simulatePosition(pos, candles) {
+  let { currentSl, tp1Hit, tp2Hit, partialCloses } = pos;
+  partialCloses = [...partialCloses]; // Clone — don't mutate original
+
+  const SPLITS   = [0.40, 0.35, 0.25]; // Position fraction closed at TP1, TP2, TP3
+  const LEVERAGE = CONFIG.leverage;
+  let remaining  = 1.0;
+  if (tp1Hit) remaining -= SPLITS[0];
+  if (tp2Hit) remaining -= SPLITS[1];
+
+  let fullyExited = false;
+
+  for (const c of candles) {
+    const cDate = new Date(c.time).toISOString().slice(0, 10);
+    const cTime = new Date(c.time).toISOString().slice(11, 19);
+
+    if (pos.side === 'long') {
+
+      // 1. SL check (pessimistic — checked before TP on same candle)
+      if (c.low <= currentSl) {
+        const pnl = (currentSl - pos.entry) * pos.qty * remaining * LEVERAGE;
+        partialCloses.push({ price: currentSl, level: 'sl', date: cDate, time: cTime, pnl });
+        remaining   = 0;
+        fullyExited = true;
+        break;
+      }
+
+      // 2. TP1 — close 40%, move SL to break-even
+      if (!tp1Hit && pos.tp1 && c.high >= pos.tp1) {
+        const pnl = (pos.tp1 - pos.entry) * pos.qty * SPLITS[0] * LEVERAGE;
+        partialCloses.push({ price: pos.tp1, level: 'tp1', date: cDate, time: cTime, pnl });
+        tp1Hit     = true;
+        remaining -= SPLITS[0];
+        currentSl  = pos.entry; // SL → break-even
+      }
+
+      // 3. TP2 — close 35%, trail SL to TP1
+      if (tp1Hit && !tp2Hit && pos.tp2 && c.high >= pos.tp2) {
+        const pnl = (pos.tp2 - pos.entry) * pos.qty * SPLITS[1] * LEVERAGE;
+        partialCloses.push({ price: pos.tp2, level: 'tp2', date: cDate, time: cTime, pnl });
+        tp2Hit     = true;
+        remaining -= SPLITS[1];
+        currentSl  = pos.tp1; // SL → TP1 (lock in some profit)
+      }
+
+      // 4. TP3 — close final 25%, fully exited
+      if (tp2Hit && pos.tp3 && c.high >= pos.tp3) {
+        const pnl = (pos.tp3 - pos.entry) * pos.qty * SPLITS[2] * LEVERAGE;
+        partialCloses.push({ price: pos.tp3, level: 'tp3', date: cDate, time: cTime, pnl });
+        remaining   = 0;
+        fullyExited = true;
+        break;
+      }
+
+    } else { // short
+
+      if (c.high >= currentSl) {
+        const pnl = (pos.entry - currentSl) * pos.qty * remaining * LEVERAGE;
+        partialCloses.push({ price: currentSl, level: 'sl', date: cDate, time: cTime, pnl });
+        remaining   = 0;
+        fullyExited = true;
+        break;
+      }
+
+      if (!tp1Hit && pos.tp1 && c.low <= pos.tp1) {
+        const pnl = (pos.entry - pos.tp1) * pos.qty * SPLITS[0] * LEVERAGE;
+        partialCloses.push({ price: pos.tp1, level: 'tp1', date: cDate, time: cTime, pnl });
+        tp1Hit     = true;
+        remaining -= SPLITS[0];
+        currentSl  = pos.entry;
+      }
+
+      if (tp1Hit && !tp2Hit && pos.tp2 && c.low <= pos.tp2) {
+        const pnl = (pos.entry - pos.tp2) * pos.qty * SPLITS[1] * LEVERAGE;
+        partialCloses.push({ price: pos.tp2, level: 'tp2', date: cDate, time: cTime, pnl });
+        tp2Hit     = true;
+        remaining -= SPLITS[1];
+        currentSl  = pos.tp1;
+      }
+
+      if (tp2Hit && pos.tp3 && c.low <= pos.tp3) {
+        const pnl = (pos.entry - pos.tp3) * pos.qty * SPLITS[2] * LEVERAGE;
+        partialCloses.push({ price: pos.tp3, level: 'tp3', date: cDate, time: cTime, pnl });
+        remaining   = 0;
+        fullyExited = true;
+        break;
+      }
+    }
+  }
+
+  const realizedPnl = parseFloat(
+    partialCloses.reduce((sum, c) => sum + c.pnl, 0).toFixed(2)
+  );
+  const lastClose   = partialCloses[partialCloses.length - 1] || null;
+
+  return { fullyExited, tp1Hit, tp2Hit, currentSl, partialCloses, realizedPnl, lastClose, remaining };
+}
+
+async function checkPositions() {
+  bootstrapFromCsv();
+
+  const openPositions   = loadOpenPositions();
+  const closedPositions = loadClosedPositions();
+
+  if (!openPositions.length) {
+    console.log('\n── Position Monitor: No open positions ──');
+    return;
+  }
+
+  console.log(`\n── Position Monitor: ${openPositions.length} open position(s) ──`);
+
+  const stillOpen = [];
+
+  for (const pos of openPositions) {
+    process.stdout.write(`  ▶ ${pos.symbol} ${pos.side.toUpperCase()} @ $${pos.entry} (${pos.openDate}) … `);
+
+    let candles;
+    try {
+      // 500 candles × 15m = ~125 hours (~5 days). Catches most recent entries.
+      candles = await fetchCandles(pos.symbol, '15m', 500);
+    } catch (err) {
+      console.log(`candles unavailable (${err.message}) — skipping`);
+      stillOpen.push(pos);
+      continue;
+    }
+
+    // Only candles that closed AFTER the position was opened
+    const openTs   = new Date(`${pos.openDate}T${pos.openTime}Z`).getTime();
+    const relevant = candles.filter(c => c.time > openTs);
+
+    if (!relevant.length) {
+      console.log('no new candles yet');
+      stillOpen.push(pos);
+      continue;
+    }
+
+    const result = simulatePosition(pos, relevant);
+
+    if (!result.fullyExited) {
+      // Update mutable state so we carry forward any TP1/TP2 hits and SL moves
+      stillOpen.push({
+        ...pos,
+        tp1Hit:        result.tp1Hit,
+        tp2Hit:        result.tp2Hit,
+        currentSl:     result.currentSl,
+        partialCloses: result.partialCloses,
+      });
+
+      const progress = result.tp2Hit ? '2/3 TPs hit'
+                     : result.tp1Hit ? '1/3 TPs hit'
+                     : 'awaiting TP1/SL';
+      const slLabel  = result.tp2Hit ? `$${pos.tp1} (trailing)` :
+                       result.tp1Hit ? `$${pos.entry} (B/E)` :
+                       `$${pos.stopLoss}`;
+      console.log(`still open [${progress}] SL→${slLabel}`);
+
+    } else {
+      // Fully exited — record in closed positions
+      const lastClose = result.lastClose;
+      const outcome   = result.partialCloses.some(c => c.level !== 'sl') ? 'WIN'
+                      : result.partialCloses.every(c => c.level === 'sl') ? 'LOSS'
+                      : 'BE'; // Break-even (stopped at entry after TP1)
+
+      closedPositions.push({
+        ...pos,
+        tp1Hit:        result.tp1Hit,
+        tp2Hit:        result.tp2Hit,
+        partialCloses: result.partialCloses,
+        realizedPnl:   result.realizedPnl,
+        exitLevel:     lastClose.level,
+        exitPrice:     lastClose.price,
+        closeDate:     lastClose.date,
+        closeTime:     lastClose.time,
+        outcome,
+      });
+
+      const icon = outcome === 'WIN' ? '✅' : outcome === 'BE' ? '🟡' : '❌';
+      console.log(`${icon} ${outcome} — last exit ${lastClose.level.toUpperCase()} @ $${lastClose.price} · P&L: ${result.realizedPnl >= 0 ? '+' : ''}$${result.realizedPnl}`);
+    }
+  }
+
+  const numClosed = openPositions.length - stillOpen.length;
+
+  saveOpenPositions(stillOpen);
+  saveClosedPositions(closedPositions);
+
+  console.log(`  ── ${numClosed} closed this run, ${stillOpen.length} still open ──`);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function run() {
@@ -438,6 +762,9 @@ async function run() {
   const researchData = loadResearchSignals();
 
   console.log(`\n══ IRONCLAD Bot run ${new Date().toISOString()} ══`);
+
+  // ── Step 0: Check open paper positions before scanning for new entries ────────
+  await checkPositions();
   console.log(`Strategy  : ${rules.strategy}`);
   console.log(`HTF       : ${rules.timeframes.htf}  LTF: ${rules.timeframes.ltf}`);
   console.log(`Leverage  : ${CONFIG.leverage}x  Paper: ${CONFIG.paperTrading}`);
@@ -575,6 +902,23 @@ async function run() {
       `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
     appendTrade(row);
+
+    // Register in open-positions tracker so the monitor can detect SL/TP hits
+    addOpenPosition({
+      id:       order.orderId || order.data?.orderId || 'unknown',
+      symbol,
+      side:     entry.signal,
+      entry:    entry.entry,
+      stopLoss: entry.stopLoss,
+      tp1:      tps.tp1,
+      tp2:      tps.tp2,
+      tp3:      tps.tp3,
+      qty,
+      totalUsd: parseFloat((qty * entry.entry).toFixed(2)),
+      openDate: now.toISOString().slice(0, 10),
+      openTime: now.toISOString().slice(11, 19),
+      strategy: `${BOT_NAME} ${BOT_VERSION}`,
+    });
 
     console.log(`  Trade logged.`);
   }
