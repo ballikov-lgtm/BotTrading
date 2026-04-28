@@ -60,20 +60,21 @@ function saveClosed(filePath, positions) {
 
 // ── Ironclad: 3-TP trailing stop simulation ───────────────────────────────────
 //
-// Rules:
-//   TP1 hit → close 40% of position, SL moves to break-even (entry)
-//   TP2 hit → close 35% of position, SL moves to TP1
-//   TP3 hit → close remaining 25%, trade fully closed
-//   SL hit at any point → close remaining position at current SL level
+// v1.0 trades (no TP2/TP3): single exit — SL or TP1 closes 100% of position.
+// v1.1+ trades (full 3-TP): split plan — 40% at TP1, 35% at TP2, 25% at TP3.
+//   After TP1: SL moves to break-even (entry price)
+//   After TP2: SL moves to TP1
+//   SL hit at any point → close remaining position, trade fully closed
 //   On same candle where both SL and TP can be reached → SL wins (pessimistic)
 
 function simulateIronclad(pos, candles) {
   const SPLITS     = [0.40, 0.35, 0.25];
+  const singleTp   = !pos.tp2 && !pos.tp3;  // v1.0 — only TP1, close 100% there
   let { currentSl, tp1Hit, tp2Hit, partialCloses } = pos;
   partialCloses    = [...partialCloses];
 
   let remaining    = 1.0;
-  if (tp1Hit) remaining -= SPLITS[0];
+  if (tp1Hit) remaining -= (singleTp ? 1.0 : SPLITS[0]);
   if (tp2Hit) remaining -= SPLITS[1];
 
   let fullyExited  = false;
@@ -104,8 +105,10 @@ function simulateIronclad(pos, candles) {
       }
       // 2. TP1
       if (!tp1Hit && pos.tp1 && c.high >= pos.tp1) {
-        closePartial(c, pos.tp1, 'tp1', SPLITS[0]);
-        tp1Hit    = true;
+        const fraction = singleTp ? remaining : SPLITS[0];
+        closePartial(c, pos.tp1, 'tp1', fraction);
+        tp1Hit = true;
+        if (singleTp) { fullyExited = true; break; }
         currentSl = pos.entry; // SL moves to break-even
       }
       // 3. TP2
@@ -129,8 +132,10 @@ function simulateIronclad(pos, candles) {
         break;
       }
       if (!tp1Hit && pos.tp1 && c.low <= pos.tp1) {
-        closePartial(c, pos.tp1, 'tp1', SPLITS[0]);
-        tp1Hit    = true;
+        const fraction = singleTp ? remaining : SPLITS[0];
+        closePartial(c, pos.tp1, 'tp1', fraction);
+        tp1Hit = true;
+        if (singleTp) { fullyExited = true; break; }
         currentSl = pos.entry;
       }
       if (tp1Hit && !tp2Hit && pos.tp2 && c.low <= pos.tp2) {
