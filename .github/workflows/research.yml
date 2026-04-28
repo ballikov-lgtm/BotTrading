@@ -21,6 +21,13 @@ jobs:
 
       - run: npm install
 
+      - name: Run position monitor
+        env:
+          BITGET_API_KEY:    ${{ secrets.BITGET_API_KEY }}
+          BITGET_SECRET_KEY: ${{ secrets.BITGET_SECRET_KEY }}
+          BITGET_PASSPHRASE: ${{ secrets.BITGET_PASSPHRASE }}
+        run: node monitor.js
+
       - name: Run research agent
         env:
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
@@ -31,6 +38,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/index.html research-signals.json
+          git add closed-positions-vwap.json closed-positions-ironclad.json closed-positions-sid.json || true
           git diff --staged --quiet || git commit -m "Dashboard update $(date -u '+%Y-%m-%d %H:%M UTC')"
           git pull --rebase --autostash origin main
           git push

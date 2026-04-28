@@ -317,6 +317,7 @@ function readSafetyLog() {
 function readClosedPositions() {
   const map = new Map();
   const files = [
+    './closed-positions-vwap.json',
     './closed-positions-ironclad.json',
     './closed-positions-sid.json',
   ];
