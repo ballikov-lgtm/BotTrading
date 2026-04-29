@@ -432,7 +432,7 @@ function printSummary(all) {
   const d = stats(all, 'D_PnL', 'D_Outcome', 'D_Action');
   const e = stats(all, 'E_PnL', 'E_Outcome', 'E_Action');
 
-  const fmt  = n => (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(2);
+  const fmt  = n => (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
   const pad  = (s, n) => String(s).padEnd(n);
   const line = '─'.repeat(62);
 

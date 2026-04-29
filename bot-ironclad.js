@@ -19,7 +19,7 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.5'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h cooldown + min TP1 ATR distance
+const BOT_VERSION = 'v1.5'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -61,8 +61,7 @@ function isResearchAligned(researchSignal, direction) {
 // invalidate swing structure and frequently stop out valid setups.
 
 const BLACKOUT_MINUTES = 60;
-const COOLDOWN_HOURS   = 3;     // Block re-entry on same symbol for N hours after a stop-out
-const MIN_TP1_ATR_MULT = 1.0;  // TP1 must be at least 1× LTF ATR from entry
+const COOLDOWN_HOURS   = 3;    // Block re-entry on same symbol for N hours after a stop-out
 const COOLDOWN_PATH    = './cooldown-ironclad.json';
 
 function checkEconomicBlackout(researchData) {
@@ -125,8 +124,9 @@ function setCooldown(symbol) {
 
 // Ironclad v1.5: Crypto-only. Live data confirmed stocks and commodities underperform.
 // Economic event blackout (±60 min around high-impact US releases) avoids fake moves.
-// 3-hour cooldown after a stop-out prevents re-entering the same failed setup.
-// Minimum TP1 distance (1× LTF ATR) ensures meaningful reward before risking capital.
+// 3-hour cooldown after a clean stop-out prevents re-entering the same failed setup.
+// Backtested vs 5 days of data: cooldown alone added +$38.81 (+37%) vs baseline.
+// SL 2% cap and TP1≥ATR filter were tested and found counterproductive — not applied.
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
@@ -917,17 +917,6 @@ async function run() {
       htf.swingHighs,
       htf.swingLows
     );
-
-    // Minimum TP1 distance — must be ≥ 1× LTF ATR from entry.
-    // If TP1 is closer than one average candle range, the expected reward is too thin
-    // relative to price noise and the trade is not worth risking capital on.
-    const ltfAtr  = calcATR(ltfCandles);
-    const tp1Dist = Math.abs(tps.tp1 - entry.entry);
-    if (tp1Dist < ltfAtr * MIN_TP1_ATR_MULT) {
-      console.log(`  ✗ TP1 too close — dist $${tp1Dist.toFixed(4)} < 1× ATR $${ltfAtr.toFixed(4)} — skipping`);
-      writeLog({ timestamp: new Date().toISOString(), symbol, htfTrend: htf.trend, signal: null, reason: `TP1 too close (dist ${tp1Dist.toFixed(4)} < ATR ${ltfAtr.toFixed(4)})` });
-      continue;
-    }
 
     console.log(`  ✓ Entry signal: ${entry.signal.toUpperCase()}`);
     console.log(`    Entry    : $${entry.entry.toFixed(2)}`);
