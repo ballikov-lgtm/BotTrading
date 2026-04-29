@@ -86,10 +86,47 @@ function checkEconomicBlackout(researchData) {
   return null;
 }
 
-// Ironclad v1.4: Crypto-only. Live data confirmed stocks and commodities underperform
-// this strategy — crypto delivered 71%+ win rate vs losses on stocks/gold.
-// Economic event blackout (±60 min around high-impact US releases) added to avoid
-// fake moves around FOMC, NFP, CPI etc.
+// ── Symbol Cooldown (post-loss re-entry block) ────────────────────────────────
+// After a position is stopped out before hitting any TP (clean loss), new entries
+// on that symbol are blocked for COOLDOWN_HOURS. Prevents the bot from repeatedly
+// re-entering the same failed setup in choppy conditions — the primary cause of
+// consecutive losses on the same asset seen in backtesting.
+// Cooldown does NOT trigger on BE outcomes (TP1 hit then stopped at entry) because
+// those are profitable and the setup had valid structure.
+
+function loadCooldowns() {
+  try {
+    if (fs.existsSync(COOLDOWN_PATH)) return JSON.parse(fs.readFileSync(COOLDOWN_PATH, 'utf8'));
+  } catch {}
+  return {};
+}
+
+function saveCooldowns(cooldowns) {
+  fs.writeFileSync(COOLDOWN_PATH, JSON.stringify(cooldowns, null, 2));
+}
+
+function isOnCooldown(symbol) {
+  const cooldowns = loadCooldowns();
+  const until     = cooldowns[symbol];
+  if (!until) return { active: false };
+  const remaining = new Date(until).getTime() - Date.now();
+  if (remaining <= 0) return { active: false };
+  const minsLeft = Math.ceil(remaining / 60000);
+  return { active: true, until, minsLeft };
+}
+
+function setCooldown(symbol) {
+  const cooldowns  = loadCooldowns();
+  const until      = new Date(Date.now() + COOLDOWN_HOURS * 3_600_000).toISOString();
+  cooldowns[symbol] = until;
+  saveCooldowns(cooldowns);
+  console.log(`  ⏳ Cooldown set — no new ${symbol} entries until ${until.slice(11, 16)} UTC (+${COOLDOWN_HOURS}h)`);
+}
+
+// Ironclad v1.5: Crypto-only. Live data confirmed stocks and commodities underperform.
+// Economic event blackout (±60 min around high-impact US releases) avoids fake moves.
+// 3-hour cooldown after a stop-out prevents re-entering the same failed setup.
+// Minimum TP1 distance (1× LTF ATR) ensures meaningful reward before risking capital.
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
@@ -772,6 +809,10 @@ async function checkPositions() {
 
       const icon = outcome === 'WIN' ? '✅' : outcome === 'BE' ? '🟡' : '❌';
       console.log(`${icon} ${outcome} — last exit ${lastClose.level.toUpperCase()} @ $${lastClose.price} · P&L: ${result.realizedPnl >= 0 ? '+' : ''}$${result.realizedPnl}`);
+
+      // Trigger cooldown on clean stop-out (no TP hit). BE outcomes (TP1 hit, then
+      // stopped at entry) are profitable and do NOT trigger cooldown — the setup worked.
+      if (outcome === 'LOSS') setCooldown(pos.symbol);
     }
   }
 
@@ -815,6 +856,13 @@ async function run() {
     // Daily trade limit per symbol
     if (countTodayTrades(symbol) >= CONFIG.maxPerDay) {
       console.log(`  Daily limit reached — skipping`);
+      continue;
+    }
+
+    // Cooldown — 3 hours after any clean stop-out on this symbol
+    const cooldown = isOnCooldown(symbol);
+    if (cooldown.active) {
+      console.log(`  ⏳ Cooldown active — ${cooldown.minsLeft} min remaining (until ${cooldown.until.slice(11, 16)} UTC)`);
       continue;
     }
 
@@ -869,6 +917,17 @@ async function run() {
       htf.swingHighs,
       htf.swingLows
     );
+
+    // Minimum TP1 distance — must be ≥ 1× LTF ATR from entry.
+    // If TP1 is closer than one average candle range, the expected reward is too thin
+    // relative to price noise and the trade is not worth risking capital on.
+    const ltfAtr  = calcATR(ltfCandles);
+    const tp1Dist = Math.abs(tps.tp1 - entry.entry);
+    if (tp1Dist < ltfAtr * MIN_TP1_ATR_MULT) {
+      console.log(`  ✗ TP1 too close — dist $${tp1Dist.toFixed(4)} < 1× ATR $${ltfAtr.toFixed(4)} — skipping`);
+      writeLog({ timestamp: new Date().toISOString(), symbol, htfTrend: htf.trend, signal: null, reason: `TP1 too close (dist ${tp1Dist.toFixed(4)} < ATR ${ltfAtr.toFixed(4)})` });
+      continue;
+    }
 
     console.log(`  ✓ Entry signal: ${entry.signal.toUpperCase()}`);
     console.log(`    Entry    : $${entry.entry.toFixed(2)}`);

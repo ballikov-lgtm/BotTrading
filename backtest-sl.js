@@ -1,16 +1,16 @@
-// backtest-sl.js — Ironclad Stop Loss Rule Comparison
+// backtest-sl.js — Ironclad Rule Comparison Backtest  (v1.5)
 // ─────────────────────────────────────────────────────────────────────────────
-// Compares TWO stop loss rules over the last 5 days of 15m candle data:
+// Tests FOUR rule sets against the same 5-day 15m candle window and outputs
+// every detected signal as a row in backtest-sl.csv (Excel-compatible).
 //
-//   CURRENT RULE  — Place SL just below 15m swing low (- ATR × 0.5).
-//                   Trade taken regardless of how far SL is from entry.
+//  RULE A — Baseline  : Take all signals. No filters.
+//  RULE B — SL Cap    : Skip if SL distance > 2% from entry.
+//  RULE C — Cooldown  : Skip if symbol was stopped out (LOSS) within 3 hours.
+//  RULE D — TP1 ATR   : Skip if TP1 is less than 1× LTF ATR from entry.
+//  RULE E — Combined  : All three filters must pass (B + C + D).
 //
-//   PROPOSED RULE — Same SL placement, but SKIP the trade if SL distance
-//                   from entry exceeds 2%. Removes wide-stop setups that
-//                   produce outsized losses relative to the risk taken.
-//
-// Output: backtest-sl.csv  (Excel-compatible, all filters on every column)
 // This script is READ-ONLY — it does not touch any live trading files.
+// Run with:  node backtest-sl.js
 // ─────────────────────────────────────────────────────────────────────────────
 
 import fetch from 'node-fetch';
@@ -24,27 +24,29 @@ const SYMBOLS = [
   'APTUSDT',  'ONDOUSDT', 'JUPUSDT',
 ];
 
-const PORTFOLIO_USD  = 500;    // Same as live bot
-const LEVERAGE       = 3;      // Same as live bot
-const MAX_TRADE_USD  = 50;     // Same as live bot
-const MAX_SL_PCT     = 0.02;   // Proposed: skip if SL > 2% from entry
-const SPLITS         = [0.40, 0.35, 0.25]; // TP1 / TP2 / TP3 position fractions
+const PORTFOLIO_USD  = 500;
+const LEVERAGE       = 3;
+const MAX_TRADE_USD  = 50;
 
+// Rule thresholds — match exactly what is applied in bot-ironclad.js v1.5
+const MAX_SL_PCT     = 0.02;   // Rule B: skip if SL > 2% from entry
+const COOLDOWN_HOURS = 3;      // Rule C: 3-hour cooldown after clean stop-out
+const MIN_TP1_ATR    = 1.0;    // Rule D: TP1 must be ≥ 1× LTF ATR from entry
+
+const SPLITS         = [0.40, 0.35, 0.25];
 const LOOKBACK_BARS  = 480;    // ~5 days (96 bars/day × 5)
-const LTF_CONTEXT    = 100;    // 15m bars of history for indicators
+const LTF_CONTEXT    = 100;
 const OUTPUT_PATH    = './backtest-sl.csv';
 const BITGET_BASE    = 'https://api.bitget.com';
 
-// ── Fetch Candles (Public — no auth needed) ───────────────────────────────────
+// ── Fetch Candles ─────────────────────────────────────────────────────────────
 
 async function fetchCandles(symbol, granularity, limit) {
   const url  = `${BITGET_BASE}/api/v2/mix/market/candles?symbol=${symbol}&productType=USDT-FUTURES&granularity=${granularity}&limit=${limit}`;
   const res  = await fetch(url);
   const json = await res.json();
-  if (!Array.isArray(json.data)) {
+  if (!Array.isArray(json.data))
     throw new Error(`No candle data for ${symbol} ${granularity}: ${JSON.stringify(json).slice(0, 200)}`);
-  }
-  // BitGet returns newest first — reverse to chronological order
   return json.data.reverse().map(c => ({
     time:  parseInt(c[0]),
     open:  parseFloat(c[1]),
@@ -86,12 +88,13 @@ const FIB_RATIOS = [0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618];
 
 function calcFibLevels(direction, htfHighs, htfLows) {
   if (!htfHighs.length || !htfLows.length) return [];
-  const high  = htfHighs[htfHighs.length - 1].price;
-  const low   = htfLows[htfLows.length  - 1].price;
-  const range = high - low;
-  if (range <= 0) return [];
-  if (direction === 'long') return FIB_RATIOS.map(r => low  + range * r);
-  return FIB_RATIOS.map(r => high - range * r);
+  const high = htfHighs[htfHighs.length - 1].price;
+  const low  = htfLows[htfLows.length  - 1].price;
+  const rng  = high - low;
+  if (rng <= 0) return [];
+  return direction === 'long'
+    ? FIB_RATIOS.map(r => low  + rng * r)
+    : FIB_RATIOS.map(r => high - rng * r);
 }
 
 function calcTakeProfitLevels(direction, entry, stopLoss, ema, htfHighs, htfLows) {
@@ -103,22 +106,15 @@ function calcTakeProfitLevels(direction, entry, stopLoss, ema, htfHighs, htfLows
     ...calcFibLevels(direction, htfHighs, htfLows),
   ].filter(Boolean);
 
-  let levels;
-  if (direction === 'long') {
-    levels = candidates.filter(p => p > entry * 1.002).sort((a, b) => a - b);
-  } else {
-    levels = candidates.filter(p => p < entry * 0.998).sort((a, b) => b - a);
-  }
+  let levels = direction === 'long'
+    ? candidates.filter(p => p > entry * 1.002).sort((a, b) => a - b)
+    : candidates.filter(p => p < entry * 0.998).sort((a, b) => b - a);
 
-  // De-duplicate levels within 0.3% of each other
   const deduped = [];
-  for (const lvl of levels) {
-    if (!deduped.length || Math.abs(lvl - deduped[deduped.length - 1]) / entry > 0.003) {
+  for (const lvl of levels)
+    if (!deduped.length || Math.abs(lvl - deduped[deduped.length - 1]) / entry > 0.003)
       deduped.push(lvl);
-    }
-  }
 
-  // Fallback R:R multiples if not enough S/R levels found
   const fb = direction === 'long'
     ? [entry + risk * 1.5, entry + risk * 2.5, entry + risk * 4.0]
     : [entry - risk * 1.5, entry - risk * 2.5, entry - risk * 4.0];
@@ -127,7 +123,6 @@ function calcTakeProfitLevels(direction, entry, stopLoss, ema, htfHighs, htfLows
   const sorted = raw.sort(direction === 'long' ? (a, b) => a - b : (a, b) => b - a);
   const [tp1, tp2, tp3] = sorted.map(t => parseFloat(t.toFixed(4)));
   const rr = t => parseFloat((Math.abs(t - entry) / risk).toFixed(2));
-
   return { tp1, tp2, tp3, rr1: rr(tp1), rr2: rr(tp2), rr3: rr(tp3) };
 }
 
@@ -149,23 +144,18 @@ function detectTrend(candles, lookback = 2, swingCount = 2, atrThreshold = 0.5) 
   const atr = calcATR(candles);
   const min  = atr * atrThreshold;
   const { swingHighs, swingLows } = detectSwings(candles, lookback);
-
   const fH = swingHighs.filter((s, i) => i === 0 || Math.abs(s.price - swingHighs[i-1].price) >= min);
   const fL = swingLows.filter( (s, i) => i === 0 || Math.abs(s.price - swingLows[i-1].price)  >= min);
-
   if (fH.length < swingCount || fL.length < swingCount)
     return { trend: 'neutral', swingHighs: fH, swingLows: fL };
-
   const rH = fH.slice(-swingCount);
   const rL = fL.slice(-swingCount);
-
   const hh = rH.every((s, i) => i === 0 || s.price > rH[i-1].price);
   const hl = rL.every((s, i) => i === 0 || s.price > rL[i-1].price);
   const lh = rH.every((s, i) => i === 0 || s.price < rH[i-1].price);
   const ll = rL.every((s, i) => i === 0 || s.price < rL[i-1].price);
-
   const trend = (hh && hl) ? 'bull' : (lh && ll) ? 'bear' : 'neutral';
-  return { trend, swingHighs: fH, swingLows: fL, atr };
+  return { trend, swingHighs: fH, swingLows: fL };
 }
 
 function detectEntry(ltfCandles, htfTrend, lookback = 2) {
@@ -175,18 +165,15 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
   const MIN_STOP_PCT = 0.003;
 
   if (htfTrend === 'bull' && swingLows.length >= 1) {
-    const sw      = swingLows[swingLows.length - 1];
-    const swHigh  = ltfCandles[sw.index].high;
-    if (price > swHigh) {
+    const sw = swingLows[swingLows.length - 1];
+    if (price > ltfCandles[sw.index].high) {
       const sl = parseFloat(Math.min(sw.price - atr * 0.5, price * (1 - MIN_STOP_PCT)).toFixed(4));
       return { signal: 'long', entry: price, stopLoss: sl, swingRef: sw.price };
     }
   }
-
   if (htfTrend === 'bear' && swingHighs.length >= 1) {
-    const sw     = swingHighs[swingHighs.length - 1];
-    const swLow  = ltfCandles[sw.index].low;
-    if (price < swLow) {
+    const sw = swingHighs[swingHighs.length - 1];
+    if (price < ltfCandles[sw.index].low) {
       const sl = parseFloat(Math.max(sw.price + atr * 0.5, price * (1 + MIN_STOP_PCT)).toFixed(4));
       return { signal: 'short', entry: price, stopLoss: sl, swingRef: sw.price };
     }
@@ -195,22 +182,12 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
 }
 
 function calcQuantity(entry, stopLoss) {
-  const riskUsd  = PORTFOLIO_USD * 0.01;
-  const slPct    = Math.abs(entry - stopLoss) / entry;
-  const sizeUsd  = Math.min(riskUsd / (slPct * LEVERAGE), MAX_TRADE_USD);
-  return parseFloat((sizeUsd / entry).toFixed(6));
+  const riskUsd = PORTFOLIO_USD * 0.01;
+  const slPct   = Math.abs(entry - stopLoss) / entry;
+  return parseFloat((Math.min(riskUsd / (slPct * LEVERAGE), MAX_TRADE_USD) / entry).toFixed(6));
 }
 
 // ── Trade Simulation ──────────────────────────────────────────────────────────
-// Walks candles chronologically and applies the 3-TP trailing SL plan:
-//   SL hit first (pessimistic) on any candle where both SL and TP are reachable.
-//   TP1 → close 40%, SL trails to break-even
-//   TP2 → close 35%, SL trails to TP1
-//   TP3 → close final 25%, fully exited
-//
-// Returns outcome, partial close list, final exit details, and the candle timestamp
-// at which the position was resolved (so the caller knows when to start looking
-// for the next entry).
 
 function simulateTrade(side, entry, stopLoss, tp1, tp2, tp3, qty, futureCandles) {
   let currentSl = stopLoss;
@@ -224,12 +201,9 @@ function simulateTrade(side, entry, stopLoss, tp1, tp2, tp3, qty, futureCandles)
     const time = d.slice(11, 19);
 
     if (side === 'long') {
-      // SL checked first on every candle (pessimistic)
       if (c.low <= currentSl) {
-        const pnl = (currentSl - entry) * qty * remaining * LEVERAGE;
-        closes.push({ price: currentSl, level: 'SL', date, time, pnl });
-        const out = closes.some(x => x.level !== 'SL') ? 'BE' : 'LOSS';
-        return { outcome: out, closes, exitLevel: 'SL', exitPrice: currentSl, resolveTime: c.time };
+        closes.push({ price: currentSl, level: 'SL', date, time, pnl: (currentSl - entry) * qty * remaining * LEVERAGE });
+        return { outcome: closes.some(x => x.level !== 'SL') ? 'BE' : 'LOSS', closes, exitLevel: 'SL', exitPrice: currentSl, resolveTime: c.time };
       }
       if (!tp1Hit && c.high >= tp1) {
         closes.push({ price: tp1, level: 'TP1', date, time, pnl: (tp1 - entry) * qty * SPLITS[0] * LEVERAGE });
@@ -243,14 +217,10 @@ function simulateTrade(side, entry, stopLoss, tp1, tp2, tp3, qty, futureCandles)
         closes.push({ price: tp3, level: 'TP3', date, time, pnl: (tp3 - entry) * qty * SPLITS[2] * LEVERAGE });
         return { outcome: 'WIN', closes, exitLevel: 'TP3', exitPrice: tp3, resolveTime: c.time };
       }
-
-    } else { // short
-
+    } else {
       if (c.high >= currentSl) {
-        const pnl = (entry - currentSl) * qty * remaining * LEVERAGE;
-        closes.push({ price: currentSl, level: 'SL', date, time, pnl });
-        const out = closes.some(x => x.level !== 'SL') ? 'BE' : 'LOSS';
-        return { outcome: out, closes, exitLevel: 'SL', exitPrice: currentSl, resolveTime: c.time };
+        closes.push({ price: currentSl, level: 'SL', date, time, pnl: (entry - currentSl) * qty * remaining * LEVERAGE });
+        return { outcome: closes.some(x => x.level !== 'SL') ? 'BE' : 'LOSS', closes, exitLevel: 'SL', exitPrice: currentSl, resolveTime: c.time };
       }
       if (!tp1Hit && c.low <= tp1) {
         closes.push({ price: tp1, level: 'TP1', date, time, pnl: (entry - tp1) * qty * SPLITS[0] * LEVERAGE });
@@ -267,112 +237,149 @@ function simulateTrade(side, entry, stopLoss, tp1, tp2, tp3, qty, futureCandles)
     }
   }
 
-  // Reached end of available candle data — position not yet resolved
   const last = closes[closes.length - 1];
   const out  = tp2Hit ? 'WIN_PARTIAL' : tp1Hit ? 'BE_PARTIAL' : 'OPEN';
   return { outcome: out, closes, exitLevel: last?.level ?? 'OPEN', exitPrice: null, resolveTime: null };
 }
 
 // ── Backtest a Single Symbol ──────────────────────────────────────────────────
-// Walks every 15m bar in the backtest window. When a signal is detected, the
-// full position lifecycle is simulated immediately using subsequent bars.
-// nextFreeIdx prevents re-entering while a position is already active.
+// Rules B/C/D are evaluated per-signal but position tracking (nextFreeIdx) is
+// always driven by the BASELINE (Rule A) so that all rules see the same signals.
+// Cooldown state is tracked from Rule A outcomes to ensure a fair comparison.
 
 async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
-  const results    = [];
-  const startIdx   = Math.max(LTF_CONTEXT, ltfCandles.length - LOOKBACK_BARS);
-  let nextFreeIdx  = startIdx;
+  const results     = [];
+  const startIdx    = Math.max(LTF_CONTEXT, ltfCandles.length - LOOKBACK_BARS);
+  let nextFreeIdx   = startIdx;
+  let cooldownUntil = 0;   // ms timestamp — updated from Rule A LOSS outcomes
 
   for (let i = startIdx; i < ltfCandles.length - 1; i++) {
     if (i < nextFreeIdx) continue;
 
     const bar = ltfCandles[i];
 
-    // Only use fully-closed daily candles — a 1D candle starting at T closes at T + 24h
+    // Only use fully-closed daily candles (1D candle closing = open + 24h)
     const availDaily = dailyCandles.filter(d => d.time + 86_400_000 <= bar.time);
     if (availDaily.length < 15) continue;
 
-    // Sliding 15m context window (LTF_CONTEXT bars up to and including current)
     const avail15m = ltfCandles.slice(Math.max(0, i - LTF_CONTEXT + 1), i + 1);
     if (avail15m.length < 20) continue;
 
-    // ── Step 1: Detect HTF trend ──────────────────────────────────────────────
     const htf = detectTrend(availDaily, 2, 2, 0.5);
     if (htf.trend === 'neutral') continue;
 
-    // ── Step 2: Detect LTF entry ──────────────────────────────────────────────
     const sig = detectEntry(avail15m, htf.trend, 2);
     if (!sig) continue;
 
-    // ── Step 3: Calculate TPs ─────────────────────────────────────────────────
-    const ema = calcEMALevels(availDaily);
-    const tps = calcTakeProfitLevels(sig.signal, sig.entry, sig.stopLoss, ema, htf.swingHighs, htf.swingLows);
+    // ── Indicators ───────────────────────────────────────────────────────────
+    const ema     = calcEMALevels(availDaily);
+    const tps     = calcTakeProfitLevels(sig.signal, sig.entry, sig.stopLoss, ema, htf.swingHighs, htf.swingLows);
+    const ltfAtr  = calcATR(avail15m);
+    const slPct   = Math.abs(sig.entry - sig.stopLoss) / sig.entry;
+    const tp1Dist = Math.abs(tps.tp1 - sig.entry);
+    const qty     = calcQuantity(sig.entry, sig.stopLoss);
 
-    const slPct  = Math.abs(sig.entry - sig.stopLoss) / sig.entry;
-    const under2 = slPct <= MAX_SL_PCT;
-    const qty    = calcQuantity(sig.entry, sig.stopLoss);
+    // ── Rule evaluation ───────────────────────────────────────────────────────
+    const ruleB_ok = slPct   <= MAX_SL_PCT;               // SL ≤ 2%
+    const ruleC_ok = bar.time >= cooldownUntil;            // not on cooldown
+    const ruleD_ok = tp1Dist >= ltfAtr * MIN_TP1_ATR;     // TP1 far enough
 
-    // ── Step 4: Simulate using all candles after entry bar ────────────────────
+    // ── Simulate using Rule A (all signals taken) ─────────────────────────────
     const future = ltfCandles.slice(i + 1);
     const sim    = simulateTrade(sig.signal, sig.entry, sig.stopLoss, tps.tp1, tps.tp2, tps.tp3, qty, future);
     const pnl    = parseFloat(sim.closes.reduce((s, c) => s + c.pnl, 0).toFixed(2));
 
-    // ── Step 5: Advance past the resolved position ────────────────────────────
+    // Advance position tracker
     if (sim.resolveTime) {
-      // Find the index of the candle where the trade resolved, then skip to i+1
       for (let j = i + 1; j < ltfCandles.length; j++) {
         if (ltfCandles[j].time >= sim.resolveTime) { nextFreeIdx = j + 1; break; }
       }
     } else {
-      // Trade still open — no more data to simulate; stop looking for this symbol
       nextFreeIdx = ltfCandles.length;
     }
 
-    // ── Step 6: Record result ─────────────────────────────────────────────────
+    // Update cooldown from Rule A outcome — only clean losses trigger it
+    if (sim.outcome === 'LOSS' && sim.resolveTime) {
+      cooldownUntil = sim.resolveTime + COOLDOWN_HOURS * 3_600_000;
+    }
+
+    // ── Per-rule P&L ──────────────────────────────────────────────────────────
+    const pnlB = ruleB_ok  ? pnl : 0;
+    const pnlC = ruleC_ok  ? pnl : 0;
+    const pnlD = ruleD_ok  ? pnl : 0;
+    const ruleE_ok = ruleB_ok && ruleC_ok && ruleD_ok;
+    const pnlE = ruleE_ok  ? pnl : 0;
+
+    const actionB = ruleB_ok  ? 'TAKEN' : 'SKIP_SL_2PCT';
+    const actionC = ruleC_ok  ? 'TAKEN' : 'BLOCK_COOLDOWN';
+    const actionD = ruleD_ok  ? 'TAKEN' : 'SKIP_TP1_ATR';
+    const actionE = ruleE_ok  ? 'TAKEN'
+                  : !ruleB_ok ? 'SKIP_SL_2PCT'
+                  : !ruleC_ok ? 'BLOCK_COOLDOWN'
+                  :             'SKIP_TP1_ATR';
+
     const date = new Date(bar.time).toISOString().slice(0, 10);
     const time = new Date(bar.time).toISOString().slice(11, 19);
 
-    // PnL_Difference: how the NEW rule performs vs CURRENT rule for this trade
-    //  - Trade taken under both rules: difference = 0
-    //  - Trade SKIPPED by new rule   : difference = how much we saved/missed by not taking it
-    //    e.g. current was -$3.50 (loss) → new saves +$3.50
-    //    e.g. current was +$5.00 (win)  → new misses -$5.00
-    const pnlDiff = parseFloat((under2 ? 0 : -pnl).toFixed(2));
-
     results.push({
-      Date:               date,
-      Time:               time,
-      Symbol:             symbol,
-      Side:               sig.signal.toUpperCase(),
-      Entry:              parseFloat(sig.entry.toFixed(4)),
-      StopLoss:           parseFloat(sig.stopLoss.toFixed(4)),
-      SwingRef:           parseFloat(sig.swingRef.toFixed(4)),
-      SL_Dist_Pct:        parseFloat((slPct * 100).toFixed(2)),
-      SL_Under_2pct:      under2 ? 'YES' : 'NO',
-      TP1:                parseFloat(tps.tp1.toFixed(4)),
-      TP2:                parseFloat(tps.tp2.toFixed(4)),
-      TP3:                parseFloat(tps.tp3.toFixed(4)),
-      RR1:                tps.rr1,
-      RR2:                tps.rr2,
-      RR3:                tps.rr3,
-      Size_USD:           parseFloat((qty * sig.entry).toFixed(2)),
-      // ── CURRENT RULE: all signals taken ────────────────────────────────────
-      Current_Outcome:    sim.outcome,
-      Current_Exit_Level: sim.exitLevel,
-      Current_Exit_Price: sim.exitPrice != null ? parseFloat(sim.exitPrice.toFixed(4)) : '',
-      Current_PnL_USD:    pnl,
-      // ── NEW RULE: skip if SL > 2% ──────────────────────────────────────────
-      New_Rule_Action:    under2 ? 'TAKEN' : 'SKIPPED',
-      New_Outcome:        under2 ? sim.outcome : 'SKIPPED',
-      New_Exit_Level:     under2 ? sim.exitLevel : 'SKIPPED',
-      New_Exit_Price:     under2 && sim.exitPrice != null ? parseFloat(sim.exitPrice.toFixed(4)) : '',
-      New_PnL_USD:        under2 ? pnl : 0,
-      PnL_Difference:     pnlDiff,
+      // ── Signal info ──────────────────────────────────────────────────────────
+      Date:             date,
+      Time:             time,
+      Symbol:           symbol,
+      Side:             sig.signal.toUpperCase(),
+      Entry:            parseFloat(sig.entry.toFixed(4)),
+      StopLoss:         parseFloat(sig.stopLoss.toFixed(4)),
+      SwingRef:         parseFloat(sig.swingRef.toFixed(4)),
+      SL_Dist_Pct:      parseFloat((slPct * 100).toFixed(2)),
+      TP1:              parseFloat(tps.tp1.toFixed(4)),
+      TP1_Dist:         parseFloat(tp1Dist.toFixed(4)),
+      LTF_ATR:          parseFloat(ltfAtr.toFixed(4)),
+      TP1_vs_ATR:       parseFloat((tp1Dist / ltfAtr).toFixed(2)),
+      TP2:              parseFloat(tps.tp2.toFixed(4)),
+      TP3:              parseFloat(tps.tp3.toFixed(4)),
+      RR1:              tps.rr1,
+      RR2:              tps.rr2,
+      RR3:              tps.rr3,
+      Size_USD:         parseFloat((qty * sig.entry).toFixed(2)),
+      // ── Rule A — Baseline (no filters) ───────────────────────────────────────
+      A_Outcome:        sim.outcome,
+      A_Exit:           sim.exitLevel,
+      A_Exit_Price:     sim.exitPrice != null ? parseFloat(sim.exitPrice.toFixed(4)) : '',
+      A_PnL:            pnl,
+      // ── Rule B — SL ≤ 2% ─────────────────────────────────────────────────────
+      B_SL_Under2pct:   ruleB_ok ? 'YES' : 'NO',
+      B_Action:         actionB,
+      B_Outcome:        ruleB_ok  ? sim.outcome : 'SKIPPED',
+      B_PnL:            pnlB,
+      // ── Rule C — 3-hour cooldown after loss ───────────────────────────────────
+      C_On_Cooldown:    ruleC_ok ? 'NO' : 'YES',
+      C_Action:         actionC,
+      C_Outcome:        ruleC_ok  ? sim.outcome : 'BLOCKED',
+      C_PnL:            pnlC,
+      // ── Rule D — TP1 ≥ 1× ATR ────────────────────────────────────────────────
+      D_TP1_ATR_OK:     ruleD_ok ? 'YES' : 'NO',
+      D_Action:         actionD,
+      D_Outcome:        ruleD_ok  ? sim.outcome : 'FILTERED',
+      D_PnL:            pnlD,
+      // ── Rule E — All filters combined (B + C + D) ─────────────────────────────
+      E_Action:         actionE,
+      E_Outcome:        ruleE_ok  ? sim.outcome : 'BLOCKED',
+      E_PnL:            pnlE,
+      // ── P&L vs baseline ──────────────────────────────────────────────────────
+      B_vs_A:           parseFloat((pnlB - pnl).toFixed(2)),
+      C_vs_A:           parseFloat((pnlC - pnl).toFixed(2)),
+      D_vs_A:           parseFloat((pnlD - pnl).toFixed(2)),
+      E_vs_A:           parseFloat((pnlE - pnl).toFixed(2)),
     });
 
-    const flag   = under2 ? '' : ' ← WOULD SKIP (SL > 2%)';
+    // Console line
+    const flags = [
+      !ruleB_ok ? 'SL>2%' : '',
+      !ruleC_ok ? 'COOLDOWN' : '',
+      !ruleD_ok ? 'TP1<ATR' : '',
+    ].filter(Boolean).join(' ');
     const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
-    console.log(`    ${date} ${time} ${sig.signal.toUpperCase().padEnd(5)} @ ${sig.entry.toFixed(4)}  SL:${(slPct*100).toFixed(2)}%  → ${sim.outcome.padEnd(12)} ${pnlStr}${flag}`);
+    console.log(`    ${date} ${time} ${sig.signal.toUpperCase().padEnd(5)} @ ${sig.entry.toFixed(4)}  SL:${(slPct*100).toFixed(2)}%  TP1/ATR:${(tp1Dist/ltfAtr).toFixed(1)}x  → ${sim.outcome.padEnd(12)} ${pnlStr}${flags ? '  ← ' + flags : ''}`);
   }
 
   return results;
@@ -381,108 +388,107 @@ async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
 // ── CSV Writer ────────────────────────────────────────────────────────────────
 
 function writeCSV(rows) {
-  if (!rows.length) {
-    console.log('\nNo signals detected — nothing to write.');
-    return;
-  }
+  if (!rows.length) { console.log('\nNo signals detected.'); return; }
   const headers = Object.keys(rows[0]);
   const lines   = [
     headers.join(','),
-    ...rows.map(r =>
-      headers.map(h => {
-        const v = r[h] ?? '';
-        return String(v).includes(',') ? `"${v}"` : v;
-      }).join(',')
-    ),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h] ?? '';
+      return String(v).includes(',') ? `"${v}"` : v;
+    }).join(',')),
   ];
   fs.writeFileSync(OUTPUT_PATH, lines.join('\n'));
   console.log(`\n✅  CSV written → ${OUTPUT_PATH}  (${rows.length} signals)`);
 }
 
-// ── Summary Table ─────────────────────────────────────────────────────────────
+// ── Summary ───────────────────────────────────────────────────────────────────
 
-function printSummary(results) {
-  // Exclude OPEN / PARTIAL outcomes from win rate (incomplete data)
-  const OPEN_OUTCOMES = ['OPEN', 'WIN_PARTIAL', 'BE_PARTIAL'];
-  const resolved      = results.filter(r => !OPEN_OUTCOMES.includes(r.Current_Outcome));
+function printSummary(all) {
+  const OPEN = ['OPEN', 'WIN_PARTIAL', 'BE_PARTIAL'];
+  const resolved = all.filter(r => !OPEN.includes(r.A_Outcome));
 
-  const cWins   = resolved.filter(r => r.Current_Outcome === 'WIN').length;
-  const cLosses = resolved.filter(r => r.Current_Outcome === 'LOSS').length;
-  const cBE     = resolved.filter(r => r.Current_Outcome === 'BE').length;
-  const cPnl    = resolved.reduce((s, r) => s + r.Current_PnL_USD, 0);
+  function stats(rows, pnlKey, outcomeKey, actionKey) {
+    const taken  = rows.filter(r => r[actionKey] === 'TAKEN' && !OPEN.includes(r[outcomeKey]));
+    const skip   = rows.filter(r => r[actionKey] !== 'TAKEN').length;
+    const wins   = taken.filter(r => r[outcomeKey] === 'WIN').length;
+    const losses = taken.filter(r => r[outcomeKey] === 'LOSS').length;
+    const bes    = taken.filter(r => r[outcomeKey] === 'BE').length;
+    const wr     = taken.length ? Math.round(wins / taken.length * 100) : 0;
+    const tp1r   = taken.length ? Math.round((wins + bes) / taken.length * 100) : 0;
+    const pnl    = rows.reduce((s, r) => s + (r[pnlKey] ?? 0), 0);
+    return { taken: taken.length, skip, wins, losses, bes, wr, tp1r, pnl };
+  }
 
-  const newTaken   = results.filter(r => r.New_Rule_Action === 'TAKEN' && !OPEN_OUTCOMES.includes(r.New_Outcome));
-  const skipped    = results.filter(r => r.New_Rule_Action === 'SKIPPED');
-  const nWins      = newTaken.filter(r => r.New_Outcome === 'WIN').length;
-  const nLosses    = newTaken.filter(r => r.New_Outcome === 'LOSS').length;
-  const nBE        = newTaken.filter(r => r.New_Outcome === 'BE').length;
-  const nPnl       = results.reduce((s, r) => s + r.New_PnL_USD, 0);
+  const a = stats(resolved, 'A_PnL', 'A_Outcome', 'A_Outcome');  // Rule A: "action" = always TAKEN
+  // override Rule A since it has no action column — all resolved
+  const aWins   = resolved.filter(r => r.A_Outcome === 'WIN').length;
+  const aLosses = resolved.filter(r => r.A_Outcome === 'LOSS').length;
+  const aBEs    = resolved.filter(r => r.A_Outcome === 'BE').length;
+  const aTp1r   = resolved.length ? Math.round((aWins + aBEs) / resolved.length * 100) : 0;
+  const aPnl    = resolved.reduce((s, r) => s + r.A_PnL, 0);
 
-  const skippedLosses = skipped.filter(r => r.Current_Outcome === 'LOSS' || r.Current_Outcome === 'BE').length;
-  const skippedWins   = skipped.filter(r => r.Current_Outcome === 'WIN').length;
-  const skippedPnl    = skipped.reduce((s, r) => s + r.Current_PnL_USD, 0);
+  const b = stats(all, 'B_PnL', 'B_Outcome', 'B_Action');
+  const c = stats(all, 'C_PnL', 'C_Outcome', 'C_Action');
+  const d = stats(all, 'D_PnL', 'D_Outcome', 'D_Action');
+  const e = stats(all, 'E_PnL', 'E_Outcome', 'E_Action');
 
-  const fmt = (n) => (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(2);
+  const fmt  = n => (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(2);
+  const pad  = (s, n) => String(s).padEnd(n);
+  const line = '─'.repeat(62);
 
-  console.log('\n╔══════════════════════════════════════════════════════════════╗');
-  console.log('║              IRONCLAD SL BACKTEST SUMMARY                   ║');
-  console.log('╠══════════════════════════════════════════════════════════════╣');
-  console.log(`║  Period        : Last 5 days of 15m candle data              ║`);
-  console.log(`║  Symbols       : ${SYMBOLS.length} crypto pairs                             ║`);
-  console.log(`║  Total signals : ${String(results.length).padEnd(44)} ║`);
-  console.log('╠══════════════════════════════════════════════════════════════╣');
-  console.log('║  CURRENT RULE — Take all signals (no SL cap)                 ║');
-  console.log(`║    Resolved    : ${String(resolved.length).padEnd(44)} ║`);
-  console.log(`║    WIN/LOSS/BE : ${cWins}/${cLosses}/${cBE}${' '.repeat(42 - String(cWins+'/'+cLosses+'/'+cBE).length)} ║`);
-  console.log(`║    Win rate    : ${String(resolved.length ? Math.round(cWins/resolved.length*100) : 0).padEnd(3)}%${' '.repeat(41)} ║`);
-  console.log(`║    Total P&L   : ${fmt(cPnl).padEnd(44)} ║`);
-  console.log('╠══════════════════════════════════════════════════════════════╣');
-  console.log('║  NEW RULE — Skip if SL > 2% from entry                       ║');
-  console.log(`║    Taken       : ${String(newTaken.length).padEnd(44)} ║`);
-  console.log(`║    Skipped     : ${String(skipped.length).padEnd(44)} ║`);
-  console.log(`║    WIN/LOSS/BE : ${nWins}/${nLosses}/${nBE}${' '.repeat(42 - String(nWins+'/'+nLosses+'/'+nBE).length)} ║`);
-  console.log(`║    Win rate    : ${String(newTaken.length ? Math.round(nWins/newTaken.length*100) : 0).padEnd(3)}%${' '.repeat(41)} ║`);
-  console.log(`║    Total P&L   : ${fmt(nPnl).padEnd(44)} ║`);
-  console.log('╠══════════════════════════════════════════════════════════════╣');
-  console.log('║  SKIPPED TRADES BREAKDOWN                                    ║');
-  console.log(`║    Losses/BE avoided   : ${String(skippedLosses).padEnd(36)} ║`);
-  console.log(`║    Wins missed         : ${String(skippedWins).padEnd(36)} ║`);
-  console.log(`║    P&L of skipped set  : ${fmt(skippedPnl).padEnd(36)} ║`);
-  console.log('╠══════════════════════════════════════════════════════════════╣');
-  console.log(`║  NET DIFFERENCE (new vs current): ${fmt(nPnl - cPnl).padEnd(28)} ║`);
-  console.log('╚══════════════════════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`Open the CSV in Excel: Data → Filter (Ctrl+Shift+L) for full analysis.`);
+  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+  console.log(`║           IRONCLAD RULE COMPARISON — LAST 5 DAYS            ║`);
+  console.log(`╠══════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Total signals : ${pad(all.length, 44)} ║`);
+  console.log(`║  Resolved      : ${pad(resolved.length, 44)} ║`);
+  console.log(`╠══════════════════╦═══════╦═══════╦═══════╦═══════╦══════════╣`);
+  console.log(`║  Metric          ║  A    ║  B    ║  C    ║  D    ║  E       ║`);
+  console.log(`║                  ║ Base  ║SL≤2%  ║Cool3h ║TP1ATR ║ All 3   ║`);
+  console.log(`╠══════════════════╬═══════╬═══════╬═══════╬═══════╬══════════╣`);
+
+  const row = (label, vals) => {
+    const cells = vals.map(v => String(v).padEnd(5));
+    console.log(`║  ${pad(label, 16)} ║ ${cells[0]} ║ ${cells[1]} ║ ${cells[2]} ║ ${cells[3]} ║ ${cells[4].padEnd(8)} ║`);
+  };
+
+  row('Taken',        [resolved.length, b.taken, c.taken, d.taken, e.taken]);
+  row('Skipped',      [0,               b.skip,  c.skip,  d.skip,  e.skip]);
+  row('WIN (TP3)',    [aWins,            b.wins,  c.wins,  d.wins,  e.wins]);
+  row('LOSS',         [aLosses,         b.losses,c.losses,d.losses,e.losses]);
+  row('BE (TP1+)',    [aBEs,            b.bes,   c.bes,   d.bes,   e.bes]);
+  row('TP1+ rate',   [`${aTp1r}%`,     `${b.tp1r}%`,`${c.tp1r}%`,`${d.tp1r}%`,`${e.tp1r}%`]);
+  row('Total P&L',   [fmt(aPnl),       fmt(b.pnl),fmt(c.pnl),fmt(d.pnl),fmt(e.pnl)]);
+  row('vs Baseline', ['—',            fmt(b.pnl-aPnl),fmt(c.pnl-aPnl),fmt(d.pnl-aPnl),fmt(e.pnl-aPnl)]);
+
+  console.log(`╚══════════════════╩═══════╩═══════╩═══════╩═══════╩══════════╝`);
+  console.log(`\n  A=Baseline  B=SL≤2%  C=3h cooldown  D=TP1≥ATR  E=B+C+D`);
+  console.log(`  TP1+ rate = trades where at least TP1 was hit (WIN or BE)`);
+  console.log(`  Open the CSV in Excel → Data → Filter (Ctrl+Shift+L) for full drill-down\n`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log('══ Ironclad Stop Loss Backtest ══');
-  console.log(`Comparing: CURRENT (no cap) vs NEW (skip SL > ${MAX_SL_PCT * 100}%)`);
-  console.log(`Window: last ~5 days  |  Symbols: ${SYMBOLS.length}  |  Leverage: ${LEVERAGE}x\n`);
+  console.log('══ Ironclad Rule Comparison Backtest (v1.5) ══');
+  console.log(`Rules: A=baseline  B=SL≤${MAX_SL_PCT*100}%  C=${COOLDOWN_HOURS}h cooldown  D=TP1≥${MIN_TP1_ATR}×ATR  E=B+C+D`);
+  console.log(`Window: ~5 days  |  ${SYMBOLS.length} symbols  |  ${LEVERAGE}x leverage\n`);
 
   const allResults = [];
 
   for (const symbol of SYMBOLS) {
-    process.stdout.write(`▶ ${symbol} — fetching candles... `);
+    process.stdout.write(`▶ ${symbol} — fetching... `);
     try {
       const [dailyCandles, ltfCandles] = await Promise.all([
         fetchCandles(symbol, '1D',  200),
         fetchCandles(symbol, '15m', 500),
       ]);
-      process.stdout.write(`${dailyCandles.length} daily, ${ltfCandles.length} 15m bars\n`);
-
-      const results = await backtestSymbol(symbol, dailyCandles, ltfCandles);
-      if (!results.length) {
-        console.log(`  (no signals detected)`);
-      }
-      allResults.push(...results);
+      process.stdout.write(`${dailyCandles.length}d / ${ltfCandles.length}×15m\n`);
+      const res = await backtestSymbol(symbol, dailyCandles, ltfCandles);
+      if (!res.length) console.log(`  (no signals)`);
+      allResults.push(...res);
     } catch (err) {
       console.log(`\n  ✗ ${err.message}`);
     }
-
-    // Small delay between symbols to stay well within rate limits
     await new Promise(r => setTimeout(r, 350));
   }
 
@@ -490,7 +496,4 @@ async function run() {
   printSummary(allResults);
 }
 
-run().catch(err => {
-  console.error('\nFatal error:', err.message);
-  process.exit(1);
-});
+run().catch(err => { console.error('Fatal:', err.message); process.exit(1); });
