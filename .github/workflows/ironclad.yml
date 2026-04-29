@@ -65,5 +65,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add trades-ironclad.csv ironclad-log.json || true
+          git add open-positions-ironclad.json           || true
+          git add closed-positions-ironclad.json         || true
+          git add cooldown-ironclad.json                 || true
           git diff --staged --quiet || git commit -m "Ironclad run $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push || true
+          git pull --rebase --autostash origin main
+          git push
