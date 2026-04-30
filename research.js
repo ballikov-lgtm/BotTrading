@@ -360,6 +360,8 @@ function calcTradePnl(trade, safetyLog, livePrices = {}, closedPositions = new M
       realized:     true,
       exitLevel:    closed.exitLevel,
       outcome:      closed.outcome,
+      closeDate:    closed.closeDate  || null,
+      closeTime:    closed.closeTime  || null,
     };
   }
 
@@ -431,11 +433,15 @@ function buildTradeData(trades, safetyLog, livePrices = {}, closedPositions = ne
     let realized   = false;
     let exitLevel  = null;
     let outcome    = null;
+    let closeDate  = null;
+    let closeTime  = null;
     if (result !== null) {
       tradePnl    = result.pnl;
       realized    = result.realized || false;
       exitLevel   = result.exitLevel || null;
       outcome     = result.outcome   || null;
+      closeDate   = result.closeDate || null;
+      closeTime   = result.closeTime || null;
       cumulative += result.pnl;
       cumPnl      = cumulative;
       totalPnl   += result.pnl;
@@ -450,6 +456,8 @@ function buildTradeData(trades, safetyLog, livePrices = {}, closedPositions = ne
       realized,
       exitLevel,
       outcome,
+      closeDate,
+      closeTime,
       currentPrice: result?.currentPrice,
       category:     getCategory(t.symbol),
       month:        t.date ? t.date.slice(0, 7) : '',
@@ -1083,14 +1091,15 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     <table>
       <thead>
         <tr>
-          <th>Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+          <th>Open Date</th><th>Open Time</th><th>Symbol</th><th>Side</th>
           <th>Entry</th><th>Stop Loss</th><th>Exit / Live</th><th>Qty</th>
+          <th>Close Date</th><th>Close Time</th>
           <th>P&amp;L</th><th>Cumulative</th><th>Mode</th>
           <th>Bot</th><th>Strategy</th><th>Version</th>
         </tr>
       </thead>
       <tbody id="history-tbody">
-        <tr><td colspan="14" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+        <tr><td colspan="16" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -1184,7 +1193,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       const tbody = document.getElementById('history-tbody');
 
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
       } else {
         tbody.innerHTML = page.map(t => {
           const modeLabel = t.mode === 'paper'
@@ -1207,15 +1216,24 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
             priceCell = '<span style="color:#484f58">—</span>';
           }
 
+          const closeDateCell = t.closeDate
+            ? '<span style="color:#c9d1d9">' + t.closeDate + '</span>'
+            : '<span style="color:#484f58">—</span>';
+          const closeTimeCell = t.closeTime
+            ? '<span style="color:#8b949e;font-size:13px">' + t.closeTime + '</span>'
+            : '<span style="color:#484f58">—</span>';
+
           return '<tr>' +
             '<td>' + t.date + '</td>' +
-            '<td>' + t.time + '</td>' +
+            '<td style="color:#8b949e;font-size:13px">' + t.time + '</td>' +
             '<td>' + (catIcon[t.category] || '📊') + ' ' + t.symbol + '</td>' +
             '<td>' + (t.side === 'long' ? '🟢 Long' : '🔴 Short') + '</td>' +
             '<td>$' + (t.entry ? t.entry.toFixed(2) : '—') + '</td>' +
             '<td style="color:#f85149;font-size:13px">' + (t.sl ? '$' + t.sl.toFixed(2) : '—') + '</td>' +
             '<td>' + priceCell + '</td>' +
             '<td style="color:#8b949e;font-size:13px">' + t.qty + '</td>' +
+            '<td>' + closeDateCell + '</td>' +
+            '<td>' + closeTimeCell + '</td>' +
             '<td>' + fmtPnl(t.pnl, t.realized, t.exitLevel) + '</td>' +
             '<td>' + fmtPnl(t.cumPnl) + '</td>' +
             '<td>' + modeLabel + '</td>' +

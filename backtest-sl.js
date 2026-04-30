@@ -1,13 +1,25 @@
-// backtest-sl.js — Ironclad Rule Comparison Backtest  (v1.5)
+// backtest-sl.js — Ironclad Rule Comparison Backtest  (v2.0)
 // ─────────────────────────────────────────────────────────────────────────────
-// Tests FOUR rule sets against the same 5-day 15m candle window and outputs
+// Tests SEVEN rule sets against the same 5-day 15m candle window and outputs
 // every detected signal as a row in backtest-sl.csv (Excel-compatible).
 //
-//  RULE A — Baseline  : Take all signals. No filters.
-//  RULE B — SL Cap    : Skip if SL distance > 2% from entry.
-//  RULE C — Cooldown  : Skip if symbol was stopped out (LOSS) within 3 hours.
-//  RULE D — TP1 ATR   : Skip if TP1 is less than 1× LTF ATR from entry.
-//  RULE E — Combined  : All three filters must pass (B + C + D).
+//  RULE A   — Baseline     : Take all signals. No filters.
+//  RULE B   — SL Cap       : Skip if SL distance > 2% from entry.
+//  RULE C   — Cooldown     : Skip if symbol was stopped out (LOSS) within 3h.
+//  RULE D   — TP1 ATR      : Skip if TP1 is less than 1× LTF ATR from entry.
+//  RULE E   — B+C+D        : All three original filters must pass.
+//  RULE F   — BTC Trend    : Block entries that go against the BTC daily trend.
+//                             BTC BULL → only LONGs across all symbols.
+//                             BTC BEAR → only SHORTs across all symbols.
+//                             BTC NEUTRAL → both directions allowed.
+//  RULE G   — Wider SL     : Same entry signal but SL buffered at ATR × 1.0
+//                             (instead of 0.5). Smaller position size, more
+//                             room to breathe. Separate simulation.
+//  RULE C+F  — Cool+BTC   : Both cooldown AND BTC trend filter must pass.
+//  RULE C+F+G — All new   : Cooldown + BTC filter + wider SL.
+//
+// Summary table shows: A, C, F, G, C+F, C+F+G
+// B/D/E are still in the CSV for reference.
 //
 // This script is READ-ONLY — it does not touch any live trading files.
 // Run with:  node backtest-sl.js
@@ -28,10 +40,13 @@ const PORTFOLIO_USD  = 500;
 const LEVERAGE       = 3;
 const MAX_TRADE_USD  = 50;
 
-// Rule thresholds — match exactly what is applied in bot-ironclad.js v1.5
-const MAX_SL_PCT     = 0.02;   // Rule B: skip if SL > 2% from entry
-const COOLDOWN_HOURS = 3;      // Rule C: 3-hour cooldown after clean stop-out
-const MIN_TP1_ATR    = 1.0;    // Rule D: TP1 must be ≥ 1× LTF ATR from entry
+// Rule thresholds
+const MAX_SL_PCT       = 0.02;   // Rule B: skip if SL > 2% from entry
+const COOLDOWN_HOURS   = 3;      // Rule C: 3-hour cooldown after clean stop-out
+const MIN_TP1_ATR      = 1.0;    // Rule D: TP1 must be ≥ 1× LTF ATR from entry
+const SL_ATR_MULT_WIDE = 1.0;    // Rule G: wider SL multiplier (vs 0.5 baseline)
+const SL_ATR_MULT_BASE = 0.5;    // Baseline SL multiplier (matches bot-ironclad.js)
+const MIN_STOP_PCT     = 0.003;  // Minimum SL distance as pct of entry (both rules)
 
 const SPLITS         = [0.40, 0.35, 0.25];
 const LOOKBACK_BARS  = 480;    // ~5 days (96 bars/day × 5)
@@ -160,22 +175,21 @@ function detectTrend(candles, lookback = 2, swingCount = 2, atrThreshold = 0.5) 
 
 function detectEntry(ltfCandles, htfTrend, lookback = 2) {
   const { swingHighs, swingLows } = detectSwings(ltfCandles, lookback);
-  const price        = ltfCandles[ltfCandles.length - 1].close;
-  const atr          = calcATR(ltfCandles);
-  const MIN_STOP_PCT = 0.003;
+  const price = ltfCandles[ltfCandles.length - 1].close;
+  const atr   = calcATR(ltfCandles);
 
   if (htfTrend === 'bull' && swingLows.length >= 1) {
     const sw = swingLows[swingLows.length - 1];
     if (price > ltfCandles[sw.index].high) {
-      const sl = parseFloat(Math.min(sw.price - atr * 0.5, price * (1 - MIN_STOP_PCT)).toFixed(4));
-      return { signal: 'long', entry: price, stopLoss: sl, swingRef: sw.price };
+      const sl = parseFloat(Math.min(sw.price - atr * SL_ATR_MULT_BASE, price * (1 - MIN_STOP_PCT)).toFixed(4));
+      return { signal: 'long', entry: price, stopLoss: sl, swingRef: sw.price, ltfAtr: atr };
     }
   }
   if (htfTrend === 'bear' && swingHighs.length >= 1) {
     const sw = swingHighs[swingHighs.length - 1];
     if (price < ltfCandles[sw.index].low) {
-      const sl = parseFloat(Math.max(sw.price + atr * 0.5, price * (1 + MIN_STOP_PCT)).toFixed(4));
-      return { signal: 'short', entry: price, stopLoss: sl, swingRef: sw.price };
+      const sl = parseFloat(Math.max(sw.price + atr * SL_ATR_MULT_BASE, price * (1 + MIN_STOP_PCT)).toFixed(4));
+      return { signal: 'short', entry: price, stopLoss: sl, swingRef: sw.price, ltfAtr: atr };
     }
   }
   return null;
@@ -243,11 +257,11 @@ function simulateTrade(side, entry, stopLoss, tp1, tp2, tp3, qty, futureCandles)
 }
 
 // ── Backtest a Single Symbol ──────────────────────────────────────────────────
-// Rules B/C/D are evaluated per-signal but position tracking (nextFreeIdx) is
-// always driven by the BASELINE (Rule A) so that all rules see the same signals.
+// Rules B/C/D/F/G are evaluated per-signal but position tracking (nextFreeIdx)
+// is always driven by the BASELINE (Rule A) so all rules see the same signals.
 // Cooldown state is tracked from Rule A outcomes to ensure a fair comparison.
 
-async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
+async function backtestSymbol(symbol, dailyCandles, ltfCandles, btcDailyCandles) {
   const results     = [];
   const startIdx    = Math.max(LTF_CONTEXT, ltfCandles.length - LOOKBACK_BARS);
   let nextFreeIdx   = startIdx;
@@ -274,22 +288,48 @@ async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
     // ── Indicators ───────────────────────────────────────────────────────────
     const ema     = calcEMALevels(availDaily);
     const tps     = calcTakeProfitLevels(sig.signal, sig.entry, sig.stopLoss, ema, htf.swingHighs, htf.swingLows);
-    const ltfAtr  = calcATR(avail15m);
+    const ltfAtr  = sig.ltfAtr ?? calcATR(avail15m);
     const slPct   = Math.abs(sig.entry - sig.stopLoss) / sig.entry;
     const tp1Dist = Math.abs(tps.tp1 - sig.entry);
     const qty     = calcQuantity(sig.entry, sig.stopLoss);
 
-    // ── Rule evaluation ───────────────────────────────────────────────────────
+    // ── Rule F: BTC master trend filter ──────────────────────────────────────
+    // Only use BTC daily candles that closed BEFORE this signal bar
+    const availBtc  = btcDailyCandles.filter(d => d.time + 86_400_000 <= bar.time);
+    const btcResult = availBtc.length >= 15 ? detectTrend(availBtc, 2, 2, 0.5) : { trend: 'neutral' };
+    const btcTrend  = btcResult.trend;
+    // BULL → only allow LONGs; BEAR → only allow SHORTs; NEUTRAL → allow both
+    const ruleF_ok  = btcTrend === 'neutral'
+                   || (btcTrend === 'bull' && sig.signal === 'long')
+                   || (btcTrend === 'bear' && sig.signal === 'short');
+
+    // ── Rule G: Wider SL (ATR × 1.0 instead of 0.5) ──────────────────────────
+    const slG = sig.signal === 'long'
+      ? parseFloat(Math.min(sig.swingRef - ltfAtr * SL_ATR_MULT_WIDE, sig.entry * (1 - MIN_STOP_PCT)).toFixed(4))
+      : parseFloat(Math.max(sig.swingRef + ltfAtr * SL_ATR_MULT_WIDE, sig.entry * (1 + MIN_STOP_PCT)).toFixed(4));
+    const slPctG = Math.abs(sig.entry - slG) / sig.entry;
+    const tpsG   = calcTakeProfitLevels(sig.signal, sig.entry, slG, ema, htf.swingHighs, htf.swingLows);
+    const qtyG   = calcQuantity(sig.entry, slG);
+
+    // ── Rule evaluation — original rules ──────────────────────────────────────
     const ruleB_ok = slPct   <= MAX_SL_PCT;               // SL ≤ 2%
     const ruleC_ok = bar.time >= cooldownUntil;            // not on cooldown
     const ruleD_ok = tp1Dist >= ltfAtr * MIN_TP1_ATR;     // TP1 far enough
 
-    // ── Simulate using Rule A (all signals taken) ─────────────────────────────
+    // ── Combo rules ───────────────────────────────────────────────────────────
+    const ruleCF_ok  = ruleC_ok && ruleF_ok;              // cooldown + BTC trend
+    const ruleCFG_ok = ruleC_ok && ruleF_ok;              // same filter, wider SL sim
+
+    // ── Simulate Rule A (baseline SL) ─────────────────────────────────────────
     const future = ltfCandles.slice(i + 1);
     const sim    = simulateTrade(sig.signal, sig.entry, sig.stopLoss, tps.tp1, tps.tp2, tps.tp3, qty, future);
     const pnl    = parseFloat(sim.closes.reduce((s, c) => s + c.pnl, 0).toFixed(2));
 
-    // Advance position tracker
+    // ── Simulate Rule G (wider SL) ────────────────────────────────────────────
+    const simG  = simulateTrade(sig.signal, sig.entry, slG, tpsG.tp1, tpsG.tp2, tpsG.tp3, qtyG, future);
+    const pnlG  = parseFloat(simG.closes.reduce((s, c) => s + c.pnl, 0).toFixed(2));
+
+    // Advance position tracker based on Rule A outcome
     if (sim.resolveTime) {
       for (let j = i + 1; j < ltfCandles.length; j++) {
         if (ltfCandles[j].time >= sim.resolveTime) { nextFreeIdx = j + 1; break; }
@@ -298,25 +338,36 @@ async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
       nextFreeIdx = ltfCandles.length;
     }
 
-    // Update cooldown from Rule A outcome — only clean losses trigger it
+    // Update cooldown from Rule A LOSS outcomes — only clean losses trigger it
     if (sim.outcome === 'LOSS' && sim.resolveTime) {
       cooldownUntil = sim.resolveTime + COOLDOWN_HOURS * 3_600_000;
     }
 
     // ── Per-rule P&L ──────────────────────────────────────────────────────────
-    const pnlB = ruleB_ok  ? pnl : 0;
-    const pnlC = ruleC_ok  ? pnl : 0;
-    const pnlD = ruleD_ok  ? pnl : 0;
+    const pnlB   = ruleB_ok   ? pnl  : 0;
+    const pnlC   = ruleC_ok   ? pnl  : 0;
+    const pnlD   = ruleD_ok   ? pnl  : 0;
     const ruleE_ok = ruleB_ok && ruleC_ok && ruleD_ok;
-    const pnlE = ruleE_ok  ? pnl : 0;
+    const pnlE   = ruleE_ok   ? pnl  : 0;
+    const pnlF   = ruleF_ok   ? pnl  : 0;    // Rule F: same sim as A (just filtered)
+    const pnlCF  = ruleCF_ok  ? pnl  : 0;    // C+F: baseline sim
+    const pnlCFG = ruleCFG_ok ? pnlG : 0;    // C+F+G: wider SL sim
 
-    const actionB = ruleB_ok  ? 'TAKEN' : 'SKIP_SL_2PCT';
-    const actionC = ruleC_ok  ? 'TAKEN' : 'BLOCK_COOLDOWN';
-    const actionD = ruleD_ok  ? 'TAKEN' : 'SKIP_TP1_ATR';
-    const actionE = ruleE_ok  ? 'TAKEN'
-                  : !ruleB_ok ? 'SKIP_SL_2PCT'
-                  : !ruleC_ok ? 'BLOCK_COOLDOWN'
-                  :             'SKIP_TP1_ATR';
+    // ── Action strings ────────────────────────────────────────────────────────
+    const actionB   = ruleB_ok   ? 'TAKEN' : 'SKIP_SL_2PCT';
+    const actionC   = ruleC_ok   ? 'TAKEN' : 'BLOCK_COOLDOWN';
+    const actionD   = ruleD_ok   ? 'TAKEN' : 'SKIP_TP1_ATR';
+    const actionE   = ruleE_ok   ? 'TAKEN'
+                    : !ruleB_ok  ? 'SKIP_SL_2PCT'
+                    : !ruleC_ok  ? 'BLOCK_COOLDOWN'
+                    :              'SKIP_TP1_ATR';
+    const actionF   = ruleF_ok   ? 'TAKEN' : `BLOCK_BTC_${btcTrend.toUpperCase()}`;
+    const actionCF  = ruleCF_ok  ? 'TAKEN'
+                    : !ruleC_ok  ? 'BLOCK_COOLDOWN'
+                    :              `BLOCK_BTC_${btcTrend.toUpperCase()}`;
+    const actionCFG = ruleCFG_ok ? 'TAKEN_WIDE_SL'
+                    : !ruleC_ok  ? 'BLOCK_COOLDOWN'
+                    :              `BLOCK_BTC_${btcTrend.toUpperCase()}`;
 
     const date = new Date(bar.time).toISOString().slice(0, 10);
     const time = new Date(bar.time).toISOString().slice(11, 19);
@@ -361,25 +412,49 @@ async function backtestSymbol(symbol, dailyCandles, ltfCandles) {
       D_Action:         actionD,
       D_Outcome:        ruleD_ok  ? sim.outcome : 'FILTERED',
       D_PnL:            pnlD,
-      // ── Rule E — All filters combined (B + C + D) ─────────────────────────────
+      // ── Rule E — All original filters combined (B + C + D) ────────────────────
       E_Action:         actionE,
       E_Outcome:        ruleE_ok  ? sim.outcome : 'BLOCKED',
       E_PnL:            pnlE,
+      // ── Rule F — BTC master trend filter ──────────────────────────────────────
+      BTC_Trend:        btcTrend,
+      F_Aligned:        ruleF_ok ? 'YES' : 'NO',
+      F_Action:         actionF,
+      F_Outcome:        ruleF_ok  ? sim.outcome : 'BLOCKED',
+      F_PnL:            pnlF,
+      // ── Rule G — Wider SL (ATR × 1.0) ─────────────────────────────────────────
+      G_SL:             parseFloat(slG.toFixed(4)),
+      G_SL_Pct:         parseFloat((slPctG * 100).toFixed(2)),
+      G_Size_USD:       parseFloat((qtyG * sig.entry).toFixed(2)),
+      G_TP1:            parseFloat(tpsG.tp1.toFixed(4)),
+      G_Outcome:        simG.outcome,
+      G_PnL:            pnlG,
+      // ── Rule C+F — Cooldown + BTC filter (baseline SL sim) ────────────────────
+      CF_Action:        actionCF,
+      CF_Outcome:       ruleCF_ok  ? sim.outcome : 'BLOCKED',
+      CF_PnL:           pnlCF,
+      // ── Rule C+F+G — Cooldown + BTC filter + wider SL ─────────────────────────
+      CFG_Action:       actionCFG,
+      CFG_Outcome:      ruleCFG_ok ? simG.outcome : 'BLOCKED',
+      CFG_PnL:          pnlCFG,
       // ── P&L vs baseline ──────────────────────────────────────────────────────
-      B_vs_A:           parseFloat((pnlB - pnl).toFixed(2)),
-      C_vs_A:           parseFloat((pnlC - pnl).toFixed(2)),
-      D_vs_A:           parseFloat((pnlD - pnl).toFixed(2)),
-      E_vs_A:           parseFloat((pnlE - pnl).toFixed(2)),
+      B_vs_A:           parseFloat((pnlB   - pnl).toFixed(2)),
+      C_vs_A:           parseFloat((pnlC   - pnl).toFixed(2)),
+      D_vs_A:           parseFloat((pnlD   - pnl).toFixed(2)),
+      E_vs_A:           parseFloat((pnlE   - pnl).toFixed(2)),
+      F_vs_A:           parseFloat((pnlF   - pnl).toFixed(2)),
+      CF_vs_A:          parseFloat((pnlCF  - pnl).toFixed(2)),
+      CFG_vs_A:         parseFloat((pnlCFG - pnl).toFixed(2)),
     });
 
     // Console line
     const flags = [
-      !ruleB_ok ? 'SL>2%' : '',
-      !ruleC_ok ? 'COOLDOWN' : '',
-      !ruleD_ok ? 'TP1<ATR' : '',
+      !ruleC_ok ? 'COOL' : '',
+      !ruleF_ok ? `BTC_${btcTrend.toUpperCase()}` : '',
     ].filter(Boolean).join(' ');
     const pnlStr = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
-    console.log(`    ${date} ${time} ${sig.signal.toUpperCase().padEnd(5)} @ ${sig.entry.toFixed(4)}  SL:${(slPct*100).toFixed(2)}%  TP1/ATR:${(tp1Dist/ltfAtr).toFixed(1)}x  → ${sim.outcome.padEnd(12)} ${pnlStr}${flags ? '  ← ' + flags : ''}`);
+    const gStr   = pnlG >= 0 ? `+$${pnlG.toFixed(2)}` : `-$${Math.abs(pnlG).toFixed(2)}`;
+    console.log(`    ${date} ${time} ${sig.signal.toUpperCase().padEnd(5)} @ ${sig.entry.toFixed(4)}  BTC:${btcTrend.padEnd(7)}  SL:${(slPct*100).toFixed(2)}%→${(slPctG*100).toFixed(2)}%  A:${pnlStr} G:${gStr}${flags ? '  ← ' + flags : ''}`);
   }
 
   return results;
@@ -409,69 +484,91 @@ function printSummary(all) {
 
   function stats(rows, pnlKey, outcomeKey, actionKey) {
     const taken  = rows.filter(r => r[actionKey] === 'TAKEN' && !OPEN.includes(r[outcomeKey]));
-    const skip   = rows.filter(r => r[actionKey] !== 'TAKEN').length;
-    const wins   = taken.filter(r => r[outcomeKey] === 'WIN').length;
-    const losses = taken.filter(r => r[outcomeKey] === 'LOSS').length;
-    const bes    = taken.filter(r => r[outcomeKey] === 'BE').length;
-    const wr     = taken.length ? Math.round(wins / taken.length * 100) : 0;
-    const tp1r   = taken.length ? Math.round((wins + bes) / taken.length * 100) : 0;
+    const takenW = rows.filter(r => r[actionKey] === 'TAKEN_WIDE_SL' && !OPEN.includes(r[outcomeKey]));
+    const allTkn = [...taken, ...takenW];
+    const skip   = rows.filter(r => r[actionKey] !== 'TAKEN' && r[actionKey] !== 'TAKEN_WIDE_SL').length;
+    const wins   = allTkn.filter(r => r[outcomeKey] === 'WIN').length;
+    const losses = allTkn.filter(r => r[outcomeKey] === 'LOSS').length;
+    const bes    = allTkn.filter(r => r[outcomeKey] === 'BE').length;
+    const wr     = allTkn.length ? Math.round(wins / allTkn.length * 100) : 0;
+    const tp1r   = allTkn.length ? Math.round((wins + bes) / allTkn.length * 100) : 0;
     const pnl    = rows.reduce((s, r) => s + (r[pnlKey] ?? 0), 0);
-    return { taken: taken.length, skip, wins, losses, bes, wr, tp1r, pnl };
+    return { taken: allTkn.length, skip, wins, losses, bes, wr, tp1r, pnl };
   }
 
-  const a = stats(resolved, 'A_PnL', 'A_Outcome', 'A_Outcome');  // Rule A: "action" = always TAKEN
-  // override Rule A since it has no action column — all resolved
+  // Rule A stats (no action col — everything taken)
   const aWins   = resolved.filter(r => r.A_Outcome === 'WIN').length;
   const aLosses = resolved.filter(r => r.A_Outcome === 'LOSS').length;
   const aBEs    = resolved.filter(r => r.A_Outcome === 'BE').length;
   const aTp1r   = resolved.length ? Math.round((aWins + aBEs) / resolved.length * 100) : 0;
   const aPnl    = resolved.reduce((s, r) => s + r.A_PnL, 0);
 
-  const b = stats(all, 'B_PnL', 'B_Outcome', 'B_Action');
-  const c = stats(all, 'C_PnL', 'C_Outcome', 'C_Action');
-  const d = stats(all, 'D_PnL', 'D_Outcome', 'D_Action');
-  const e = stats(all, 'E_PnL', 'E_Outcome', 'E_Action');
+  const c   = stats(all, 'C_PnL',   'C_Outcome',   'C_Action');
+  const f   = stats(all, 'F_PnL',   'F_Outcome',   'F_Action');
+  const g   = stats(all, 'G_PnL',   'G_Outcome',   'A_Action');   // G runs on all signals, use A_Action as proxy
+  const cf  = stats(all, 'CF_PnL',  'CF_Outcome',  'CF_Action');
+  const cfg = stats(all, 'CFG_PnL', 'CFG_Outcome', 'CFG_Action');
+
+  // Rule G: all signals run (same as A but different sim) — compute manually
+  const gResolved = resolved;  // same signals as A
+  const gWins     = gResolved.filter(r => r.G_Outcome === 'WIN').length;
+  const gLosses   = gResolved.filter(r => r.G_Outcome === 'LOSS').length;
+  const gBEs      = gResolved.filter(r => r.G_Outcome === 'BE').length;
+  const gTp1r     = gResolved.length ? Math.round((gWins + gBEs) / gResolved.length * 100) : 0;
+  const gPnl      = resolved.reduce((s, r) => s + r.G_PnL, 0);
 
   const fmt  = n => (n >= 0 ? '+$' : '-$') + Math.abs(n).toFixed(2);
   const pad  = (s, n) => String(s).padEnd(n);
-  const line = '─'.repeat(62);
 
-  console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
-  console.log(`║           IRONCLAD RULE COMPARISON — LAST 5 DAYS            ║`);
-  console.log(`╠══════════════════════════════════════════════════════════════╣`);
-  console.log(`║  Total signals : ${pad(all.length, 44)} ║`);
-  console.log(`║  Resolved      : ${pad(resolved.length, 44)} ║`);
-  console.log(`╠══════════════════╦═══════╦═══════╦═══════╦═══════╦══════════╣`);
-  console.log(`║  Metric          ║  A    ║  B    ║  C    ║  D    ║  E       ║`);
-  console.log(`║                  ║ Base  ║SL≤2%  ║Cool3h ║TP1ATR ║ All 3   ║`);
-  console.log(`╠══════════════════╬═══════╬═══════╬═══════╬═══════╬══════════╣`);
+  console.log(`\n╔════════════════════════════════════════════════════════════════════════════╗`);
+  console.log(`║              IRONCLAD RULE COMPARISON — LAST 5 DAYS (v2.0)               ║`);
+  console.log(`╠════════════════════════════════════════════════════════════════════════════╣`);
+  console.log(`║  Total signals : ${pad(all.length, 58)} ║`);
+  console.log(`║  Resolved      : ${pad(resolved.length, 58)} ║`);
+  console.log(`╠══════════════════╦════════╦════════╦════════╦════════╦════════╦════════╣`);
+  console.log(`║  Metric          ║   A    ║   C    ║   F    ║   G    ║  C+F   ║ C+F+G  ║`);
+  console.log(`║                  ║ Base   ║ Cool3h ║BTC Trd ║ WideSL ║Cl+BTC  ║All New ║`);
+  console.log(`╠══════════════════╬════════╬════════╬════════╬════════╬════════╬════════╣`);
 
   const row = (label, vals) => {
-    const cells = vals.map(v => String(v).padEnd(5));
-    console.log(`║  ${pad(label, 16)} ║ ${cells[0]} ║ ${cells[1]} ║ ${cells[2]} ║ ${cells[3]} ║ ${cells[4].padEnd(8)} ║`);
+    const cells = vals.map(v => String(v).padEnd(6));
+    console.log(`║  ${pad(label, 16)} ║ ${cells[0]} ║ ${cells[1]} ║ ${cells[2]} ║ ${cells[3]} ║ ${cells[4]} ║ ${cells[5]} ║`);
   };
 
-  row('Taken',        [resolved.length, b.taken, c.taken, d.taken, e.taken]);
-  row('Skipped',      [0,               b.skip,  c.skip,  d.skip,  e.skip]);
-  row('WIN (TP3)',    [aWins,            b.wins,  c.wins,  d.wins,  e.wins]);
-  row('LOSS',         [aLosses,         b.losses,c.losses,d.losses,e.losses]);
-  row('BE (TP1+)',    [aBEs,            b.bes,   c.bes,   d.bes,   e.bes]);
-  row('TP1+ rate',   [`${aTp1r}%`,     `${b.tp1r}%`,`${c.tp1r}%`,`${d.tp1r}%`,`${e.tp1r}%`]);
-  row('Total P&L',   [fmt(aPnl),       fmt(b.pnl),fmt(c.pnl),fmt(d.pnl),fmt(e.pnl)]);
-  row('vs Baseline', ['—',            fmt(b.pnl-aPnl),fmt(c.pnl-aPnl),fmt(d.pnl-aPnl),fmt(e.pnl-aPnl)]);
+  row('Taken',       [resolved.length,           c.taken,   f.taken,   gResolved.length, cf.taken,  cfg.taken]);
+  row('Skipped',     [0,                          c.skip,    f.skip,    0,                cf.skip,   cfg.skip]);
+  row('WIN (TP3)',   [aWins,                      c.wins,    f.wins,    gWins,            cf.wins,   cfg.wins]);
+  row('LOSS',        [aLosses,                    c.losses,  f.losses,  gLosses,          cf.losses, cfg.losses]);
+  row('BE (TP1+)',   [aBEs,                       c.bes,     f.bes,     gBEs,             cf.bes,    cfg.bes]);
+  row('TP1+ rate',  [`${aTp1r}%`,               `${c.tp1r}%`,`${f.tp1r}%`,`${gTp1r}%`,`${cf.tp1r}%`,`${cfg.tp1r}%`]);
+  row('Total P&L',  [fmt(aPnl),                  fmt(c.pnl),fmt(f.pnl),fmt(gPnl),       fmt(cf.pnl),fmt(cfg.pnl)]);
+  row('vs Baseline',[`—`,                        fmt(c.pnl-aPnl),fmt(f.pnl-aPnl),fmt(gPnl-aPnl),fmt(cf.pnl-aPnl),fmt(cfg.pnl-aPnl)]);
 
-  console.log(`╚══════════════════╩═══════╩═══════╩═══════╩═══════╩══════════╝`);
-  console.log(`\n  A=Baseline  B=SL≤2%  C=3h cooldown  D=TP1≥ATR  E=B+C+D`);
-  console.log(`  TP1+ rate = trades where at least TP1 was hit (WIN or BE)`);
+  console.log(`╚══════════════════╩════════╩════════╩════════╩════════╩════════╩════════╝`);
+  console.log(`\n  A=Baseline  C=3h cooldown  F=BTC trend gate  G=Wider SL (ATR×1.0)`);
+  console.log(`  C+F = cooldown + BTC filter (same SL)   C+F+G = all three new rules`);
+  console.log(`  TP1+ rate = % of taken trades where at least TP1 was hit (WIN or BE)`);
+  console.log(`  G runs all signals — position size is smaller due to wider SL`);
   console.log(`  Open the CSV in Excel → Data → Filter (Ctrl+Shift+L) for full drill-down\n`);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log('══ Ironclad Rule Comparison Backtest (v1.5) ══');
-  console.log(`Rules: A=baseline  B=SL≤${MAX_SL_PCT*100}%  C=${COOLDOWN_HOURS}h cooldown  D=TP1≥${MIN_TP1_ATR}×ATR  E=B+C+D`);
+  console.log('══ Ironclad Rule Comparison Backtest (v2.0) ══');
+  console.log(`New rules: F=BTC daily trend gate  G=wider SL (ATR×${SL_ATR_MULT_WIDE})`);
   console.log(`Window: ~5 days  |  ${SYMBOLS.length} symbols  |  ${LEVERAGE}x leverage\n`);
+
+  // Fetch BTC daily candles ONCE — used as master trend filter for all symbols
+  console.log('▶ Fetching BTC daily candles for master trend filter...');
+  let btcDailyCandles;
+  try {
+    btcDailyCandles = await fetchCandles('BTCUSDT', '1D', 200);
+    console.log(`  ✓ ${btcDailyCandles.length} BTC daily candles loaded\n`);
+  } catch (err) {
+    console.error(`  ✗ Failed to fetch BTC daily candles: ${err.message}`);
+    process.exit(1);
+  }
 
   const allResults = [];
 
@@ -483,7 +580,7 @@ async function run() {
         fetchCandles(symbol, '15m', 500),
       ]);
       process.stdout.write(`${dailyCandles.length}d / ${ltfCandles.length}×15m\n`);
-      const res = await backtestSymbol(symbol, dailyCandles, ltfCandles);
+      const res = await backtestSymbol(symbol, dailyCandles, ltfCandles, btcDailyCandles);
       if (!res.length) console.log(`  (no signals)`);
       allResults.push(...res);
     } catch (err) {
