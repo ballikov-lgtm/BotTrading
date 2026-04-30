@@ -1,0 +1,48 @@
+name: SID Swing Bot
+
+on:
+  workflow_dispatch: # Manual trigger for testing
+
+  schedule:
+    # ── WEEKDAYS ONLY — once per day at 14:35 UTC (9:35am ET) ────────────────
+    # Runs 5 minutes after US market open to allow the daily candle to settle.
+    # SID is a daily-chart swing strategy — one scan per day is all that's needed.
+    - cron: '35 14 * * 1-5'
+
+permissions:
+  contents: write
+
+jobs:
+  sid:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run SID bot
+        env:
+          SID_ACCOUNT_USD:    ${{ secrets.SID_ACCOUNT_USD }}
+          SID_RISK_PCT:       ${{ secrets.SID_RISK_PCT }}
+          SID_MAX_POS_PCT:    ${{ secrets.SID_MAX_POS_PCT }}
+          SID_MAX_POSITIONS:  ${{ secrets.SID_MAX_POSITIONS }}
+          SID_MAX_PER_DAY:    ${{ secrets.SID_MAX_PER_DAY }}
+          SID_EARNINGS_WINDOW: ${{ secrets.SID_EARNINGS_WINDOW }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+        run: node bot-sid.js
+
+      - name: Save trade logs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add trades-sid.csv sid-log.json         || true
+          git add open-positions-sid.json              || true
+          git add closed-positions-sid.json            || true
+          git add sid-account.json                     || true
+          git diff --staged --quiet || git commit -m "SID run $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash origin main
+          git push
