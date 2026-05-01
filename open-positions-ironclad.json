@@ -80,40 +80,6 @@
     "partialCloses": []
   },
   {
-    "id": "IRONCLAD-PAPER-1777645236766",
-    "symbol": "XRPUSDT",
-    "side": "long",
-    "entry": 1.3735,
-    "stopLoss": 1.3591,
-    "tp1": 1.3874,
-    "tp2": 1.3959,
-    "tp3": 1.4078,
-    "qty": 36.403349,
-    "totalUsd": 50,
-    "openDate": "2026-05-01",
-    "openTime": "14:20:36",
-    "strategy": "Ironclad v1.5",
-    "tp1Hit": true,
-    "tp2Hit": true,
-    "currentSl": 1.3874,
-    "partialCloses": [
-      {
-        "price": 1.3874,
-        "level": "tp1",
-        "date": "2026-05-01",
-        "time": "16:00:00",
-        "pnl": 0.607207861320001
-      },
-      {
-        "price": 1.3959,
-        "level": "tp2",
-        "date": "2026-05-01",
-        "time": "16:00:00",
-        "pnl": 0.856206768479999
-      }
-    ]
-  },
-  {
     "id": "IRONCLAD-PAPER-1777645236921",
     "symbol": "LINKUSDT",
     "side": "long",
@@ -222,25 +188,6 @@
     "tp1Hit": false,
     "tp2Hit": false,
     "currentSl": 82.8514,
-    "partialCloses": []
-  },
-  {
-    "id": "IRONCLAD-PAPER-1777666204606",
-    "symbol": "LINKUSDT",
-    "side": "long",
-    "entry": 9.148,
-    "stopLoss": 9.112,
-    "tp1": 9.1681,
-    "tp2": 9.3414,
-    "tp3": 9.412,
-    "qty": 5.465676,
-    "totalUsd": 50,
-    "openDate": "2026-05-01",
-    "openTime": "20:10:04",
-    "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
-    "tp2Hit": false,
-    "currentSl": 9.112,
     "partialCloses": []
   }
 ]
