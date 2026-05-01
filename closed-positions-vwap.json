@@ -112,5 +112,43 @@
     "closeDate": "2026-04-29",
     "closeTime": "04:30:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1777534477711",
+    "symbol": "ONDOUSDT",
+    "side": "short",
+    "entry": 0.26,
+    "stopLoss": 0.2678,
+    "takeProfit": 0.2551,
+    "qty": 19.033118,
+    "totalUsd": 5,
+    "openDate": "2026-04-30",
+    "openTime": "07:34:37",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.45,
+    "exitLevel": "sl",
+    "exitPrice": 0.2678,
+    "closeDate": "2026-05-01",
+    "closeTime": "03:15:00",
+    "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1777581781273",
+    "symbol": "HYPEUSDT",
+    "side": "short",
+    "entry": 39.2,
+    "stopLoss": 39.8309,
+    "takeProfit": 38.2511,
+    "qty": 0.127554,
+    "totalUsd": 5,
+    "openDate": "2026-04-30",
+    "openTime": "20:43:01",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.2414,
+    "exitLevel": "sl",
+    "exitPrice": 39.8309,
+    "closeDate": "2026-05-01",
+    "closeTime": "00:15:00",
+    "outcome": "LOSS"
   }
 ]
