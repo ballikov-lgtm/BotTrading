@@ -237,25 +237,6 @@
     "partialCloses": []
   },
   {
-    "id": "IRONCLAD-PAPER-1777701497497",
-    "symbol": "SOLUSDT",
-    "side": "long",
-    "entry": 84.068,
-    "stopLoss": 83.4994,
-    "tp1": 85.025,
-    "tp2": 85.3787,
-    "tp3": 87.5694,
-    "qty": 0.594757,
-    "totalUsd": 50,
-    "openDate": "2026-05-02",
-    "openTime": "05:58:17",
-    "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
-    "tp2Hit": false,
-    "currentSl": 83.4994,
-    "partialCloses": []
-  },
-  {
     "id": "IRONCLAD-PAPER-1777701497641",
     "symbol": "XRPUSDT",
     "side": "long",
@@ -363,25 +344,6 @@
     "partialCloses": []
   },
   {
-    "id": "IRONCLAD-PAPER-1777703473893",
-    "symbol": "SOLUSDT",
-    "side": "long",
-    "entry": 84.015,
-    "stopLoss": 83.5177,
-    "tp1": 85.025,
-    "tp2": 85.3763,
-    "tp3": 87.569,
-    "qty": 0.595132,
-    "totalUsd": 50,
-    "openDate": "2026-05-02",
-    "openTime": "06:31:13",
-    "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
-    "tp2Hit": false,
-    "currentSl": 83.5177,
-    "partialCloses": []
-  },
-  {
     "id": "IRONCLAD-PAPER-1777703474070",
     "symbol": "XRPUSDT",
     "side": "long",
@@ -456,28 +418,36 @@
     "openDate": "2026-05-02",
     "openTime": "10:37:59",
     "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
+    "tp1Hit": true,
     "tp2Hit": false,
-    "currentSl": 40.3609,
-    "partialCloses": []
+    "currentSl": 40.848,
+    "partialCloses": [
+      {
+        "price": 41.5087,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "14:30:00",
+        "pnl": 0.970475801999998
+      }
+    ]
   },
   {
-    "id": "IRONCLAD-PAPER-1777718280385",
-    "symbol": "JUPUSDT",
+    "id": "IRONCLAD-PAPER-1777732707088",
+    "symbol": "XRPUSDT",
     "side": "long",
-    "entry": 0.1805,
-    "stopLoss": 0.1791,
-    "tp1": 0.1841,
-    "tp2": 0.1899,
-    "tp3": 0.1933,
-    "qty": 277.00831,
+    "entry": 1.3975,
+    "stopLoss": 1.386,
+    "tp1": 1.4075,
+    "tp2": 1.4186,
+    "tp3": 1.4545,
+    "qty": 35.778175,
     "totalUsd": 50,
     "openDate": "2026-05-02",
-    "openTime": "10:38:00",
+    "openTime": "14:38:27",
     "strategy": "Ironclad v1.5",
     "tp1Hit": false,
     "tp2Hit": false,
-    "currentSl": 0.1791,
+    "currentSl": 1.386,
     "partialCloses": []
   }
 ]
