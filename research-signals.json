@@ -1,6 +1,163 @@
 {
-  "generated": "2026-05-01T20:13:19.989Z",
-  "date": "2026-05-01",
-  "summary": "⚠️ Market research unavailable — Perplexity did not return valid data. Trade history and signals will update on the next run.",
-  "signals": []
+  "generated": "2026-05-02T10:38:19.433Z",
+  "date": "2026-05-02",
+  "summary": "Markets exhibit caution amid recent crypto declines and safe-haven flows into gold, with Bitcoin and Ethereum facing bearish pressure from February's sharp drops and ongoing ETF outflows. Commodities like gold show bullish resilience as a protective asset during geopolitical tensions. Limited fresh commentary today points to neutral short-term sentiment pending further catalysts.",
+  "signals": [
+    {
+      "token": "BTC",
+      "name": "Bitcoin",
+      "category": "crypto",
+      "signal": "bear",
+      "risk": "high",
+      "reason": "DegenDave outlines a short setup on Bitcoin at a specific $K price level expected to print profits.",
+      "source": "DegenDave / ChartHackers",
+      "price_level": "$$K resistance",
+      "chart_pattern": "short setup",
+      "bitget": true
+    },
+    {
+      "token": "ALTCOINS",
+      "name": "Top Altcoins",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "DegenDave states these top altcoins are not waiting for Bitcoin and poised to move.",
+      "source": "DegenDave / ChartHackers",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "ETH",
+      "name": "Ethereum",
+      "category": "crypto",
+      "signal": "bear",
+      "risk": "medium",
+      "reason": "Ethereum dropped -28.5% in February with continued spot ETF outflows.",
+      "source": "Crypto.com Research[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "XAU",
+      "name": "Gold",
+      "category": "commodity",
+      "signal": "bull",
+      "risk": "low",
+      "reason": "Gold surged +8.7% continuing its safe-haven supercycle amid tensions.",
+      "source": "Crypto.com Research[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "SOL",
+      "name": "Solana",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "No specific mentions today amid broader crypto weakness.",
+      "source": "General market context[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "XRP",
+      "name": "XRP",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "Lacking direct commentary in today's limited updates.",
+      "source": "Search results",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "LINK",
+      "name": "Chainlink",
+      "category": "crypto",
+      "signal": "bear",
+      "risk": "high",
+      "reason": "Oracles category decreased amid DeFi weakness in February.",
+      "source": "Crypto.com Research[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "HYPE",
+      "name": "Hyperliquid",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No recent signals or discussions found today.",
+      "source": "Search results",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "VIRTUAL",
+      "name": "Virtual Protocol",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "Absent from today's analyst commentary.",
+      "source": "Search results",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "AAPL",
+      "name": "Apple",
+      "category": "stock",
+      "signal": "neutral",
+      "risk": "low",
+      "reason": "No specific views in recent market updates.",
+      "source": "General context[3]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "NVDA",
+      "name": "Nvidia",
+      "category": "stock",
+      "signal": "bear",
+      "risk": "medium",
+      "reason": "Impacted by AI scare driving global market divergence.",
+      "source": "Crypto.com Research[1]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "GOOGL",
+      "name": "Alphabet/Google",
+      "category": "stock",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "No targeted signals amid broader tech pressures.",
+      "source": "Search results",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "UKO",
+      "name": "Brent Crude Oil",
+      "category": "commodity",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "Live quotes available but no clear directional bias today.",
+      "source": "Trading Economics[6]",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    }
+  ]
 }
