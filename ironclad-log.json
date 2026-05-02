@@ -1,5 +1,153 @@
 [
   {
+    "timestamp": "2026-05-02T18:37:11.763Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "bull",
+    "signal": "long",
+    "entry": 0.1795,
+    "stopLoss": 0.1784,
+    "tp1": 0.1841,
+    "tp2": 0.1899,
+    "tp3": 0.1933,
+    "rr1": 4.18,
+    "rr2": 9.45,
+    "rr3": 12.55,
+    "slAfterTp1": 0.1795,
+    "slAfterTp2": 0.1841,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 0.15930804201693516,
+      "ema50": 0.165754,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        0.1566,
+        0.1605,
+        0.1636,
+        0.1667,
+        0.1712,
+        0.1769,
+        0.1841,
+        0.1933
+      ]
+    },
+    "swingHigh": 0.1769,
+    "swingLow": 0.1503,
+    "reason": "HTF bullish + 15m swing low breakout above $0.18",
+    "orderId": "IRONCLAD-PAPER-1777747031763"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:11.628Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:11.495Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:11.366Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:11.222Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "Research conflict: bear vs long"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:11.085Z",
+    "symbol": "SOLUSDT",
+    "htfTrend": "bull",
+    "signal": "long",
+    "entry": 84.192,
+    "stopLoss": 83.1744,
+    "tp1": 85.025,
+    "tp2": 85.3342,
+    "tp3": 87.617,
+    "rr1": 0.82,
+    "rr2": 1.12,
+    "rr3": 3.37,
+    "slAfterTp1": 84.192,
+    "slAfterTp2": 85.025,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 87.64349208654623,
+      "ema50": 85.33418,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        88.0019,
+        89.8435,
+        91.332,
+        92.8205,
+        94.9396,
+        97.639,
+        101.07,
+        105.4345
+      ]
+    },
+    "swingHigh": 97.639,
+    "swingLow": 85.025,
+    "reason": "HTF bullish + 15m swing low breakout above $83.67",
+    "orderId": "IRONCLAD-PAPER-1777747031085"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:10.951Z",
+    "symbol": "ETHUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "Research conflict: bear vs long"
+  },
+  {
+    "timestamp": "2026-05-02T18:37:10.825Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "Research conflict: bear vs long"
+  },
+  {
     "timestamp": "2026-05-02T14:38:27.629Z",
     "symbol": "ONDOUSDT",
     "htfTrend": "neutral",
@@ -4056,199 +4204,5 @@
     "htfTrend": "neutral",
     "signal": null,
     "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:44.252Z",
-    "symbol": "XAUUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:44.082Z",
-    "symbol": "GOOGLUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:43.835Z",
-    "symbol": "NVDAUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:43.664Z",
-    "symbol": "AAPLUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:43.494Z",
-    "symbol": "JUPUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 0.1919,
-    "stopLoss": 0.1893,
-    "tp1": 0.1984,
-    "tp2": 0.1991,
-    "tp3": 0.2023,
-    "rr1": 2.5,
-    "rr2": 2.77,
-    "rr3": 4,
-    "slAfterTp1": 0.1919,
-    "slAfterTp2": 0.1984,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 0.16066770966692884,
-      "ema50": 0.16455999999999996,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        0.1622,
-        0.165,
-        0.1673,
-        0.1696,
-        0.1728,
-        0.1769,
-        0.1821,
-        0.1888
-      ]
-    },
-    "swingHigh": 0.1769,
-    "swingLow": 0.1577,
-    "reason": "HTF bullish + 15m swing low breakout above $0.19",
-    "orderId": "IRONCLAD-PAPER-1777449163494"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:43.319Z",
-    "symbol": "ONDOUSDT",
-    "htfTrend": "bear",
-    "signal": "short",
-    "entry": 0.2606,
-    "stopLoss": 0.2631,
-    "tp1": 0.2593,
-    "tp2": 0.2573,
-    "tp3": 0.2551,
-    "rr1": 0.52,
-    "rr2": 1.32,
-    "rr3": 2.2,
-    "slAfterTp1": 0.2606,
-    "slAfterTp2": 0.2593,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 0.2620984187828811,
-      "ema50": 0.2608080000000001,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        0.2688,
-        0.2636,
-        0.2593,
-        0.2551,
-        0.2491,
-        0.2415,
-        0.2318,
-        0.2194
-      ]
-    },
-    "swingHigh": 0.2772,
-    "swingLow": 0.2415,
-    "reason": "HTF bearish + 15m swing high breakdown below $0.26",
-    "orderId": "IRONCLAD-PAPER-1777449163318"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:43.142Z",
-    "symbol": "APTUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-04-29T07:52:42.967Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "bear",
-    "signal": "short",
-    "entry": 0.6855,
-    "stopLoss": 0.6937,
-    "tp1": 0.675,
-    "tp2": 0.66,
-    "tp3": 0.6439,
-    "rr1": 1.28,
-    "rr2": 3.11,
-    "rr3": 5.07,
-    "slAfterTp1": 0.6855,
-    "slAfterTp2": 0.675,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 0.7068493972882404,
-      "ema50": 0.689196,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        0.7458,
-        0.7188,
-        0.6969,
-        0.675,
-        0.6439,
-        0.6042,
-        0.5538,
-        0.4896
-      ]
-    },
-    "swingHigh": 0.7896,
-    "swingLow": 0.6042,
-    "reason": "HTF bearish + 15m swing high breakdown below $0.69",
-    "orderId": "IRONCLAD-PAPER-1777449162967"
   }
 ]
