@@ -204,10 +204,18 @@
     "openDate": "2026-05-02",
     "openTime": "05:58:17",
     "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
+    "tp1Hit": true,
     "tp2Hit": false,
-    "currentSl": 76718.2071,
-    "partialCloses": []
+    "currentSl": 77090.3,
+    "partialCloses": [
+      {
+        "price": 78331.7528,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "09:30:00",
+        "pnl": 0.9668434406399993
+      }
+    ]
   },
   {
     "id": "IRONCLAD-PAPER-1777701497362",
@@ -261,10 +269,18 @@
     "openDate": "2026-05-02",
     "openTime": "05:58:17",
     "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
+    "tp1Hit": true,
     "tp2Hit": false,
-    "currentSl": 1.3693,
-    "partialCloses": []
+    "currentSl": 1.377,
+    "partialCloses": [
+      {
+        "price": 1.387,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "07:30:00",
+        "pnl": 0.4357298520000004
+      }
+    ]
   },
   {
     "id": "IRONCLAD-PAPER-1777701497937",
@@ -281,8 +297,8 @@
     "openTime": "05:58:17",
     "strategy": "Ironclad v1.5",
     "tp1Hit": true,
-    "tp2Hit": false,
-    "currentSl": 40.244,
+    "tp2Hit": true,
+    "currentSl": 40.816,
     "partialCloses": [
       {
         "price": 40.816,
@@ -290,6 +306,13 @@
         "date": "2026-05-02",
         "time": "06:30:00",
         "pnl": 0.8527977744000041
+      },
+      {
+        "price": 41.5087,
+        "level": "tp2",
+        "date": "2026-05-02",
+        "time": "10:30:00",
+        "pnl": 1.6498543306349966
       }
     ]
   },
@@ -307,10 +330,18 @@
     "openDate": "2026-05-02",
     "openTime": "06:31:13",
     "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
+    "tp1Hit": true,
     "tp2Hit": false,
-    "currentSl": 76721.1143,
-    "partialCloses": []
+    "currentSl": 77122.9,
+    "partialCloses": [
+      {
+        "price": 78331.7528,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "09:30:00",
+        "pnl": 0.9400039372800062
+      }
+    ]
   },
   {
     "id": "IRONCLAD-PAPER-1777703473714",
@@ -364,10 +395,18 @@
     "openDate": "2026-05-02",
     "openTime": "06:31:14",
     "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
+    "tp1Hit": true,
     "tp2Hit": false,
-    "currentSl": 1.3693,
-    "partialCloses": []
+    "currentSl": 1.3758,
+    "partialCloses": [
+      {
+        "price": 1.387,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "07:30:00",
+        "pnl": 0.48844309248000434
+      }
+    ]
   },
   {
     "id": "IRONCLAD-PAPER-1777703474242",
@@ -383,9 +422,62 @@
     "openDate": "2026-05-02",
     "openTime": "06:31:14",
     "strategy": "Ironclad v1.5",
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "currentSl": 40.816,
+    "partialCloses": [
+      {
+        "price": 40.816,
+        "level": "tp1",
+        "date": "2026-05-02",
+        "time": "10:30:00",
+        "pnl": 1.0332710952000037
+      },
+      {
+        "price": 41.5087,
+        "level": "tp2",
+        "date": "2026-05-02",
+        "time": "10:30:00",
+        "pnl": 1.8104487158099964
+      }
+    ]
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777718279875",
+    "symbol": "HYPEUSDT",
+    "side": "long",
+    "entry": 40.848,
+    "stopLoss": 40.3609,
+    "tp1": 41.5087,
+    "tp2": 42.4948,
+    "tp3": 43.551,
+    "qty": 1.22405,
+    "totalUsd": 50,
+    "openDate": "2026-05-02",
+    "openTime": "10:37:59",
+    "strategy": "Ironclad v1.5",
     "tp1Hit": false,
     "tp2Hit": false,
-    "currentSl": 39.5963,
+    "currentSl": 40.3609,
+    "partialCloses": []
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777718280385",
+    "symbol": "JUPUSDT",
+    "side": "long",
+    "entry": 0.1805,
+    "stopLoss": 0.1791,
+    "tp1": 0.1841,
+    "tp2": 0.1899,
+    "tp3": 0.1933,
+    "qty": 277.00831,
+    "totalUsd": 50,
+    "openDate": "2026-05-02",
+    "openTime": "10:38:00",
+    "strategy": "Ironclad v1.5",
+    "tp1Hit": false,
+    "tp2Hit": false,
+    "currentSl": 0.1791,
     "partialCloses": []
   }
 ]
