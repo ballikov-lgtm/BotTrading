@@ -188,5 +188,43 @@
     "closeDate": "2026-05-01",
     "closeTime": "12:30:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1777806418933",
+    "symbol": "XRPUSDT",
+    "side": "long",
+    "entry": 1.39,
+    "stopLoss": 1.3776,
+    "takeProfit": 1.4019,
+    "qty": 3.604123,
+    "totalUsd": 5,
+    "openDate": "2026-05-03",
+    "openTime": "11:06:58",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.1284,
+    "exitLevel": "tp1",
+    "exitPrice": 1.4019,
+    "closeDate": "2026-05-03",
+    "closeTime": "22:15:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1777846019785",
+    "symbol": "LINKUSDT",
+    "side": "long",
+    "entry": 9.16,
+    "stopLoss": 9.0781,
+    "takeProfit": 9.2753,
+    "qty": 0.54603,
+    "totalUsd": 5,
+    "openDate": "2026-05-03",
+    "openTime": "22:06:59",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.1888,
+    "exitLevel": "tp1",
+    "exitPrice": 9.2753,
+    "closeDate": "2026-05-04",
+    "closeTime": "02:00:00",
+    "outcome": "WIN"
   }
 ]

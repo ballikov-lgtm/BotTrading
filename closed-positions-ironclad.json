@@ -5314,5 +5314,92 @@
     "closeDate": "2026-05-04",
     "closeTime": "12:00:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777571564510",
+    "symbol": "SOLUSDT",
+    "side": "long",
+    "entry": 83.08,
+    "stopLoss": 81.02,
+    "tp1": 85.03,
+    "tp2": 85.46,
+    "tp3": 87.62,
+    "qty": 0.601822,
+    "totalUsd": 50,
+    "openDate": "2026-04-30",
+    "openTime": "17:52:44",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 81.02,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 85.03,
+        "date": "2026-05-04",
+        "time": "02:00:00",
+        "pnl": 1.4082811747713069
+      },
+      {
+        "level": "tp2",
+        "price": 85.46,
+        "date": "2026-05-04",
+        "time": "02:30:00",
+        "pnl": 1.5039720751083265
+      },
+      {
+        "level": "sl",
+        "price": 85.03,
+        "date": "2026-05-04",
+        "time": "06:15:00",
+        "pnl": 0.8801757342320669
+      }
+    ],
+    "realizedPnl": 3.7924,
+    "exitLevel": "sl",
+    "exitPrice": 85.03,
+    "closeDate": "2026-05-04",
+    "closeTime": "06:15:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777890287173",
+    "symbol": "HYPEUSDT",
+    "side": "long",
+    "entry": 41.09,
+    "stopLoss": 40.86,
+    "tp1": 41.51,
+    "tp2": 42.49,
+    "tp3": 43.55,
+    "qty": 1.216841,
+    "totalUsd": 50,
+    "openDate": "2026-05-04",
+    "openTime": "10:24:47",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 40.86,
+    "tp1Hit": true,
+    "tp2Hit": false,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 41.51,
+        "date": "2026-05-04",
+        "time": "10:45:00",
+        "pnl": 0.6132879045996513
+      },
+      {
+        "level": "sl",
+        "price": 41.09,
+        "date": "2026-05-04",
+        "time": "13:00:00",
+        "pnl": 0
+      }
+    ],
+    "realizedPnl": 0.6133,
+    "exitLevel": "sl",
+    "exitPrice": 41.09,
+    "closeDate": "2026-05-04",
+    "closeTime": "13:00:00",
+    "outcome": "WIN"
   }
 ]
