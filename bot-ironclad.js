@@ -6,20 +6,21 @@ import crypto from 'crypto';
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  apiKey:       process.env.BITGET_API_KEY      || '',
-  secretKey:    process.env.BITGET_SECRET_KEY   || '',
-  passphrase:   process.env.BITGET_PASSPHRASE   || '',
-  mode:         process.env.MODE                || 'futures',
-  leverage:     parseInt(process.env.LEVERAGE)           || 3,
-  portfolioUsd: parseFloat(process.env.PORTFOLIO_USD)    || 500,
-  maxTradeUsd:  parseFloat(process.env.MAX_TRADE_USD)    || 50,
-  maxPerDay:    parseInt(process.env.MAX_TRADES_PER_DAY) || 3,
-  paperTrading: process.env.IRONCLAD_PAPER !== 'false',  // Separate paper flag
+  apiKey:          process.env.BITGET_API_KEY        || '',
+  secretKey:       process.env.BITGET_SECRET_KEY     || '',
+  passphrase:      process.env.BITGET_PASSPHRASE     || '',
+  mode:            process.env.MODE                  || 'futures',
+  leverage:        parseInt(process.env.LEVERAGE)             || 3,
+  portfolioUsd:    parseFloat(process.env.PORTFOLIO_USD)      || 1000,
+  maxTradeUsd:     parseFloat(process.env.MAX_TRADE_USD)      || 100,
+  maxPerDay:       parseInt(process.env.MAX_TRADES_PER_DAY)   || 3,
+  paperTrading:    process.env.IRONCLAD_PAPER !== 'false',     // Separate paper flag
+  maxDailyLossUsd: parseFloat(process.env.MAX_DAILY_LOSS_USD) || 30, // Daily drawdown circuit-breaker
 };
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.5'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol
+const BOT_VERSION = 'v1.6'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -122,14 +123,36 @@ function setCooldown(symbol) {
   console.log(`  ⏳ Cooldown set — no new ${symbol} entries until ${until.slice(11, 16)} UTC (+${COOLDOWN_HOURS}h)`);
 }
 
-// Ironclad v1.5: Crypto-only. Live data confirmed stocks and commodities underperform.
-// Economic event blackout (±60 min around high-impact US releases) avoids fake moves.
-// 3-hour cooldown after a clean stop-out prevents re-entering the same failed setup.
+// ── Daily Drawdown Circuit-Breaker ────────────────────────────────────────────
+// If today's realized losses exceed MAX_DAILY_LOSS_USD, halt all new entries.
+// Only counts fully closed positions (partialCloses summed). Open positions and
+// partial TP hits are not counted — we only know the full picture on close.
+// Rationale: in a reversing market the strategy can stack consecutive losses
+// quickly. This hard stop prevents a bad day compounding into a wipeout.
+
+function checkDailyDrawdown() {
+  const today = todayString();
+  let closed  = [];
+  try {
+    if (fs.existsSync(CLOSED_PATH)) closed = JSON.parse(fs.readFileSync(CLOSED_PATH, 'utf8'));
+  } catch {}
+
+  const todayPnl = closed
+    .filter(p => p.closeDate === today)
+    .reduce((sum, p) => sum + (p.realizedPnl ?? 0), 0);
+
+  const breached = todayPnl <= -Math.abs(CONFIG.maxDailyLossUsd);
+  return { todayPnl: parseFloat(todayPnl.toFixed(2)), breached };
+}
+
+// Ironclad v1.6: Live mode. Portfolio $1000. Daily drawdown circuit-breaker added.
+// HYPEUSDT temporarily excluded — user has a manual live position open. Re-add once confirmed closed.
+// v1.5: 3-hour cooldown after clean stop-out prevents re-entering the same failed setup.
 // Backtested vs 5 days of data: cooldown alone added +$38.81 (+37%) vs baseline.
 // SL 2% cap and TP1≥ATR filter were tested and found counterproductive — not applied.
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
-  'LINKUSDT', 'HYPEUSDT', 'VIRTUALUSDT',
+  'LINKUSDT', /* 'HYPEUSDT' — excluded: manual live position open, re-add when closed */ 'VIRTUALUSDT',
   'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
 ];
 
@@ -840,6 +863,15 @@ async function run() {
   console.log(`Symbols   : ${SYMBOLS.length} pairs`);
   console.log(`Research  : ${researchData ? `${researchData.signals.length} signals loaded` : 'No signal file — technicals only'}`);
   console.log(`─`.repeat(60));
+
+  // ── Daily drawdown circuit-breaker ────────────────────────────────────────
+  const drawdown = checkDailyDrawdown();
+  console.log(`Daily P&L : ${drawdown.todayPnl >= 0 ? '+' : ''}$${drawdown.todayPnl}  (limit: -$${CONFIG.maxDailyLossUsd})`);
+  if (drawdown.breached) {
+    console.log(`\n🛑 DAILY DRAWDOWN LIMIT HIT — today's losses: $${drawdown.todayPnl}`);
+    console.log(`   No new entries for the rest of today. Trading resumes tomorrow.`);
+    return;
+  }
 
   // ── Economic event blackout check ─────────────────────────────────────────
   const blackout = checkEconomicBlackout(researchData);
