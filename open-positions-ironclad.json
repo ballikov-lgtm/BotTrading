@@ -97,9 +97,36 @@
     "openDate": "2026-05-05",
     "openTime": "18:02:00",
     "strategy": "Ironclad v1.5",
+    "tp1Hit": true,
+    "tp2Hit": false,
+    "currentSl": 84.859,
+    "partialCloses": [
+      {
+        "price": 86.3816,
+        "level": "tp1",
+        "date": "2026-05-05",
+        "time": "20:30:00",
+        "pnl": 1.076562856560008
+      }
+    ]
+  },
+  {
+    "id": "IRONCLAD-PAPER-1778013852099",
+    "symbol": "SOLUSDT",
+    "side": "long",
+    "entry": 84.419,
+    "stopLoss": 83.9084,
+    "tp1": 84.9712,
+    "tp2": 86.3856,
+    "tp3": 87.0109,
+    "qty": 0.592284,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "20:44:12",
+    "strategy": "Ironclad v1.5",
     "tp1Hit": false,
     "tp2Hit": false,
-    "currentSl": 83.8868,
+    "currentSl": 83.9084,
     "partialCloses": []
   }
 ]
