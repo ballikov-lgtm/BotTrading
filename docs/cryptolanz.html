@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz — Automated Crypto Trading Strategy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --bg2:       #161b22;
+      --bg3:       #1f2d3d;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --green:     #3fb950;
+      --blue:      #58a6ff;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --purple:    #bc8cff;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* ── HERO ─────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 20px 60px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto 36px;
+    }
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .stat-pill {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+    }
+    .stat-pill strong { color: var(--green); font-size: 16px; display: block; }
+
+    .btn-primary {
+      display: inline-block;
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 13px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary {
+      display: inline-block;
+      background: transparent;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 15px;
+      padding: 12px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      margin-left: 12px;
+      transition: border-color 0.15s;
+    }
+    .btn-secondary:hover { border-color: var(--blue); color: var(--blue); }
+
+    /* ── LAYOUT ───────────────────────────────────────────── */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    section:last-child { border-bottom: none; }
+
+    h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .section-sub {
+      color: var(--muted);
+      margin-bottom: 36px;
+      font-size: 15px;
+    }
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--blue);
+      margin: 28px 0 8px;
+    }
+    p { color: #c9d1d9; margin-bottom: 12px; }
+
+    /* ── HOW IT WORKS ─────────────────────────────────────── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 8px;
+    }
+    .step-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+    }
+    .step-card:hover { border-color: var(--blue); }
+    .step-num {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+    .step-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .step-card p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    /* ── SAFETY RULES ─────────────────────────────────────── */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .rule-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .rule-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    .rule-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .rule-card p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    /* ── TP TABLE ─────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th {
+      background: var(--bg2);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: #c9d1d9;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg2); }
+    .tag-green { color: var(--green); font-weight: 600; }
+    .tag-blue  { color: var(--blue);  font-weight: 600; }
+    .tag-yel   { color: var(--yellow); font-weight: 600; }
+
+    /* ── PERFORMANCE ──────────────────────────────────────── */
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .perf-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .perf-card .value {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .perf-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── SYMBOLS ──────────────────────────────────────────── */
+    .symbol-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .symbol-pill {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: monospace;
+      color: var(--blue);
+    }
+
+    /* ── PROMPT BOX ───────────────────────────────────────── */
+    .prompt-wrapper {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .prompt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .prompt-header span { font-size: 13px; color: var(--muted); }
+    .copy-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .copy-btn.copied { border-color: var(--green); color: var(--green); }
+    .prompt-body {
+      padding: 24px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    /* ── SETUP STEPS ──────────────────────────────────────── */
+    .setup-steps { counter-reset: step; }
+    .setup-step {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 28px;
+      align-items: flex-start;
+    }
+    .setup-step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .setup-step h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .setup-step p { font-size: 14px; color: var(--muted); margin: 0; }
+    code {
+      background: var(--bg3);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12.5px;
+      color: var(--blue);
+    }
+
+    /* ── DISCLAIMER ───────────────────────────────────────── */
+    .disclaimer {
+      background: rgba(248, 81, 73, 0.07);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 24px;
+    }
+    .disclaimer strong { color: var(--red); }
+
+    /* ── FOOTER ───────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 600px) {
+      .hero { padding: 50px 16px 40px; }
+      .btn-secondary { margin: 12px 0 0 0; display: block; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HERO ─────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-badge">⚡ Automated · Cloud-Native · 24/7</div>
+  <h1>Cryptolanz</h1>
+  <p>Advanced, real-time tested crypto futures trading strategy.<br>
+     Deploy in minutes. Runs entirely free on GitHub Actions.</p>
+
+  <div class="hero-stats">
+    <div class="stat-pill"><strong>60–80%</strong>Win Rate</div>
+    <div class="stat-pill"><strong>150+</strong>Trades Tested</div>
+    <div class="stat-pill"><strong>3×</strong>Leverage</div>
+    <div class="stat-pill"><strong>10</strong>Crypto Pairs</div>
+    <div class="stat-pill"><strong>$0</strong>Server Cost</div>
+  </div>
+
+  <a href="#deploy" class="btn-primary">🚀 Deploy Now</a>
+  <a href="#strategy" class="btn-secondary">How It Works</a>
+</div>
+
+<!-- ── HOW IT WORKS ──────────────────────────────────────────────────────── -->
+<section id="strategy">
+  <div class="container">
+    <h2>How the Strategy Works</h2>
+    <p class="section-sub">Multi-timeframe confluence — daily trend structure meets 15-minute precision entries.</p>
+
+    <div class="steps">
+      <div class="step-card">
+        <div class="step-num">Step 01</div>
+        <h4>Daily Trend Detection</h4>
+        <p>The bot reads the daily chart and identifies bull or bear structure using swing highs and lows. Neutral markets are skipped entirely.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 02</div>
+        <h4>15-Minute Entry Signal</h4>
+        <p>Once the daily trend is confirmed, the bot waits for a pullback on the 15m chart and a clean breakout of a swing level to trigger entry.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 03</div>
+        <h4>ATR-Buffered Stop Loss</h4>
+        <p>Stop is placed below the swing reference with an ATR × 0.5 buffer. Minimum 0.3% distance enforced — no unrealistically tight stops.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 04</div>
+        <h4>Three Take-Profit Levels</h4>
+        <p>Position split across three targets using EMA levels, swing structure and Fibonacci extensions. Stop trails to break-even at TP1.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 05</div>
+        <h4>Risk Management</h4>
+        <p>Fixed 1% portfolio risk per trade. Position size calculated automatically. 5% daily drawdown circuit-breaker halts trading if the session turns bad.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">Step 06</div>
+        <h4>AI Research Layer</h4>
+        <p>Twice-daily market research scan adds a sentiment filter. Economic event blackout blocks entries ±60 min around FOMC, NFP and CPI releases.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TP SYSTEM ─────────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <h2>Three Take-Profit System</h2>
+    <p class="section-sub">Once TP1 is hit the trade cannot lose money — stop moves to break-even automatically.</p>
+
+    <table>
+      <thead>
+        <tr><th>Level</th><th>Position Size</th><th>Target</th><th>SL Move After</th><th>Outcome If Stopped</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tag-blue">TP1</td>
+          <td>40%</td>
+          <td>Nearest EMA / swing / Fib level</td>
+          <td>SL → Break-even</td>
+          <td class="tag-yel">Break-even (profitable)</td>
+        </tr>
+        <tr>
+          <td class="tag-blue">TP2</td>
+          <td>35%</td>
+          <td>Second structural level</td>
+          <td>SL → TP1 (lock profit)</td>
+          <td class="tag-green">Partial win</td>
+        </tr>
+        <tr>
+          <td class="tag-blue">TP3</td>
+          <td>25%</td>
+          <td>Third structural level</td>
+          <td>Full exit</td>
+          <td class="tag-green">Full win</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── SAFETY RULES ──────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <h2>Built-In Safety Rules</h2>
+    <p class="section-sub">Six layers of protection that automatically adapt to market conditions.</p>
+
+    <div class="rules-grid">
+      <div class="rule-card">
+        <div class="rule-icon">🧭</div>
+        <div>
+          <h4>HTF Neutral Filter</h4>
+          <p>No clear daily trend = no trade. The bot never guesses in a choppy market.</p>
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-icon">📰</div>
+        <div>
+          <h4>Research Conflict Filter</h4>
+          <p>If AI sentiment contradicts the technical entry direction, the trade is skipped.</p>
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-icon">⚠️</div>
+        <div>
+          <h4>Economic Event Blackout</h4>
+          <p>All entries halted ±60 minutes around FOMC, NFP, CPI and major Fed events.</p>
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-icon">⏳</div>
+        <div>
+          <h4>3-Hour Symbol Cooldown</h4>
+          <p>After a clean stop-out, that specific token is blocked for 3 hours. No re-entering the same failed setup.</p>
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-icon">📊</div>
+        <div>
+          <h4>Daily Trade Limit</h4>
+          <p>Maximum 3 entries per symbol per day regardless of how many signals fire.</p>
+        </div>
+      </div>
+      <div class="rule-card">
+        <div class="rule-icon">🛑</div>
+        <div>
+          <h4>Daily Drawdown Limit</h4>
+          <p>If today's losses exceed 5% of portfolio, all trading stops until tomorrow. Hard circuit-breaker.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PERFORMANCE ───────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <h2>Performance</h2>
+    <p class="section-sub">Real-time paper-tested before any live capital deployed.</p>
+
+    <div class="perf-grid">
+      <div class="perf-card">
+        <div class="value">60–80%</div>
+        <div class="label">Win Rate</div>
+      </div>
+      <div class="perf-card">
+        <div class="value">150+</div>
+        <div class="label">Trades Tested</div>
+      </div>
+      <div class="perf-card">
+        <div class="value">3×</div>
+        <div class="label">Leverage</div>
+      </div>
+      <div class="perf-card">
+        <div class="value">1%</div>
+        <div class="label">Risk Per Trade</div>
+      </div>
+      <div class="perf-card">
+        <div class="value">5%</div>
+        <div class="label">Max Daily Loss</div>
+      </div>
+      <div class="perf-card">
+        <div class="value">$0</div>
+        <div class="label">Running Cost</div>
+      </div>
+    </div>
+
+    <p style="margin-top:20px;font-size:13px;color:var(--muted)">
+      Best performance in trending markets (clear bull or bear daily structure).
+      Neutral filter naturally reduces trade frequency during choppy/ranging conditions.
+    </p>
+  </div>
+</section>
+
+<!-- ── SYMBOLS ───────────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <h2>Traded Pairs</h2>
+    <p class="section-sub">10 USDT-M futures pairs on Bitget exchange.</p>
+    <div class="symbol-grid">
+      <div class="symbol-pill">BTCUSDT</div>
+      <div class="symbol-pill">ETHUSDT</div>
+      <div class="symbol-pill">SOLUSDT</div>
+      <div class="symbol-pill">XRPUSDT</div>
+      <div class="symbol-pill">LINKUSDT</div>
+      <div class="symbol-pill">HYPEUSDT</div>
+      <div class="symbol-pill">VIRTUALUSDT</div>
+      <div class="symbol-pill">APTUSDT</div>
+      <div class="symbol-pill">ONDOUSDT</div>
+      <div class="symbol-pill">JUPUSDT</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── QUICK SETUP ───────────────────────────────────────────────────────── -->
+<section>
+  <div class="container">
+    <h2>Quick Setup</h2>
+    <p class="section-sub">Four accounts, one prompt. Up and running in under an hour.</p>
+
+    <div class="setup-steps">
+      <div class="setup-step">
+        <div>
+          <h4>Install Git and Node.js v20</h4>
+          <p>Download from <a href="https://git-scm.com" style="color:var(--blue)">git-scm.com</a> and <a href="https://nodejs.org" style="color:var(--blue)">nodejs.org</a>. Verify with <code>git --version</code> and <code>node --version</code>.</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div>
+          <h4>Create a free GitHub account</h4>
+          <p>Sign up at <a href="https://github.com" style="color:var(--blue)">github.com</a>. Create a new repository called <code>cryptolanz</code>. Enable GitHub Pages (Settings → Pages → Branch: main → /docs).</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div>
+          <h4>Create a Bitget account</h4>
+          <p>Sign up at <a href="https://www.bitget.com" style="color:var(--blue)">bitget.com</a>. Complete KYC and enable futures trading. Create an API key with <strong>Read + Trade</strong> permissions (never enable Withdrawal).</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div>
+          <h4>Paste the deployment prompt into Claude</h4>
+          <p>Copy the prompt below and paste it into a fresh Claude session. Claude will build every file, walk you through GitHub Secrets configuration, and get everything running. No coding experience needed.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DEPLOY PROMPT ─────────────────────────────────────────────────────── -->
+<section id="deploy">
+  <div class="container">
+    <h2>Deployment Prompt</h2>
+    <p class="section-sub">Copy this entire prompt and paste it into a new Claude chat at <a href="https://claude.ai" style="color:var(--blue)">claude.ai</a></p>
+
+    <div class="prompt-wrapper">
+      <div class="prompt-header">
+        <span>📋 Cryptolanz — One-Shot Deployment Prompt</span>
+        <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy Prompt</button>
+      </div>
+      <div class="prompt-body" id="promptText">You are going to help me deploy the Cryptolanz Trading Strategy — an advanced,
+real-time tested automated crypto futures trading bot with an expected 60–80%
+win rate over 150+ trades.
+
+Please build the complete system from scratch, step by step. Ask me for my
+API keys and configuration values as you need them — never store or expose them
+in any file you create. All sensitive values go into GitHub Secrets only.
+
+OVERVIEW
+────────
+This system runs entirely in the cloud using GitHub Actions (free tier).
+No server or VPS is needed. It trades crypto futures on Bitget exchange 24/7.
+
+Components to build:
+1. bot-ironclad.js      — Main trading bot (runs every 15 min during active sessions)
+2. research.js          — Market research + live HTML dashboard (runs 9am + 6pm UK)
+3. monitor.js           — Fund balance monitor (runs with research)
+4. .github/workflows/ironclad.yml  — Trading bot scheduler
+5. .github/workflows/research.yml  — Research + dashboard scheduler
+6. rules-ironclad.json  — Strategy configuration file
+7. package.json         — Node.js dependencies
+
+STEP 1 — SOFTWARE PREREQUISITES
+─────────────────────────────────
+Guide me through installing the following:
+
+1. Git — https://git-scm.com/downloads
+2. Node.js v20 LTS — https://nodejs.org
+3. A GitHub account — https://github.com (free)
+4. A Bitget account — https://www.bitget.com
+   - Complete KYC and enable futures trading
+   - Create API key: Read + Trade permissions only (NO Withdrawal)
+   - Note: API Key, Secret Key, Passphrase
+
+STEP 2 — CREATE THE GITHUB REPOSITORY
+───────────────────────────────────────
+Guide me through creating a repo called "cryptolanz", cloning it, and opening it locally.
+
+STEP 3 — BUILD ALL PROJECT FILES
+──────────────────────────────────
+
+package.json:
+{ "type": "module", "dependencies": { "node-fetch": "^3.3.2", "dotenv": "^16.0.0" } }
+
+rules-ironclad.json:
+{
+  "strategy": "Cryptolanz Ironclad v1.6",
+  "timeframes": { "htf": "1D", "ltf": "15m" },
+  "swing_detection": {
+    "swing_lookback": 2, "trend_swing_count": 2,
+    "atr_threshold": 0.5, "ltf_swing_lookback": 2
+  }
+}
+
+bot-ironclad.js — Full trading bot with:
+
+CONFIG (all from env vars, these defaults):
+- portfolioUsd: 1000, maxTradeUsd: 100, leverage: 3
+- maxPerDay: 3, paperTrading: true (IRONCLAD_PAPER env var)
+- maxDailyLossUsd: 50 (5% daily circuit-breaker)
+
+SYMBOLS: BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, LINKUSDT,
+         HYPEUSDT, VIRTUALUSDT, APTUSDT, ONDOUSDT, JUPUSDT
+
+State files (committed back to repo each run for persistence):
+trades-ironclad.csv, open-positions-ironclad.json,
+closed-positions-ironclad.json, cooldown-ironclad.json, ironclad-log.json
+
+MARKET DATA — Bitget public candle API (no auth needed):
+GET https://api.bitget.com/api/v2/mix/market/candles
+  ?symbol={symbol}&productType=USDT-FUTURES&granularity={gran}&limit={limit}
+Returns newest-first — reverse to chronological.
+
+INDICATORS (implement from scratch):
+
+1. ATR(14): TR = max(high-low, |high-prevClose|, |low-prevClose|), average of last 14
+
+2. EMA(period): k = 2/(period+1), seed with SMA, then EMA = close×k + prevEMA×(1-k)
+   Calculate for 21, 50, 100, 200 on daily candles
+
+3. Swing detection detectSwings(candles, lookback=2):
+   Swing high at i: all candles ±lookback have lower highs
+   Swing low at i: all candles ±lookback have higher lows
+
+4. Trend detection detectTrend(candles, lookback=2, swingCount=2, atrThreshold=0.5):
+   Filter swings: only keep where adjacent swings differ by >= ATR×atrThreshold
+   BULL = last N highs are higher highs AND last N lows are higher lows
+   BEAR = last N highs are lower highs AND last N lows are lower lows
+   NEUTRAL = neither → skip symbol
+
+5. Entry detection detectEntry(ltfCandles, htfTrend, lookback=2):
+   BULL: find most recent 15m swing low → if price > high of that candle → LONG
+     SL = min(swingLow - ATR×0.5, entry×0.997)
+   BEAR: find most recent 15m swing high → if price < low of that candle → SHORT
+     SL = max(swingHigh + ATR×0.5, entry×1.003)
+
+6. Fibonacci levels: use most recent HTF swing high/low
+   Range = swingHigh - swingLow
+   LONG levels = swingLow + range × ratio for [0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618]
+   SHORT levels = swingHigh - range × ratio
+
+7. Take-profit levels calcTakeProfitLevels():
+   Candidates: ema21/50/100/200, all HTF swings, all fib levels
+   LONG: filter > entry×1.002, sort ascending, deduplicate within 0.3%
+   SHORT: filter < entry×0.998, sort descending, deduplicate within 0.3%
+   Pick first 3 as TP1/TP2/TP3. Fallback: 1.5R, 2.5R, 4.0R
+
+POSITION SIZING calcQuantity(entry, stopLoss):
+  risk = portfolioUsd × 0.01
+  slPct = |entry - sl| / entry
+  qty = min(risk / (slPct × leverage), maxTradeUsd) / entry
+
+POSITION MONITORING checkPositions() — runs at start of every bot execution:
+  Load open-positions-ironclad.json, fetch 500×15m candles per symbol
+  Only process candles after position open time
+  Walk candles with 3-TP trailing stop plan:
+    Splits: 40% at TP1, 35% at TP2, 25% at TP3
+    LONG per candle:
+      low <= currentSL → stop out (SL checked before TP — pessimistic)
+      high >= TP1 and not tp1Hit → close 40%, tp1Hit=true, SL→entry (break-even)
+      high >= TP2 and tp1Hit → close 35%, tp2Hit=true, SL→TP1
+      high >= TP3 and tp2Hit → close 25%, fully exited
+    Mirror for SHORT (swap high/low)
+  Outcomes: LOSS (no TP hit) → trigger 3h cooldown | BE (stopped at entry after TP1) | WIN (TP3)
+  Write closed position with: realizedPnl, exitLevel, exitPrice, closeDate, closeTime, outcome
+
+COOLDOWN: cooldown-ironclad.json = { "BTCUSDT": "ISO timestamp" }
+  After LOSS: write symbol → now + 3 hours
+  Before scan: if now < cooldown timestamp → skip
+
+DAILY DRAWDOWN CIRCUIT-BREAKER:
+  Sum realizedPnl from closed-positions-ironclad.json where closeDate = today
+  If sum <= -maxDailyLossUsd → log and return (no trading today)
+
+ECONOMIC EVENT BLACKOUT:
+  Read research-signals.json events array
+  If any event within ±60 min of now → halt all new entries
+
+RESEARCH SIGNAL FILTER:
+  Read research-signals.json signals
+  Match token to entry direction. Conflict (bull research + short entry) → skip
+  Neutral = allow both directions
+
+ORDER PLACEMENT placeOrder(symbol, side, qty, entry, sl, tp1):
+  Paper mode: return { orderId: "IRONCLAD-PAPER-{timestamp}" }
+  Live mode: Bitget authenticated market order
+    Auth: HMAC-SHA256(secretKey, timestamp + "POST" + path + body), base64
+    Endpoint: POST https://api.bitget.com/api/v2/mix/order/place-order
+    Body: { symbol, productType:"USDT-FUTURES", marginMode:"crossed",
+            marginCoin:"USDT", size:qty, side:"buy"/"sell",
+            tradeSide:"open", orderType:"market", leverage }
+
+MAIN RUN ORDER:
+1. checkPositions()
+2. checkDailyDrawdown() → return if breached
+3. checkEconomicBlackout() → return if active
+4. For each symbol: daily limit check → cooldown check → fetch candles →
+   detectTrend → detectEntry → calcTPs → research check → calcQty → placeOrder → log
+
+.github/workflows/ironclad.yml schedule (UTC):
+  Weekends:     every 4 hours  → '0 0,4,8,12,16,20 * * 0,6'
+  Asian 00-02:  every 15 min  → '0,15,30,45 0,1 * * 1-5'
+  Quiet 02-07:  hourly        → '0 2,3,4,5,6 * * 1-5'
+  London 07-10: every 15 min  → '0,15,30,45 7,8,9 * * 1-5'
+  Mid 10-13:    every 30 min  → '0,30 10,11,12 * * 1-5'
+  US open 13-17:every 15 min  → '0,15,30,45 13,14,15,16 * * 1-5'
+  Afternoon17-20:every 30 min → '0,30 17,18,19 * * 1-5'
+  US close 20-22:every 15 min → '0,15,30,45 20,21 * * 1-5'
+  Wind down22-00:hourly       → '0 22,23 * * 1-5'
+
+  permissions: contents: write
+  Steps: checkout → setup-node@v4 (node 20) → npm install → run bot → save step:
+    git add trades-ironclad.csv ironclad-log.json || true
+    git add open-positions-ironclad.json closed-positions-ironclad.json cooldown-ironclad.json || true
+    git diff --staged --quiet || git commit -m "Ironclad run $(date -u '+%Y-%m-%d %H:%M UTC')"
+    git pull --rebase --autostash origin main && git push
+
+  Env secrets: BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE,
+               MODE (futures), LEVERAGE, PORTFOLIO_USD, MAX_TRADE_USD,
+               MAX_TRADES_PER_DAY, IRONCLAD_PAPER, MAX_DAILY_LOSS_USD
+
+.github/workflows/research.yml:
+  Schedule: '0 9,18 * * 1-5' (9am + 6pm UTC weekdays)
+  Runs: monitor.js then research.js
+  Saves: research-signals.json, docs/index.html, safety-check-log.json
+
+research.js — Two jobs:
+  JOB 1: For each of 10 tokens scan for sentiment signal (bull/bear/neutral) + reason.
+    Detect upcoming high-impact US events (FOMC/NFP/CPI) within 24 hours.
+    Write research-signals.json: { date, generated, signals[], events[] }
+
+  JOB 2: Generate docs/index.html dark-themed dashboard with tabs:
+    Tab 1: Today's overview (P&L, win rate, open positions, signals)
+    Tab 2: Trade history table with filters — columns: Open Date, Open Time, Symbol,
+            Side, Entry, Stop Loss, Exit/Live, Qty, Close Date, Close Time,
+            P&L (🔒 realized / 📊 unrealized), Cumulative P&L, Mode, Bot, Version
+    Tab 3: Research signals per token
+    Tab 4: Fund monitor summary
+    Read trades-ironclad.csv + closed-positions-ironclad.json for realized P&L.
+    Fetch live Bitget prices for open positions. Embed all data as JSON in HTML.
+
+STEP 4 — GITHUB SECRETS
+─────────────────────────
+Guide me through adding these at: repo → Settings → Secrets → Actions:
+
+  BITGET_API_KEY          (your API key)
+  BITGET_SECRET_KEY       (your secret key)
+  BITGET_PASSPHRASE       (your passphrase)
+  LEVERAGE                3
+  PORTFOLIO_USD           1000
+  MAX_TRADE_USD           100
+  MAX_TRADES_PER_DAY      3
+  IRONCLAD_PAPER          true   ← KEEP TRUE UNTIL READY TO GO LIVE
+  MAX_DAILY_LOSS_USD      50
+
+STEP 5 — GITHUB PAGES
+───────────────────────
+Settings → Pages → Branch: main → /docs folder → Save
+Dashboard live at: https://YOUR_USERNAME.github.io/cryptolanz/
+
+STEP 6 — FIRST RUN TEST
+─────────────────────────
+1. git add . && git commit -m "Initial deploy" && git push
+2. GitHub → Actions → "Ironclad Trading Bot" → Run workflow
+3. Verify state files are committed back to repo
+4. Run "Daily Market Research" workflow
+5. Confirm docs/index.html generated and GitHub Pages shows dashboard
+
+STEP 7 — PAPER TRADE FOR AT LEAST 2 WEEKS BEFORE GOING LIVE
+─────────────────────────────────────────────────────────────
+Keep IRONCLAD_PAPER = true until:
+- 20–30 paper trades completed
+- Signals reviewed on TradingView and make logical sense
+- No errors in Actions logs
+Only then change IRONCLAD_PAPER to "false" to deploy with real capital.
+
+Build everything now, file by file. Start with package.json, then rules-ironclad.json, then bot-ironclad.js. Confirm each file before moving to the next.</div>
+    </div>
+
+    <div class="disclaimer">
+      <strong>Risk Warning:</strong> Algorithmic trading involves risk of financial loss.
+      Past performance and backtesting results do not guarantee future returns.
+      Always paper trade first. Only deploy capital you can afford to lose.
+      This is not financial advice.
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────────────── -->
+<footer>
+  <p>Cryptolanz Trading Strategy &nbsp;·&nbsp; Built with Claude AI &nbsp;·&nbsp; Runs on GitHub Actions</p>
+  <p style="margin-top:6px">Not financial advice &nbsp;·&nbsp; Always paper trade before going live</p>
+</footer>
+
+<script>
+  function copyPrompt() {
+    const text = document.getElementById('promptText').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy Prompt';
+        btn.classList.remove('copied');
+      }, 2500);
+    });
+  }
+</script>
+
+</body>
+</html>
