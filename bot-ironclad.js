@@ -15,7 +15,7 @@ const CONFIG = {
   maxTradeUsd:     parseFloat(process.env.MAX_TRADE_USD)      || 100,
   maxPerDay:       parseInt(process.env.MAX_TRADES_PER_DAY)   || 3,
   paperTrading:    process.env.IRONCLAD_PAPER !== 'false',     // Separate paper flag
-  maxDailyLossUsd: parseFloat(process.env.MAX_DAILY_LOSS_USD) || 30, // Daily drawdown circuit-breaker
+  maxDailyLossUsd: parseFloat(process.env.MAX_DAILY_LOSS_USD) || 50, // Daily drawdown circuit-breaker (5% of $1000)
 };
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
