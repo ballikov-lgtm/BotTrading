@@ -249,9 +249,23 @@ Claude Pro is required to build the system, manage strategy changes, run backtes
 
 ---
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-This is an algorithmic trading system. All trading involves risk of loss. Past performance and backtesting results do not guarantee future returns. Always start in paper trading mode and only deploy capital you can afford to lose. This is not financial advice.
+**This is not financial advice. Please do your own research.**
+
+Cryptolanz is an experimental algorithmic trading system shared for educational and informational purposes only. Nothing in this repository, the deployment prompt, the landing page or any associated documentation constitutes financial advice, investment advice, trading advice or any other type of advice.
+
+**You run this strategy entirely at your own risk.**
+
+- This is not a guaranteed strategy. No trading system guarantees profits.
+- Past performance, backtesting results and paper trading outcomes do not guarantee future returns under live market conditions.
+- Cryptocurrency futures trading involves significant risk of loss, including the possible loss of all capital deployed.
+- Market conditions change. A strategy that performs well in trending markets may underperform or lose money in choppy or reversing conditions.
+- You are solely responsible for any financial decisions you make. The creator of this system accepts no liability for any losses incurred through its use.
+- Always consult a qualified financial adviser before deploying any automated trading system with real capital.
+- Never trade with money you cannot afford to lose.
+
+**By deploying this system you acknowledge that you have read, understood and accepted this disclaimer in full.**
 
 ---
 
