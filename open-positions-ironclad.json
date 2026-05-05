@@ -91,25 +91,6 @@
     "partialCloses": []
   },
   {
-    "id": "IRONCLAD-PAPER-1777962600141",
-    "symbol": "LINKUSDT",
-    "side": "long",
-    "entry": 9.339,
-    "stopLoss": 9.2332,
-    "tp1": 9.362,
-    "tp2": 9.412,
-    "tp3": 9.491,
-    "qty": 5.353892,
-    "totalUsd": 50,
-    "openDate": "2026-05-05",
-    "openTime": "06:30:00",
-    "strategy": "Ironclad v1.5",
-    "tp1Hit": false,
-    "tp2Hit": false,
-    "currentSl": 9.2332,
-    "partialCloses": []
-  },
-  {
     "id": "IRONCLAD-PAPER-1777962600353",
     "symbol": "HYPEUSDT",
     "side": "long",
@@ -123,9 +104,55 @@
     "openDate": "2026-05-05",
     "openTime": "06:30:00",
     "strategy": "Ironclad v1.5",
+    "tp1Hit": true,
+    "tp2Hit": false,
+    "currentSl": 42.065,
+    "partialCloses": [
+      {
+        "price": 42.4948,
+        "level": "tp1",
+        "date": "2026-05-05",
+        "time": "07:30:00",
+        "pnl": 0.6130514191200003
+      }
+    ]
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777966386145",
+    "symbol": "BTCUSDT",
+    "side": "long",
+    "entry": 79823.7,
+    "stopLoss": 79387.7,
+    "tp1": 80477.7,
+    "tp2": 80913.7,
+    "tp3": 81567.7,
+    "qty": 0.000626,
+    "totalUsd": 49.97,
+    "openDate": "2026-05-05",
+    "openTime": "07:33:06",
+    "strategy": "Ironclad v1.5",
     "tp1Hit": false,
     "tp2Hit": false,
-    "currentSl": 41.5378,
+    "currentSl": 79387.7,
+    "partialCloses": []
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777966387156",
+    "symbol": "HYPEUSDT",
+    "side": "long",
+    "entry": 41.879,
+    "stopLoss": 41.4539,
+    "tp1": 42.4948,
+    "tp2": 43.551,
+    "tp3": 43.751,
+    "qty": 1.193916,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "07:33:07",
+    "strategy": "Ironclad v1.5",
+    "tp1Hit": false,
+    "tp2Hit": false,
+    "currentSl": 41.4539,
     "partialCloses": []
   }
 ]
