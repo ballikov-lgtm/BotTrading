@@ -497,7 +497,16 @@ async function bitgetRequest(method, path, body = null) {
     },
     body: body ? bodyStr : undefined,
   });
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.error(`  ⚠️  Non-JSON response from Bitget`);
+    console.error(`     Endpoint : ${method} ${path}`);
+    console.error(`     Status   : ${res.status} ${res.statusText}`);
+    console.error(`     Response : ${text.slice(0, 300)}`);
+    throw new Error(`Non-JSON response (${res.status}) from ${path}`);
+  }
 }
 
 async function setLeverage(symbol, leverage) {
