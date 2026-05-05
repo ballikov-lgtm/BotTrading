@@ -241,10 +241,11 @@ Sign up: [railway.app](https://railway.app)
 | Bitget | ✅ Yes | $0 + trading fees (~0.02–0.06% per trade) |
 | Perplexity API | ✅ Yes (research layer) | ~$5–10 |
 | SendGrid | ✅ Yes (email alerts) | $0 |
+| Claude Pro | ✅ Yes (builds and manages the system) | $20 |
 | Railway | ❌ Optional | $0–5 |
-| **Total** | | **~$5–10/month** |
+| **Total** | | **~$25–30/month** |
 
-The research layer is the only meaningful recurring cost. If you skip email alerts and use GitHub Actions only, the entire system runs at **zero fixed cost** beyond exchange trading fees.
+Claude Pro is required to build the system, manage strategy changes, run backtests, debug issues and iterate on the bot. Without it you would need to maintain the codebase manually. Consider it the developer subscription — one good trading day covers the monthly cost.
 
 ---
 
