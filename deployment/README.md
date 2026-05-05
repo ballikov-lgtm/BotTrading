@@ -157,9 +157,94 @@ HYPEUSDT  VIRTUALUSDT  APTUSDT  ONDOUSDT  JUPUSDT
 
 ---
 
-## Infrastructure Cost
+## Setup Costs — Full Breakdown
 
-**Zero.** GitHub Actions free tier provides 2,000 minutes/month. This strategy uses approximately 800–1,000 minutes/month, well within the free allowance. The only cost is the Bitget account (no monthly fee — exchange takes a small trading commission per trade).
+Before you start, here is an honest picture of what this system costs to run. Most of it is free.
+
+---
+
+### GitHub — Free ✅
+
+| Feature | Plan | Cost |
+|---|---|---|
+| GitHub Actions (bot scheduling) | Free tier | $0 — 2,000 min/month included |
+| GitHub Pages (live dashboard) | Free tier | $0 — always free for public repos |
+| Private repository | Free tier | $0 |
+
+**Usage:** The bot uses approximately 800–1,000 Actions minutes per month — well within the free limit.
+
+---
+
+### Bitget Exchange — Free to hold, fees on trades ✅
+
+| Fee | Amount |
+|---|---|
+| Account / KYC | Free |
+| Monthly subscription | Free |
+| Futures maker fee | ~0.02% per trade |
+| Futures taker fee | ~0.06% per trade |
+
+**Minimum capital:** Bitget requires no minimum deposit. In practice, $200–$500 minimum is recommended to make the 1% risk-per-trade position sizing meaningful. The strategy is configured for a $1,000 portfolio by default.
+
+---
+
+### Perplexity AI — Research Layer 💰
+
+The research bot uses the Perplexity API to scan market sentiment and AI analysis for each token twice daily.
+
+| Plan | Cost | Notes |
+|---|---|---|
+| Free tier | $0 | Web access only — **not usable** for the API |
+| Pay-as-you-go API | ~$5–10/month | Based on ~60 research queries/day (low volume) |
+| Perplexity Pro | $20/month | Includes API access + higher rate limits |
+
+**Recommendation:** Start with pay-as-you-go. At twice-daily runs across 10 tokens the monthly API cost is typically under $10.
+
+Sign up: [perplexity.ai](https://www.perplexity.ai)
+
+---
+
+### SendGrid — Email Alerts (Fund Monitor) ✅
+
+The fund monitor sends email alerts when account balance changes significantly.
+
+| Plan | Cost | Limit |
+|---|---|---|
+| Free tier | $0 | 100 emails/day |
+
+100 emails/day is far more than enough for daily fund monitoring alerts. The free tier never needs to be upgraded.
+
+Sign up: [sendgrid.com](https://sendgrid.com)
+
+---
+
+### Railway — Optional Cloud Hosting Alternative 💡
+
+GitHub Actions is the recommended (and free) way to run this system. Railway is an alternative if you want a persistent server with more control — for example if you want to add a live API endpoint or run the bot outside GitHub's scheduler.
+
+| Plan | Cost | Notes |
+|---|---|---|
+| Hobby | $5/month | 512MB RAM, always-on, custom domains |
+| Pro | $20/month | More resources, team features |
+
+**Verdict:** Railway is not required. GitHub Actions handles everything this strategy needs at zero cost. Only consider Railway if you want to extend the system beyond what's built here.
+
+Sign up: [railway.app](https://railway.app)
+
+---
+
+### Total Monthly Cost Summary
+
+| Service | Required | Monthly Cost |
+|---|---|---|
+| GitHub | ✅ Yes | $0 |
+| Bitget | ✅ Yes | $0 + trading fees (~0.02–0.06% per trade) |
+| Perplexity API | ✅ Yes (research layer) | ~$5–10 |
+| SendGrid | ✅ Yes (email alerts) | $0 |
+| Railway | ❌ Optional | $0–5 |
+| **Total** | | **~$5–10/month** |
+
+The research layer is the only meaningful recurring cost. If you skip email alerts and use GitHub Actions only, the entire system runs at **zero fixed cost** beyond exchange trading fees.
 
 ---
 
