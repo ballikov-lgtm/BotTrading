@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz Patch v1.5 — Bitget API Fix + 18 Pairs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1f2d3d;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --blue:   #58a6ff;
+      --yellow: #d29922;
+      --red:    #f85149;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 48px;
+      text-align: center;
+    }
+    .version-badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1rem; max-width: 560px; margin: 0 auto 24px; }
+    .hero .meta { color: var(--muted); font-size: 13px; }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    p { color: #c9d1d9; margin-bottom: 12px; font-size: 14px; }
+
+    /* Change cards */
+    .change-list { display: flex; flex-direction: column; gap: 14px; }
+    .change-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .change-card.critical { border-left: 3px solid var(--red); }
+    .change-card.improve  { border-left: 3px solid var(--blue); }
+    .change-card.watchlist{ border-left: 3px solid var(--green); }
+    .change-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .change-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .change-card p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .tag-critical { background: rgba(248,81,73,0.15); color: var(--red); }
+    .tag-improve  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-watchlist{ background: rgba(63,185,80,0.15);  color: var(--green); }
+
+    /* Steps */
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 20px; }
+    .step {
+      display: flex;
+      gap: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .step p  { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .step p:last-child { margin: 0; }
+
+    /* Code */
+    code {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .c  { color: #8b949e; }   /* comment */
+    .k  { color: #79c0ff; }   /* key / keyword */
+    .v  { color: #a5d6ff; }   /* value */
+    .s  { color: #3fb950; }   /* string */
+    .e  { color: #f85149; }   /* error / bad */
+    .g  { color: #3fb950; }   /* good / new */
+
+    /* Alert boxes */
+    .alert {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .alert-warn  { background: rgba(210,153,34,0.1);  border: 1px solid rgba(210,153,34,0.4); color: var(--yellow); }
+    .alert-danger{ background: rgba(248,81,73,0.08);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red); }
+    .alert-ok    { background: rgba(63,185,80,0.08);  border: 1px solid rgba(63,185,80,0.3);  color: var(--green); }
+
+    /* Symbol grid */
+    .sym-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .sym-pill {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: monospace;
+      color: var(--blue);
+    }
+    .sym-pill.new { border-color: var(--green); color: var(--green); }
+
+    /* Error table */
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th {
+      background: var(--bg2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #21262d; font-size: 13px; color: #c9d1d9; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { font-family: monospace; color: var(--red); font-size: 12px; }
+
+    /* Nav */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .nav a { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .version { font-size: 12px; color: var(--muted); }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+  <a href="../cryptolanz.html">← Back to Cryptolanz</a>
+  <span class="version">Patch v1.5 — 6 May 2026</span>
+</div>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="version-badge">🔧 Patch v1.5</div>
+  <h1>Bitget API Fix + 18-Pair Watchlist</h1>
+  <p>Critical order placement fixes discovered during go-live testing. If you deployed v1.0–1.4 your bot has never placed a real order — this patch fixes that.</p>
+  <div class="meta">Released 6 May 2026 &nbsp;·&nbsp; Affects all installs on v1.0–1.4</div>
+</div>
+
+<div class="container">
+
+  <!-- What changed -->
+  <section>
+    <h2>What Changed</h2>
+    <p class="sub">Three critical API bugs prevented any live orders from firing. If you were in paper mode you won't have noticed — all trade decisions were logged correctly, only the order submission was silently failing.</p>
+
+    <div class="change-list">
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Wrong API endpoint format — no orders were ever placed</h4>
+          <p>Bitget v2 endpoints use kebab-case. <code>placeOrder</code> returns 404. The correct endpoint is <code>place-order</code>. This affected both <code>bot-ironclad.js</code> and <code>bot-hype-manager.js</code>.</p>
+        </div>
+      </div>
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Wrong margin mode — orders rejected with error 400172</h4>
+          <p><code>marginMode: "crossed"</code> is not valid for isolated futures accounts. Must be <code>marginMode: "isolated"</code>.</p>
+        </div>
+      </div>
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Wrong side format for one-way position mode — error 40774</h4>
+          <p>Bitget one-way mode requires <code>side: "buy"/"sell"</code> + <code>tradeSide: "open"</code>. The old format <code>side: "open_long"</code> is hedge-mode only and causes 40774 errors.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">🛡️</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>set-leverage wrapped in try/catch — no longer fatal</h4>
+          <p>The <code>set-leverage</code> API call requires an account management permission (error 40014) not included in standard "Futures Order" API keys. The bot now catches this gracefully and continues — use manually set leverage on BitGet instead.</p>
+        </div>
+      </div>
+
+      <div class="change-card watchlist">
+        <div class="change-icon">🪙</div>
+        <div>
+          <div class="tag tag-watchlist">Watchlist</div>
+          <h4>Expanded from 10 → 18 pairs</h4>
+          <p>Added 8 new pairs across DePIN/AI, privacy, BlockDAG and independent L1 narratives. All CoinGecko top 100. New pairs highlighted below.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- How to apply -->
+  <section>
+    <h2>How to Apply This Patch</h2>
+    <p class="sub">Four things to do — estimated time 10 minutes.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div>
+          <h4>Set BitGet to one-way position mode</h4>
+          <p>In BitGet → Futures → Settings ⚙️ → Position Mode → select <strong>One-Way</strong>.</p>
+          <p>If you skip this every order will fail with error 40774.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Pull the latest code from GitHub</h4>
+          <p>In your local repo folder:</p>
+          <pre>git pull origin main</pre>
+          <p>This brings in the fixed <code>bot-ironclad.js</code> and <code>bot-hype-manager.js</code>. The changes are already committed — you don't need to edit any files manually.</p>
+          <div class="alert alert-ok">✅ The three API bugs are fixed in the repo. <code>git pull</code> is all you need for the code.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Redeploy to Railway</h4>
+          <p>Railway auto-deploys when you push to <code>main</code>. If you just pulled (not pushed) you'll need to trigger a redeploy:</p>
+          <pre>git commit --allow-empty -m "Trigger redeploy — patch v1.5" &amp;&amp; git push origin main</pre>
+          <p>Or use the Railway dashboard → your service → Redeploy.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Confirm IRONCLAD_PAPER is set correctly in Railway</h4>
+          <p>Railway → your service → Variables. Check <code>IRONCLAD_PAPER</code>:</p>
+          <pre><span class="e">IRONCLAD_PAPER=          ← blank → still in paper mode (bad)</span>
+<span class="e">IRONCLAD_PAPER=0         ← zero → still in paper mode (bad)</span>
+<span class="g">IRONCLAD_PAPER=false     ← exact string → live trading ✅</span></pre>
+          <div class="alert alert-warn">⚠️ The value must be the string <code>false</code>. Any other value — including blank — defaults the bot to paper mode and no real orders are placed.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Exact code changes for reference -->
+  <section>
+    <h2>Exact Code Changes (for reference)</h2>
+    <p class="sub">If you made manual edits to the bot code and can't simply pull, apply these changes manually.</p>
+
+    <h3 style="color:var(--blue);font-size:1rem;margin:0 0 8px">bot-ironclad.js — placeOrder()</h3>
+    <pre><span class="c">// BEFORE (broken)</span>
+<span class="e">return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {</span>
+  symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
+<span class="e">  marginMode: 'crossed',</span>
+<span class="e">  side: side === 'long' ? 'open_long' : 'open_short',</span>
+  orderType: 'market', size: quantity.toString(), ...
+});
+
+<span class="c">// AFTER (fixed)</span>
+<span class="g">return bitgetRequest('POST', '/api/v2/mix/order/place-order', {</span>
+  symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
+<span class="g">  marginMode: 'isolated',</span>
+<span class="g">  side: side === 'long' ? 'buy' : 'sell',</span>
+<span class="g">  tradeSide: 'open',</span>
+  orderType: 'market', size: quantity.toString(), ...
+});</pre>
+
+    <h3 style="color:var(--blue);font-size:1rem;margin:20px 0 8px">bot-hype-manager.js — placeCloseLimit()</h3>
+    <pre><span class="c">// BEFORE (broken)</span>
+<span class="e">return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {</span>
+  symbol, productType, marginCoin,
+<span class="e">  side: 'close_long',</span>
+  orderType: 'limit', price: price.toString(), size: qty.toString(),
+});
+
+<span class="c">// AFTER (fixed)</span>
+<span class="g">return bitgetRequest('POST', '/api/v2/mix/order/place-order', {</span>
+  symbol, productType, marginCoin,
+<span class="g">  marginMode: 'isolated',</span>
+<span class="g">  side: 'sell',</span>
+<span class="g">  tradeSide: 'close',</span>
+  orderType: 'limit', price: price.toString(), size: qty.toString(),
+});</pre>
+  </section>
+
+  <!-- Error reference -->
+  <section>
+    <h2>Error Code Reference</h2>
+    <p class="sub">Errors you may have seen in Railway logs before this patch.</p>
+    <table>
+      <thead><tr><th>Code</th><th>Message</th><th>Root Cause</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>40404</td>
+          <td>Endpoint not found</td>
+          <td>Camelcase endpoint <code>placeOrder</code> doesn't exist</td>
+          <td style="color:var(--green)">✅ Fixed in v1.5</td>
+        </tr>
+        <tr>
+          <td>400172</td>
+          <td>Margin mode cannot be empty</td>
+          <td><code>marginMode</code> field missing or set to <code>"crossed"</code></td>
+          <td style="color:var(--green)">✅ Fixed in v1.5</td>
+        </tr>
+        <tr>
+          <td>400172</td>
+          <td>Side parameter mismatch</td>
+          <td>Hedge-mode side format used on one-way account</td>
+          <td style="color:var(--green)">✅ Fixed in v1.5</td>
+        </tr>
+        <tr>
+          <td>40774</td>
+          <td>Unilateral position type</td>
+          <td>BitGet account still in hedge mode</td>
+          <td style="color:var(--yellow)">⚠️ Manual — switch to one-way mode in BitGet settings</td>
+        </tr>
+        <tr>
+          <td>40014</td>
+          <td>Incorrect permissions (set-leverage)</td>
+          <td>API key doesn't have account management permission</td>
+          <td style="color:var(--green)">✅ Non-fatal in v1.5 — bot continues, set leverage manually</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- New watchlist -->
+  <section>
+    <h2>Updated Watchlist — 18 Pairs</h2>
+    <p class="sub">8 new pairs added. All CoinGecko top 100 — never trade coins ranked below 100 (thin liquidity, wide spreads).</p>
+    <div class="sym-grid">
+      <div class="sym-pill">BTCUSDT</div>
+      <div class="sym-pill">ETHUSDT</div>
+      <div class="sym-pill">SOLUSDT</div>
+      <div class="sym-pill">XRPUSDT</div>
+      <div class="sym-pill">LINKUSDT</div>
+      <div class="sym-pill">VIRTUALUSDT</div>
+      <div class="sym-pill">APTUSDT</div>
+      <div class="sym-pill">ONDOUSDT</div>
+      <div class="sym-pill">JUPUSDT</div>
+      <div class="sym-pill new">RENDERUSDT ✦</div>
+      <div class="sym-pill new">TAOUSDT ✦</div>
+      <div class="sym-pill new">AVAXUSDT ✦</div>
+      <div class="sym-pill new">ZECUSDT ✦</div>
+      <div class="sym-pill new">KASUSDT ✦</div>
+      <div class="sym-pill new">TONUSDT ✦</div>
+      <div class="sym-pill new">NEARUSDT ✦</div>
+      <div class="sym-pill new">INJUSDT ✦</div>
+      <div class="sym-pill new">SUIUSDT ✦</div>
+    </div>
+    <p style="margin-top:14px;font-size:13px;color:var(--muted)">✦ New in v1.5 &nbsp;·&nbsp; HYPEUSDT temporarily removed while a manual position is open — re-add to the SYMBOLS array once that position closes.</p>
+    <div class="alert alert-warn" style="margin-top:14px">⚠️ TON, NEAR, INJ and SUI are active but consider pausing them if you take 3+ consecutive losses — wait for BTC to hold above $84K before resuming those four.</div>
+  </section>
+
+  <!-- Disclaimer -->
+  <section style="background:rgba(248,81,73,0.04);border:1px solid rgba(248,81,73,0.2);border-radius:8px;padding:28px 32px;margin-top:0">
+    <h2 style="color:var(--red);margin-bottom:14px">⚠️ Disclaimer</h2>
+    <p>This is not financial advice. Cryptolanz is an experimental algorithmic trading system shared for educational purposes only. <strong style="color:var(--text)">You run this strategy entirely at your own risk.</strong> No trading system guarantees profits. The creator accepts no liability for any losses incurred. Never trade with money you cannot afford to lose.</p>
+  </section>
+
+</div>
+
+<footer>
+  <p>Cryptolanz Patch v1.5 &nbsp;·&nbsp; Released 6 May 2026 &nbsp;·&nbsp; <a href="../cryptolanz.html" style="color:var(--blue)">← Back to main page</a></p>
+  <p style="margin-top:6px;color:#484f58">Not financial advice &nbsp;·&nbsp; No guaranteed returns &nbsp;·&nbsp; You run this entirely at your own risk</p>
+</footer>
+
+</body>
+</html>
