@@ -69,7 +69,7 @@ async function pushFile(filename) {
     const sha      = existing.sha || null;
 
     const body = {
-      message: `Ironclad state ${new Date().toISOString().slice(0, 16)} UTC`,
+      message: `Ironclad state ${new Date().toISOString().slice(0, 16)} UTC [skip ci]`,
       content: encoded,
     };
     if (sha) body.sha = sha;
