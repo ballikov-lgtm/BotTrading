@@ -151,9 +151,19 @@ function checkDailyDrawdown() {
 // Backtested vs 5 days of data: cooldown alone added +$38.81 (+37%) vs baseline.
 // SL 2% cap and TP1≥ATR filter were tested and found counterproductive — not applied.
 const SYMBOLS = [
+  // ── Core L1s ──────────────────────────────────────────────────────────────
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
-  'LINKUSDT', /* 'HYPEUSDT' — excluded: manual live position open, re-add when closed */ 'VIRTUALUSDT',
-  'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
+  // ── Original watchlist ────────────────────────────────────────────────────
+  'LINKUSDT', /* 'HYPEUSDT' — excluded: manual live position open, re-add when closed */
+  'VIRTUALUSDT', 'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
+  // ── Added 2026-05-06: lagging / independent-narrative tokens ──────────────
+  'PENDLEUSDT',   // Yield/RWA — own DeFi cycle, independent of BTC
+  'RENDERUSDT',   // DePIN/AI — GPU compute demand driven
+  'TAOUSDT',      // Bittensor AI — subnet narrative, genuinely independent
+  'AVAXUSDT',     // L1 breaking out of consolidation
+  'ZECUSDT',      // Privacy coin — independent +190% trend
+  'KASUSDT',      // BlockDAG — good fundamentals, pullback recovery
+  'AMDUSDT',      // Tokenised stock — AI/chip narrative, +94% trend
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
