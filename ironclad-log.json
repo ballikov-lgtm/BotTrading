@@ -1,5 +1,54 @@
 [
   {
+    "timestamp": "2026-05-06T00:19:44.217Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:43.962Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:43.699Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:43.437Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:43.173Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:42.930Z",
+    "symbol": "XRPUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-06T00:19:42.666Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
     "timestamp": "2026-05-06T00:19:32.327Z",
     "symbol": "JUPUSDT",
     "htfTrend": "neutral",
@@ -2081,146 +2130,5 @@
     "swingLow": 1.3606,
     "reason": "HTF bullish + 15m swing low breakout above $1.41",
     "orderId": "IRONCLAD-PAPER-1777962599886"
-  },
-  {
-    "timestamp": "2026-05-05T06:29:59.637Z",
-    "symbol": "SOLUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 85.46,
-    "stopLoss": 84.3158,
-    "tp1": 87.0109,
-    "tp2": 87.617,
-    "tp3": 88.046,
-    "rr1": 1.36,
-    "rr2": 1.89,
-    "rr3": 2.26,
-    "slAfterTp1": 85.46,
-    "slAfterTp2": 87.0109,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 87.05561989913065,
-      "ema50": 85.09483999999999,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        87.0109,
-        88.2395,
-        89.2325,
-        90.2255,
-        91.6392,
-        93.44,
-        95.7289,
-        98.6405
-      ]
-    },
-    "swingHigh": 93.44,
-    "swingLow": 85.025,
-    "reason": "HTF bullish + 15m swing low breakout above $85.25",
-    "orderId": "IRONCLAD-PAPER-1777962599637"
-  },
-  {
-    "timestamp": "2026-05-05T06:29:59.394Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-05T06:29:59.119Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 80037.2,
-    "stopLoss": 79340.1071,
-    "tp1": 81082.8393,
-    "tp2": 81779.9323,
-    "tp3": 82825.5716,
-    "rr1": 1.5,
-    "rr2": 2.5,
-    "rr3": 4,
-    "slAfterTp1": 80037.2,
-    "slAfterTp2": 81082.8393,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 70237.77047360095,
-      "ema50": 72820.992,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        68416.84,
-        69101.58,
-        69655,
-        70208.42,
-        70996.34,
-        72000,
-        73275.68,
-        74898.42
-      ]
-    },
-    "swingHigh": 72000,
-    "swingLow": 67310,
-    "reason": "HTF bullish + 15m swing low breakout above $79864.40",
-    "orderId": "IRONCLAD-PAPER-1777962599119"
-  },
-  {
-    "timestamp": "2026-05-04T23:13:30.843Z",
-    "symbol": "JUPUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T23:13:30.717Z",
-    "symbol": "ONDOUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T23:13:30.592Z",
-    "symbol": "APTUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T23:13:30.464Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
   }
 ]
