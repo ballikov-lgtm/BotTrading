@@ -20,15 +20,9 @@ const PULL_FILES = [
   'rules-ironclad.json',
 ];
 
-// Files to push TO GitHub after each bot run (keeps dashboard + state in sync)
-const PUSH_FILES = [
-  'open-positions-ironclad.json',
-  'closed-positions-ironclad.json',
-  'trades-ironclad.csv',
-  'cooldown-ironclad.json',
-  'ironclad-log.json',
-  'hype-state.json',
-];
+// State files live on Railway's persistent filesystem between runs.
+// We pull from GitHub on startup so state survives redeployments,
+// but we do NOT push back — pushing triggered a Railway redeploy loop.
 
 // ── GitHub API helpers ────────────────────────────────────────────────────────
 
@@ -112,10 +106,6 @@ async function runCycle() {
   } catch (e) {
     console.log(`HYPE manager error: ${e.message}`);
   }
-
-  // 4. Push updated state back to GitHub (keeps dashboard live)
-  console.log('\n── Pushing state to GitHub ──');
-  for (const f of PUSH_FILES) await pushFile(f);
 
   console.log(`\n✓ Cycle complete. Next run in ${INTERVAL_MS / 60000} minutes.\n`);
 }
