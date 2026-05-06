@@ -559,7 +559,14 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
     presetStopLossPrice:    stopLoss.toString(),
     presetStopSurplusPrice: tp1.toString(),
   };
-  return bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
+  const result = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
+  if (result.code !== '00000') {
+    console.log(`  ⚠️  Order FAILED for ${symbol}: code=${result.code} msg="${result.msg}"`);
+    console.log(`     Body sent: ${JSON.stringify(body)}`);
+  } else {
+    console.log(`  ✅ Order placed: ${symbol} ${side.toUpperCase()} — orderId: ${result.data?.orderId}`);
+  }
+  return result;
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────

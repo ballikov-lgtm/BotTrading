@@ -8,16 +8,21 @@ const OWNER        = 'ballikov-lgtm';
 const REPO         = 'BotTrading';
 const INTERVAL_MS  = 15 * 60 * 1000;   // 15 minutes
 
-// Files to pull FROM GitHub before each bot run (so the bot has fresh state)
-const PULL_FILES = [
+// State files — pulled from 'logs' branch (where the bot last saved them).
+// This preserves cooldowns, open positions, trade history across runs.
+const PULL_STATE_FILES = [
   'open-positions-ironclad.json',
   'closed-positions-ironclad.json',
   'trades-ironclad.csv',
   'cooldown-ironclad.json',
   'ironclad-log.json',
   'hype-state.json',
-  'research-signals.json',   // written by research.js on GitHub Actions
-  'rules-ironclad.json',
+];
+
+// Config files — pulled from 'main' branch (source of truth for strategy config).
+const PULL_MAIN_FILES = [
+  'research-signals.json',   // written by research.js on GitHub Actions → main
+  'rules-ironclad.json',     // strategy config — only changes with code deploys
 ];
 
 // Files to push TO GitHub after each run for visibility / dashboard.
@@ -48,16 +53,16 @@ async function githubRequest(method, path, body = null) {
   return res.json();
 }
 
-async function pullFile(filename) {
+async function pullFile(filename, branch = 'main') {
   try {
-    const data = await githubRequest('GET', `/repos/${OWNER}/${REPO}/contents/${filename}`);
+    const data = await githubRequest('GET', `/repos/${OWNER}/${REPO}/contents/${filename}?ref=${branch}`);
     if (data.content) {
       fs.writeFileSync(filename, Buffer.from(data.content, 'base64').toString('utf8'));
-      console.log(`  ↓ ${filename}`);
+      console.log(`  ↓ ${filename} (${branch})`);
     }
   } catch (e) {
     // File may not exist yet on first run — that's fine
-    console.log(`  ↓ ${filename} — not found, skipping`);
+    console.log(`  ↓ ${filename} — not found on ${branch}, skipping`);
   }
 }
 
@@ -100,7 +105,8 @@ async function runCycle() {
 
   // 1. Pull latest state from GitHub
   console.log('\n── Pulling state from GitHub ──');
-  for (const f of PULL_FILES) await pullFile(f);
+  for (const f of PULL_STATE_FILES) await pullFile(f, LOGS_BRANCH);  // live state from logs branch
+  for (const f of PULL_MAIN_FILES)  await pullFile(f, 'main');        // config from main
 
   // 2. Run Ironclad bot
   console.log('\n── Running Ironclad ──');

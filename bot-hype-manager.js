@@ -101,11 +101,12 @@ async function getPosition() {
 
 // Place a reduce-only limit close order
 async function placeCloseLimit(qty, price) {
+  // Note: marginMode is intentionally omitted on close orders — specifying it
+  // causes 22002 "No position to close" when the position's margin mode differs.
   const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', {
     symbol:      SYMBOL,
     productType: PRODUCT_TYPE,
     marginCoin:  MARGIN_COIN,
-    marginMode:  'isolated',
     side:        'sell',
     tradeSide:   'close',
     orderType:   'limit',
