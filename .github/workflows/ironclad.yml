@@ -1,36 +1,7 @@
 name: Ironclad Trading Bot
 
 on:
-  workflow_dispatch: # Manual trigger for testing
-  schedule:
-    # ── WEEKENDS — every 4 hours ──────────────────────────────────────────────
-    - cron: '0 0,4,8,12,16,20 * * 0,6'
-
-    # ── WEEKDAYS ──────────────────────────────────────────────────────────────
-
-    # Asian session: 00:00–02:00 UK — every 15 mins
-    - cron: '0,15,30,45 0,1 * * 1-5'
-
-    # Quiet period: 02:00–07:00 UK — every hour
-    - cron: '0 2,3,4,5,6 * * 1-5'
-
-    # London open: 07:00–10:00 UK — every 15 mins
-    - cron: '0,15,30,45 7,8,9 * * 1-5'
-
-    # Mid-morning: 10:00–13:00 UK — every 30 mins
-    - cron: '0,30 10,11,12 * * 1-5'
-
-    # US open + overlap: 13:00–17:00 UK — every 15 mins
-    - cron: '0,15,30,45 13,14,15,16 * * 1-5'
-
-    # Afternoon: 17:00–20:00 UK — every 30 mins
-    - cron: '0,30 17,18,19 * * 1-5'
-
-    # US close: 20:00–22:00 UK — every 15 mins
-    - cron: '0,15,30,45 20,21 * * 1-5'
-
-    # Wind down: 22:00–00:00 UK — every hour
-    - cron: '0 22,23 * * 1-5'
+  workflow_dispatch: # Manual trigger only — bot now runs on Railway (Cloudflare blocks GitHub Actions IPs)
 
 permissions:
   contents: write
