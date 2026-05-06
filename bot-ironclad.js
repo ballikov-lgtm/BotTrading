@@ -551,6 +551,7 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
+    leverage:   CONFIG.leverage.toString(),   // set leverage inline — avoids needing account permission
     side:      side === 'long' ? 'buy' : 'sell',
     tradeSide: 'open',
     orderType: 'market', size: quantity.toString(),
