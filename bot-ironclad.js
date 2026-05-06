@@ -525,11 +525,17 @@ async function bitgetRequest(method, path, body = null) {
 }
 
 async function setLeverage(symbol, leverage) {
+  // Note: requires futures account write permission. Wrapped in try/catch — if API key
+  // only has Futures Order permission, leverage must be set manually in the Bitget app.
   for (const holdSide of ['long', 'short']) {
-    await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
-      symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
-      leverage: leverage.toString(), holdSide,
-    });
+    try {
+      await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
+        symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
+        leverage: leverage.toString(), holdSide,
+      });
+    } catch (e) {
+      console.log(`  ⚠️  set-leverage warning (${holdSide}): ${e.message} — using existing leverage`);
+    }
   }
 }
 
@@ -540,18 +546,20 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
     return { orderId: 'IRONCLAD-PAPER-' + Date.now() };
   }
   await setLeverage(symbol, CONFIG.leverage);
-  const futuresSide = side === 'long' ? 'open_long' : 'open_short';
+  // Bitget v2 one-way position mode: side=buy/sell + tradeSide=open/close
+  // Endpoint is kebab-case: place-order (not camelCase placeOrder)
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
-    marginMode: 'crossed', side: futuresSide,
+    marginMode: 'isolated',
+    side:      side === 'long' ? 'buy' : 'sell',
+    tradeSide: 'open',
     orderType: 'market', size: quantity.toString(),
     // SL and TP1 set natively on BitGet — exchange manages these automatically.
-    // TP2 and TP3 are logged separately; move SL to BE manually after TP1 hits,
-    // or use the BitGet app to set trailing stop after entry.
+    // TP2 and TP3 are logged separately; move SL to BE manually after TP1 hits.
     presetStopLossPrice:    stopLoss.toString(),
     presetStopSurplusPrice: tp1.toString(),
   };
-  return bitgetRequest('POST', '/api/v2/mix/order/placeOrder', body);
+  return bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────

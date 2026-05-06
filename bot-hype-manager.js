@@ -101,12 +101,16 @@ async function getPosition() {
 
 // Place a reduce-only limit close order
 async function placeCloseLimit(qty, price) {
-  const r = await bitgetRequest('POST', '/api/v2/mix/order/placeOrder', {
-    symbol: SYMBOL, productType: PRODUCT_TYPE, marginCoin: MARGIN_COIN,
-    side:      'close_long',
-    orderType: 'limit',
-    price:     price.toString(),
-    size:      qty.toString(),
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', {
+    symbol:      SYMBOL,
+    productType: PRODUCT_TYPE,
+    marginCoin:  MARGIN_COIN,
+    marginMode:  'isolated',
+    side:        'sell',
+    tradeSide:   'close',
+    orderType:   'limit',
+    price:       price.toString(),
+    size:        qty.toString(),
   });
   if (r.code !== '00000') throw new Error(`Close order failed: ${JSON.stringify(r)}`);
   return r.data?.orderId;
