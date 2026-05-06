@@ -200,6 +200,120 @@
       color: #484f58;
       font-size: 12px;
     }
+
+    /* ── Setup Guide styles ── */
+    .setup-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+    }
+    .setup-section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e6edf3;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #30363d;
+    }
+    .setup-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #58a6ff;
+      margin: 20px 0 10px;
+    }
+    .setup-section p, .setup-section li {
+      font-size: 14px;
+      color: #c9d1d9;
+      line-height: 1.7;
+    }
+    .setup-section ul, .setup-section ol {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
+    .setup-section li { margin-bottom: 6px; }
+    .setup-section code {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 12px;
+      color: #79c0ff;
+    }
+    .setup-section pre {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 12px 0;
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #e6edf3;
+    }
+    .setup-section pre .comment { color: #8b949e; }
+    .setup-section pre .key    { color: #79c0ff; }
+    .setup-section pre .val    { color: #a5d6ff; }
+    .alert-box {
+      background: #2d1f0e;
+      border: 1px solid #bd561d;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #e3b341;
+      line-height: 1.6;
+    }
+    .ok-box {
+      background: #0f2a1a;
+      border: 1px solid #238636;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      font-size: 13px;
+      color: #3fb950;
+      line-height: 1.6;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #1f4477;
+      color: #58a6ff;
+      font-size: 12px;
+      font-weight: 700;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .step-row {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .symbol-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .symbol-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+    .symbol-card .sym  { font-size: 14px; font-weight: 600; color: #58a6ff; }
+    .symbol-card .cat  { font-size: 12px; color: #8b949e; margin-top: 2px; }
+    .error-table { margin-top: 12px; }
+    .error-table th { font-size: 11px; }
+    .error-table td { font-size: 13px; }
+    .error-table td:first-child { font-family: monospace; color: #f85149; }
   </style>
 </head>
 <body>
@@ -215,6 +329,7 @@
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="research">📊 Market Research</button>
     <button class="tab-btn"        data-tab="history">📈 Trade History</button>
+    <button class="tab-btn"        data-tab="setup">🛠️ Setup Guide</button>
   </nav>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -816,5 +931,175 @@
     renderStats(TRADES);
     renderTable();
   </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 3 — Setup Guide                                                     -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-setup" class="tab-pane">
+
+    <!-- ── Overview ── -->
+    <div class="setup-section">
+      <h2>🤖 What Is This?</h2>
+      <p>The <strong>Ironclad</strong> bot is a multi-timeframe swing trading system running 24/7 on Railway. It scans 18 crypto pairs every 15 minutes, confirms the daily trend, then looks for a 15-minute entry trigger. When both align it places a live market order on BitGet with automatic stop-loss and take-profit levels.</p>
+      <div class="stats" style="margin-top:16px">
+        <div class="stat"><div class="num" style="color:#e6edf3">18</div><div class="label">Pairs Watched</div></div>
+        <div class="stat"><div class="num" style="color:#58a6ff">3×</div><div class="label">Leverage</div></div>
+        <div class="stat"><div class="num" style="color:#3fb950">1%</div><div class="label">Risk / Trade</div></div>
+        <div class="stat"><div class="num" style="color:#d29922">15 min</div><div class="label">Scan Interval</div></div>
+        <div class="stat"><div class="num" style="color:#e6edf3">72%</div><div class="label">Backtest Win Rate</div></div>
+      </div>
+    </div>
+
+    <!-- ── Watchlist ── -->
+    <div class="setup-section">
+      <h2>🪙 Active Watchlist — 18 Pairs</h2>
+      <p>All pairs are CoinGecko top 100 only — anything ranked lower has thin liquidity and wide spreads that hurt fill prices.</p>
+      <div class="symbol-grid" style="margin-top:16px">
+        <div class="symbol-card"><div class="sym">BTCUSDT</div><div class="cat">Core L1</div></div>
+        <div class="symbol-card"><div class="sym">ETHUSDT</div><div class="cat">Core L1</div></div>
+        <div class="symbol-card"><div class="sym">SOLUSDT</div><div class="cat">Core L1</div></div>
+        <div class="symbol-card"><div class="sym">XRPUSDT</div><div class="cat">Core L1</div></div>
+        <div class="symbol-card"><div class="sym">LINKUSDT</div><div class="cat">Oracle</div></div>
+        <div class="symbol-card"><div class="sym">VIRTUALUSDT</div><div class="cat">AI Agent</div></div>
+        <div class="symbol-card"><div class="sym">APTUSDT</div><div class="cat">L1</div></div>
+        <div class="symbol-card"><div class="sym">ONDOUSDT</div><div class="cat">RWA</div></div>
+        <div class="symbol-card"><div class="sym">JUPUSDT</div><div class="cat">DEX</div></div>
+        <div class="symbol-card"><div class="sym">RENDERUSDT</div><div class="cat">DePIN / AI</div></div>
+        <div class="symbol-card"><div class="sym">TAOUSDT</div><div class="cat">Bittensor AI</div></div>
+        <div class="symbol-card"><div class="sym">AVAXUSDT</div><div class="cat">L1</div></div>
+        <div class="symbol-card"><div class="sym">ZECUSDT</div><div class="cat">Privacy</div></div>
+        <div class="symbol-card"><div class="sym">KASUSDT</div><div class="cat">BlockDAG</div></div>
+        <div class="symbol-card"><div class="sym">TONUSDT</div><div class="cat">Telegram ecosystem</div></div>
+        <div class="symbol-card"><div class="sym">NEARUSDT</div><div class="cat">L1 AI layer</div></div>
+        <div class="symbol-card"><div class="sym">INJUSDT</div><div class="cat">DeFi L1</div></div>
+        <div class="symbol-card"><div class="sym">SUIUSDT</div><div class="cat">L1</div></div>
+      </div>
+    </div>
+
+    <!-- ── Step-by-step ── -->
+    <div class="setup-section">
+      <h2>🚀 Going Live — Step by Step</h2>
+
+      <h3><span class="step-num">1</span> Fork the repo</h3>
+      <p>Fork <strong>ballikov-lgtm/BotTrading</strong> on GitHub, then clone it locally and run <code>npm install</code>.</p>
+
+      <h3><span class="step-num">2</span> Create your BitGet API key</h3>
+      <p>In BitGet → Profile → API Management → Create API:</p>
+      <ul>
+        <li>Permissions: <strong>Read-Write Futures Orders</strong> + Read-Write Spot Trading</li>
+        <li><strong>Passphrase: alphanumeric only</strong> — no <code>$</code>, <code>@</code>, <code>!</code> or special characters. They break environment variable parsing.</li>
+        <li>IP whitelist: leave blank unless you have a static IP</li>
+        <li>Do NOT enable withdrawal or copy-trading permissions</li>
+      </ul>
+      <div class="alert-box">⚠️ "Futures Position" read permission is not available on most account tiers. The bot works around this by using environment variables for position tracking — you don't need it.</div>
+
+      <h3><span class="step-num">3</span> Set BitGet to one-way position mode</h3>
+      <p>BitGet defaults to <strong>hedge mode</strong>. The bot requires <strong>one-way mode</strong>.</p>
+      <p>Go to: BitGet → Futures → Settings (⚙️) → Position Mode → select <strong>One-Way</strong>.</p>
+      <div class="alert-box">⚠️ Skipping this step causes error <code>40774</code> on every order — no trades will fire.</div>
+
+      <h3><span class="step-num">4</span> Set leverage on BitGet manually</h3>
+      <p>The bot tries to set leverage via API but the <code>set-leverage</code> endpoint requires a separate permission that isn't always available. Manually set <strong>3× isolated</strong> on each pair you plan to trade. You only need to do this once per symbol.</p>
+
+      <h3><span class="step-num">5</span> Create the logs branch on GitHub</h3>
+      <p>Railway pushes bot state to a <code>logs</code> branch after each run so you can see activity without triggering a redeploy. Create it before deploying:</p>
+      <pre>git checkout -b logs
+git push origin logs
+git checkout main</pre>
+
+      <h3><span class="step-num">6</span> Create a GitHub Personal Access Token</h3>
+      <p>GitHub → Settings → Developer Settings → Personal Access Tokens → Fine-grained:</p>
+      <ul>
+        <li>Repository access: your trading repo only</li>
+        <li>Permissions: Contents → <strong>Read and Write</strong></li>
+      </ul>
+      <p>Save the token — you'll add it to Railway as <code>GITHUB_TOKEN</code>.</p>
+
+      <h3><span class="step-num">7</span> Deploy to Railway</h3>
+      <p>Create a new project on Railway, connect your GitHub repo, then add these environment variables:</p>
+      <pre><span class="comment"># BitGet credentials</span>
+<span class="key">BITGET_API_KEY</span>=<span class="val">your_key</span>
+<span class="key">BITGET_SECRET_KEY</span>=<span class="val">your_secret</span>
+<span class="key">BITGET_PASSPHRASE</span>=<span class="val">alphanumeric_only</span>
+
+<span class="comment"># Must be the string "false" — not blank, not 0</span>
+<span class="key">IRONCLAD_PAPER</span>=<span class="val">false</span>
+
+<span class="comment"># Position sizing</span>
+<span class="key">PORTFOLIO_USD</span>=<span class="val">500</span>
+<span class="key">MAX_TRADE_USD</span>=<span class="val">50</span>
+<span class="key">LEVERAGE</span>=<span class="val">3</span>
+<span class="key">MAX_TRADES_PER_DAY</span>=<span class="val">3</span>
+
+<span class="comment"># GitHub state sync</span>
+<span class="key">GITHUB_TOKEN</span>=<span class="val">your_github_pat</span></pre>
+      <div class="alert-box">⚠️ <strong>Critical:</strong> <code>IRONCLAD_PAPER</code> must be set to the string <code>false</code>. If the variable is missing or empty the bot defaults to paper mode and no real orders are placed — even on Railway.</div>
+      <div class="ok-box">✅ Railway auto-deploys when you push to <code>main</code>. The runner starts immediately and loops every 15 minutes.</div>
+
+      <h3><span class="step-num">8</span> Verify it's working</h3>
+      <p>After the first Railway run, check the <code>logs</code> branch on GitHub — <code>ironclad-log.json</code> should be updated with scan results. If it's there, the bot is running and syncing correctly.</p>
+    </div>
+
+    <!-- ── Common errors ── -->
+    <div class="setup-section">
+      <h2>🔧 Common Errors &amp; Fixes</h2>
+      <table class="error-table">
+        <thead>
+          <tr><th>Error Code</th><th>Message</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>40404</td>
+            <td>Endpoint not found</td>
+            <td>API endpoint must use kebab-case: <code>place-order</code> not <code>placeOrder</code>. Already fixed in the bot code.</td>
+          </tr>
+          <tr>
+            <td>400172</td>
+            <td>Margin mode cannot be empty</td>
+            <td>Add <code>marginMode: 'isolated'</code> to the order body. Already fixed in the bot code.</td>
+          </tr>
+          <tr>
+            <td>400172</td>
+            <td>Side parameter mismatch</td>
+            <td>Hedge-mode side format (<code>open_long</code>) doesn't work in one-way mode. Use <code>side: 'buy'/'sell'</code> + <code>tradeSide: 'open'</code>. Already fixed.</td>
+          </tr>
+          <tr>
+            <td>40774</td>
+            <td>Unilateral position type</td>
+            <td>BitGet account is in hedge mode. Switch to one-way mode in BitGet Futures settings.</td>
+          </tr>
+          <tr>
+            <td>40014</td>
+            <td>Incorrect permissions (set-leverage)</td>
+            <td>Non-fatal — the bot catches this and continues. Set leverage manually on BitGet instead.</td>
+          </tr>
+          <tr>
+            <td style="color:#d29922">Paper mode</td>
+            <td>Bot never places real orders</td>
+            <td>Set <code>IRONCLAD_PAPER=false</code> (exact string) in Railway environment variables.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Files reference ── -->
+    <div class="setup-section">
+      <h2>📁 Key Files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>bot-ironclad.js</code></td><td>Main swing trading bot — scans 18 pairs every cycle</td></tr>
+          <tr><td><code>bot-hype-manager.js</code></td><td>Manages manual HYPE position with TP1/TP2/TP3 + trailing stop</td></tr>
+          <tr><td><code>railway-runner.js</code></td><td>Cloud runner — 15-min loop, GitHub state sync</td></tr>
+          <tr><td><code>rules-ironclad.json</code></td><td>Strategy configuration (editable without touching bot code)</td></tr>
+          <tr><td><code>ironclad-log.json</code></td><td>Full decision log from every run — pushed to <code>logs</code> branch</td></tr>
+          <tr><td><code>open-positions-ironclad.json</code></td><td>Live open position tracker</td></tr>
+          <tr><td><code>closed-positions-ironclad.json</code></td><td>Closed trade P&amp;L history</td></tr>
+          <tr><td><code>.env.example</code></td><td>Copy to <code>.env</code> for local runs — all variables documented</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /tab-setup -->
 </body>
 </html>
