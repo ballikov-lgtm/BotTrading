@@ -124,9 +124,43 @@
     "openDate": "2026-05-05",
     "openTime": "20:44:12",
     "strategy": "Ironclad v1.5",
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "currentSl": 84.9712,
+    "partialCloses": [
+      {
+        "price": 84.9712,
+        "level": "tp1",
+        "date": "2026-05-06",
+        "time": "00:00:00",
+        "pnl": 0.39247106975999935
+      },
+      {
+        "price": 86.3856,
+        "level": "tp2",
+        "date": "2026-05-06",
+        "time": "00:00:00",
+        "pnl": 1.2230250001199998
+      }
+    ]
+  },
+  {
+    "id": "unknown",
+    "symbol": "ETHUSDT",
+    "side": "short",
+    "entry": 2351.8,
+    "stopLoss": 2392.4932,
+    "tp1": 2273.2,
+    "tp2": 2219.22,
+    "tp3": 2173.1,
+    "qty": 0.042521,
+    "totalUsd": 100,
+    "openDate": "2026-05-06",
+    "openTime": "00:09:22",
+    "strategy": "Ironclad v1.6",
     "tp1Hit": false,
     "tp2Hit": false,
-    "currentSl": 83.9084,
+    "currentSl": 2392.4932,
     "partialCloses": []
   }
 ]
