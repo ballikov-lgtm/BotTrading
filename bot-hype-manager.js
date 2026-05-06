@@ -88,11 +88,11 @@ async function bitgetRequest(method, path, body = null) {
 // Get current HYPEUSDT long position
 async function getPosition() {
   const r = await bitgetRequest('GET',
-    `/api/v2/mix/position/single-position?symbol=${SYMBOL}&productType=${PRODUCT_TYPE}&marginCoin=${MARGIN_COIN}`
+    `/api/v2/mix/position/all-position?productType=${PRODUCT_TYPE}&marginCoin=${MARGIN_COIN}`
   );
   if (r.code !== '00000') throw new Error(`Position fetch failed: ${JSON.stringify(r)}`);
   const list = Array.isArray(r.data) ? r.data : [];
-  return list.find(p => p.holdSide === 'long') || null;
+  return list.find(p => p.symbol === SYMBOL && p.holdSide === 'long') || null;
 }
 
 // Place a reduce-only limit close order
