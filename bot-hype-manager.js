@@ -10,6 +10,10 @@ const CONFIG = {
   passphrase: process.env.BITGET_PASSPHRASE || '',
 };
 
+// Position size set via Railway env var — bypasses position-read API permission issues
+const HYPE_QTY   = parseFloat(process.env.HYPE_QTY   || '0');
+const HYPE_ENTRY = parseFloat(process.env.HYPE_ENTRY  || '40.901');
+
 const SYMBOL        = 'HYPEUSDT';
 const PRODUCT_TYPE  = 'USDT-FUTURES';
 const MARGIN_COIN   = 'USDT';
@@ -178,36 +182,18 @@ async function run() {
     return;
   }
 
-  // ── Fetch current position ───────────────────────────────────────────────
-  let pos;
-  try {
-    pos = await getPosition();
-  } catch (e) {
-    log(state, `⚠️  Error fetching position: ${e.message}`);
-    saveState(state);
+  // ── Position size from env var (bypasses position-read permission issues) ──
+  if (!HYPE_QTY) {
+    console.log('[HYPE] HYPE_QTY env var not set — skipping.');
     return;
   }
 
-  if (!pos || parseFloat(pos.total) < 0.0001) {
-    log(state, '✅ No open HYPE position found — marking manager complete.');
-    state.active = false;
-    saveState(state);
-    return;
-  }
-
-  const currentQty   = parseFloat(pos.total);
-  const entryPrice   = parseFloat(pos.openPriceAvg);
-  const markPrice    = parseFloat(pos.markPrice || pos.marketPrice || 0);
-  const unrealised   = parseFloat(pos.unrealizedPL || 0);
-
-  console.log(`[HYPE] Position: ${currentQty} HYPE | Entry: $${entryPrice} | Mark: $${markPrice} | uPnL: ${unrealised >= 0 ? '+' : ''}$${unrealised.toFixed(2)}`);
-
-  // First run — snapshot the entry details
+  // First run — snapshot from env var
   if (!state.entryQty) {
-    state.entryQty   = currentQty;
-    state.entryPrice = entryPrice;
-    log(state, `📍 Recorded entry: ${state.entryQty} HYPE @ $${state.entryPrice}`);
-    log(state, `   Plan: TP1=$${TP1_PRICE} (40%), TP2=$${TP2_PRICE} (35%) + 3% trail, TP3=$${TP3_PRICE} (25%)`);
+    state.entryQty   = HYPE_QTY;
+    state.entryPrice = HYPE_ENTRY;
+    log(state, `📍 Position configured: ${state.entryQty} HYPE @ $${state.entryPrice}`);
+    log(state, `   TP1=$${TP1_PRICE} (${(state.entryQty*TP1_RATIO).toFixed(2)} HYPE), TP2=$${TP2_PRICE} (${(state.entryQty*TP2_RATIO).toFixed(2)} HYPE), TP3=$${TP3_PRICE} (${(state.entryQty*TP3_RATIO).toFixed(2)} HYPE)`);
   }
 
   const tp1Qty = parseFloat((state.entryQty * TP1_RATIO).toFixed(4));
@@ -277,14 +263,14 @@ async function run() {
   }
 
   // ── Check if TP3 / trailing stop has closed the position ───────────────────
-  if (state.tp2Hit && !state.tp3Hit) {
-    // Position qty should be near tp3Qty or below if trail fired first
-    if (currentQty < state.entryQty * 0.05) {
+  if (state.tp2Hit && !state.tp3Hit && state.tp3OrderId) {
+    const open = await isOrderOpen(state.tp3OrderId);
+    if (!open) {
       state.tp3Hit = true;
       state.active = false;
       log(state, `✅ HYPE position fully closed (TP3 or trailing stop triggered). Manager deactivated.`);
     } else {
-      log(state, `   Remaining: ${currentQty} HYPE. Waiting for TP3=$${TP3_PRICE} or 3% trail to trigger.`);
+      log(state, `   Waiting for TP3=$${TP3_PRICE} or 3% trail to trigger.`);
     }
   }
 
