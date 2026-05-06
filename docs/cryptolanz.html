@@ -361,8 +361,8 @@
     <div class="stat-pill"><strong>60–80%</strong>Win Rate</div>
     <div class="stat-pill"><strong>150+</strong>Trades Tested</div>
     <div class="stat-pill"><strong>3×</strong>Leverage</div>
-    <div class="stat-pill"><strong>10</strong>Crypto Pairs</div>
-    <div class="stat-pill"><strong>$0</strong>Server Cost</div>
+    <div class="stat-pill"><strong>18</strong>Crypto Pairs</div>
+    <div class="stat-pill"><strong>~$30</strong>Running Cost/mo</div>
   </div>
 
   <a href="#deploy" class="btn-primary">🚀 Deploy Now</a>
@@ -528,7 +528,7 @@
         <div class="label">Max Daily Loss</div>
       </div>
       <div class="perf-card">
-        <div class="value">$0</div>
+        <div class="value" style="font-size:1.4rem">~$30/mo</div>
         <div class="label">Running Cost</div>
       </div>
     </div>
@@ -544,18 +544,26 @@
 <section>
   <div class="container">
     <h2>Traded Pairs</h2>
-    <p class="section-sub">10 USDT-M futures pairs on Bitget exchange.</p>
+    <p class="section-sub">18 USDT-M futures pairs on Bitget — CoinGecko top 100 only for liquidity. Selected for low BTC correlation across multiple narratives.</p>
     <div class="symbol-grid">
       <div class="symbol-pill">BTCUSDT</div>
       <div class="symbol-pill">ETHUSDT</div>
       <div class="symbol-pill">SOLUSDT</div>
       <div class="symbol-pill">XRPUSDT</div>
       <div class="symbol-pill">LINKUSDT</div>
-      <div class="symbol-pill">HYPEUSDT</div>
       <div class="symbol-pill">VIRTUALUSDT</div>
       <div class="symbol-pill">APTUSDT</div>
       <div class="symbol-pill">ONDOUSDT</div>
       <div class="symbol-pill">JUPUSDT</div>
+      <div class="symbol-pill">RENDERUSDT</div>
+      <div class="symbol-pill">TAOUSDT</div>
+      <div class="symbol-pill">AVAXUSDT</div>
+      <div class="symbol-pill">ZECUSDT</div>
+      <div class="symbol-pill">KASUSDT</div>
+      <div class="symbol-pill">TONUSDT</div>
+      <div class="symbol-pill">NEARUSDT</div>
+      <div class="symbol-pill">INJUSDT</div>
+      <div class="symbol-pill">SUIUSDT</div>
     </div>
   </div>
 </section>
@@ -659,8 +667,8 @@
       </div>
       <div class="setup-step">
         <div>
-          <h4>Create a Railway account</h4>
-          <p>Sign up at <a href="https://railway.app" style="color:var(--blue)">railway.app</a> using your GitHub account. Create a new project and deploy from your GitHub repo. Add your API keys as environment variables. The trading bot runs here 24/7 — required because Bitget's Cloudflare protection blocks GitHub Actions IPs.</p>
+          <h4>Create a Railway account &amp; configure Bitget</h4>
+          <p>Sign up at <a href="https://railway.app" style="color:var(--blue)">railway.app</a> and deploy from your GitHub repo — the bot runs here 24/7 (Bitget's Cloudflare blocks GitHub Actions IPs). Before adding API keys: set Bitget to <strong>one-way position mode</strong> (Futures → Settings → Position Mode) and ensure your API passphrase is <strong>alphanumeric only</strong> — no special characters.</p>
         </div>
       </div>
       <div class="setup-step">
@@ -746,7 +754,10 @@ CONFIG (all from env vars, these defaults):
 - maxDailyLossUsd: 50 (5% daily circuit-breaker)
 
 SYMBOLS: BTCUSDT, ETHUSDT, SOLUSDT, XRPUSDT, LINKUSDT,
-         HYPEUSDT, VIRTUALUSDT, APTUSDT, ONDOUSDT, JUPUSDT
+         VIRTUALUSDT, APTUSDT, ONDOUSDT, JUPUSDT,
+         RENDERUSDT, TAOUSDT, AVAXUSDT, ZECUSDT, KASUSDT,
+         TONUSDT, NEARUSDT, INJUSDT, SUIUSDT
+(CoinGecko top 100 only — never add coins ranked below 100)
 
 State files (committed back to repo each run for persistence):
 trades-ironclad.csv, open-positions-ironclad.json,
@@ -832,9 +843,15 @@ ORDER PLACEMENT placeOrder(symbol, side, qty, entry, sl, tp1):
   Live mode: Bitget authenticated market order
     Auth: HMAC-SHA256(secretKey, timestamp + "POST" + path + body), base64
     Endpoint: POST https://api.bitget.com/api/v2/mix/order/place-order
-    Body: { symbol, productType:"USDT-FUTURES", marginMode:"crossed",
+    CRITICAL — use kebab-case "place-order" NOT camelCase "placeOrder" (404 otherwise)
+    Body: { symbol, productType:"USDT-FUTURES", marginMode:"isolated",
             marginCoin:"USDT", size:qty, side:"buy"/"sell",
-            tradeSide:"open", orderType:"market", leverage }
+            tradeSide:"open", orderType:"market" }
+    CRITICAL — marginMode must be "isolated" not "crossed"
+    CRITICAL — Bitget must be set to ONE-WAY position mode (not hedge mode)
+      → BitGet Futures → Settings ⚙️ → Position Mode → One-Way
+    CRITICAL — IRONCLAD_PAPER must be the string "false" to go live
+      → If the env var is missing or blank the bot defaults to paper mode
 
 MAIN RUN ORDER:
 1. checkPositions()
@@ -843,27 +860,36 @@ MAIN RUN ORDER:
 4. For each symbol: daily limit check → cooldown check → fetch candles →
    detectTrend → detectEntry → calcTPs → research check → calcQty → placeOrder → log
 
-.github/workflows/ironclad.yml schedule (UTC):
-  Weekends:     every 4 hours  → '0 0,4,8,12,16,20 * * 0,6'
-  Asian 00-02:  every 15 min  → '0,15,30,45 0,1 * * 1-5'
-  Quiet 02-07:  hourly        → '0 2,3,4,5,6 * * 1-5'
-  London 07-10: every 15 min  → '0,15,30,45 7,8,9 * * 1-5'
-  Mid 10-13:    every 30 min  → '0,30 10,11,12 * * 1-5'
-  US open 13-17:every 15 min  → '0,15,30,45 13,14,15,16 * * 1-5'
-  Afternoon17-20:every 30 min → '0,30 17,18,19 * * 1-5'
-  US close 20-22:every 15 min → '0,15,30,45 20,21 * * 1-5'
-  Wind down22-00:hourly       → '0 22,23 * * 1-5'
+IMPORTANT — DEPLOY THE BOT ON RAILWAY, NOT GITHUB ACTIONS:
+  Bitget's Cloudflare WAF blocks API calls from GitHub Actions IP ranges.
+  Orders will silently fail or return authentication errors on GitHub Actions.
+  The trading bot MUST run on Railway ($5/mo). GitHub Actions is fine for
+  the research.js dashboard only (no authenticated Bitget calls needed).
 
-  permissions: contents: write
-  Steps: checkout → setup-node@v4 (node 20) → npm install → run bot → save step:
-    git add trades-ironclad.csv ironclad-log.json || true
-    git add open-positions-ironclad.json closed-positions-ironclad.json cooldown-ironclad.json || true
-    git diff --staged --quiet || git commit -m "Ironclad run $(date -u '+%Y-%m-%d %H:%M UTC')"
-    git pull --rebase --autostash origin main && git push
+railway-runner.js — Cloud runner loop (every 15 minutes):
+  1. Pull latest state files from GitHub (main branch)
+  2. Run bot-ironclad.js
+  3. Push updated logs to 'logs' branch on GitHub for visibility
 
-  Env secrets: BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE,
-               MODE (futures), LEVERAGE, PORTFOLIO_USD, MAX_TRADE_USD,
-               MAX_TRADES_PER_DAY, IRONCLAD_PAPER, MAX_DAILY_LOSS_USD
+  Required Railway environment variables:
+    BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE (alphanumeric only!)
+    IRONCLAD_PAPER=false  ← must be the string "false" not blank/missing
+    PORTFOLIO_USD, MAX_TRADE_USD, LEVERAGE, MAX_TRADES_PER_DAY
+    GITHUB_TOKEN  ← fine-grained PAT: Contents read+write on the repo
+
+  Before deploying: create a 'logs' branch on GitHub:
+    git checkout -b logs && git push origin logs && git checkout main
+
+.github/workflows/research.yml:
+  Schedule: '0 9,18 * * 1-5' (9am + 6pm UTC weekdays)
+  This is safe on GitHub Actions — research.js uses Perplexity, not Bitget auth.
+  Runs: research.js → saves research-signals.json + docs/index.html
+
+  Env secrets: PERPLEXITY_API_KEY, GITHUB_TOKEN
+
+.github/workflows/ironclad.yml:
+  Set to workflow_dispatch (manual only) — Railway handles the live scheduling.
+  Keep the workflow file for emergency manual runs only.
 
 .github/workflows/research.yml:
   Schedule: '0 9,18 * * 1-5' (9am + 6pm UTC weekdays)
@@ -885,40 +911,59 @@ research.js — Two jobs:
     Read trades-ironclad.csv + closed-positions-ironclad.json for realized P&L.
     Fetch live Bitget prices for open positions. Embed all data as JSON in HTML.
 
-STEP 4 — GITHUB SECRETS
-─────────────────────────
-Guide me through adding these at: repo → Settings → Secrets → Actions:
+STEP 4 — BITGET ACCOUNT SETUP (CRITICAL — DO THIS BEFORE DEPLOYING)
+─────────────────────────────────────────────────────────────────────
+1. API Key permissions needed: Read-Write Futures Orders + Read-Write Spot Trading
+   Passphrase MUST be alphanumeric only — no $, @, ! or special characters.
+   These break environment variable parsing and cause silent auth failures.
+
+2. Set BitGet to ONE-WAY position mode:
+   BitGet Futures → Settings ⚙️ → Position Mode → One-Way
+   Skipping this causes error 40774 on every order.
+
+3. Set leverage manually on BitGet (3× isolated) for each pair before going live.
+   The API set-leverage call requires a separate permission not always available.
+
+STEP 5 — RAILWAY ENVIRONMENT VARIABLES
+─────────────────────────────────────────
+Guide me through adding these in Railway → Service → Variables:
 
   BITGET_API_KEY          (your API key)
   BITGET_SECRET_KEY       (your secret key)
-  BITGET_PASSPHRASE       (your passphrase)
+  BITGET_PASSPHRASE       (alphanumeric passphrase only)
+  IRONCLAD_PAPER          true   ← KEEP AS STRING "true" UNTIL READY TO GO LIVE
   LEVERAGE                3
   PORTFOLIO_USD           1000
   MAX_TRADE_USD           100
   MAX_TRADES_PER_DAY      3
-  IRONCLAD_PAPER          true   ← KEEP TRUE UNTIL READY TO GO LIVE
   MAX_DAILY_LOSS_USD      50
+  GITHUB_TOKEN            (fine-grained PAT: Contents read+write)
 
-STEP 5 — GITHUB PAGES
-───────────────────────
+GOING LIVE: Change IRONCLAD_PAPER to the string "false" in Railway variables.
+Do NOT leave it blank — a missing variable defaults the bot back to paper mode.
+
+STEP 6 — GITHUB PAGES (Dashboard)
+───────────────────────────────────
 Settings → Pages → Branch: main → /docs folder → Save
 Dashboard live at: https://YOUR_USERNAME.github.io/cryptolanz/
 
-STEP 6 — FIRST RUN TEST
+STEP 7 — FIRST RUN TEST
 ─────────────────────────
 1. git add . && git commit -m "Initial deploy" && git push
-2. GitHub → Actions → "Ironclad Trading Bot" → Run workflow
-3. Verify state files are committed back to repo
-4. Run "Daily Market Research" workflow
-5. Confirm docs/index.html generated and GitHub Pages shows dashboard
+2. Railway will auto-deploy and start running within 1-2 minutes
+3. Check Railway logs to confirm the runner starts
+4. After first 15-min cycle: check 'logs' branch on GitHub — ironclad-log.json
+   should be there with scan results showing paper trade decisions
+5. GitHub → Actions → Run "Daily Market Research" workflow manually
+6. Confirm docs/index.html generated and GitHub Pages shows dashboard
 
-STEP 7 — PAPER TRADE FOR AT LEAST 2 WEEKS BEFORE GOING LIVE
+STEP 8 — PAPER TRADE FOR AT LEAST 2 WEEKS BEFORE GOING LIVE
 ─────────────────────────────────────────────────────────────
-Keep IRONCLAD_PAPER = true until:
+Keep IRONCLAD_PAPER = true in Railway until:
 - 20–30 paper trades completed
 - Signals reviewed on TradingView and make logical sense
-- No errors in Actions logs
-Only then change IRONCLAD_PAPER to "false" to deploy with real capital.
+- No errors in Railway logs for at least 48 hours
+Only then change IRONCLAD_PAPER to the string "false" in Railway variables.
 
 Build everything now, file by file. Start with package.json, then rules-ironclad.json, then bot-ironclad.js. Confirm each file before moving to the next.</div>
     </div>
