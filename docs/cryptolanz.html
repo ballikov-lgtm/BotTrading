@@ -601,10 +601,10 @@
         </tr>
         <tr>
           <td><strong>Railway</strong></td>
-          <td style="color:var(--muted)">❌ Optional</td>
+          <td class="tag-green">✅ Required</td>
           <td>Hobby plan</td>
-          <td style="color:var(--muted)">$5</td>
-          <td style="color:var(--muted);font-size:13px">Alternative to GitHub Actions if you want a persistent server. Not required — GitHub handles everything.</td>
+          <td class="tag-yel">$5</td>
+          <td style="color:var(--muted);font-size:13px">Required for the trading bot. Bitget's Cloudflare WAF blocks authenticated API calls from GitHub Actions IPs. Railway uses clean IPs that work without issue.</td>
         </tr>
         <tr>
           <td><strong>Claude Pro</strong></td>
@@ -617,16 +617,16 @@
           <td><strong>Total</strong></td>
           <td></td>
           <td></td>
-          <td class="tag-green"><strong>~$25–30/mo</strong></td>
-          <td style="color:var(--muted);font-size:13px">Claude Pro + Perplexity API are the only meaningful recurring costs.</td>
+          <td class="tag-green"><strong>~$30–35/mo</strong></td>
+          <td style="color:var(--muted);font-size:13px">Railway + Claude Pro + Perplexity API are the main recurring costs.</td>
         </tr>
       </tbody>
     </table>
 
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-top:20px;font-size:13px;color:var(--muted)">
       💡 <strong style="color:var(--text)">Minimum to get started:</strong>
-      A GitHub account, a Bitget account, Claude Pro ($20/mo) and $5–10/month for the Perplexity API.
-      Everything else — hosting, dashboard, scheduling — is completely free.
+      A GitHub account, a Bitget account, a Railway account ($5/mo), Claude Pro ($20/mo) and $5–10/month for the Perplexity API.
+      GitHub Pages (dashboard) and GitHub Actions (research) are completely free.
       One good trading day covers the entire monthly running cost.
     </div>
   </div>
@@ -636,7 +636,7 @@
 <section>
   <div class="container">
     <h2>Quick Setup</h2>
-    <p class="section-sub">Four accounts, one prompt. Up and running in under an hour.</p>
+    <p class="section-sub">Five accounts, one prompt. Up and running in under an hour.</p>
 
     <div class="setup-steps">
       <div class="setup-step">
@@ -654,13 +654,19 @@
       <div class="setup-step">
         <div>
           <h4>Create a Bitget account</h4>
-          <p>Sign up at <a href="https://www.bitget.com" style="color:var(--blue)">bitget.com</a>. Complete KYC and enable futures trading. Create an API key with <strong>Read + Trade</strong> permissions (never enable Withdrawal).</p>
+          <p>Sign up at <a href="https://www.bitget.com" style="color:var(--blue)">bitget.com</a>. Complete KYC and enable futures trading. Create an API key with <strong>Read + Trade (Futures)</strong> permissions. Use a simple alphanumeric passphrase — no special characters.</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div>
+          <h4>Create a Railway account</h4>
+          <p>Sign up at <a href="https://railway.app" style="color:var(--blue)">railway.app</a> using your GitHub account. Create a new project and deploy from your GitHub repo. Add your API keys as environment variables. The trading bot runs here 24/7 — required because Bitget's Cloudflare protection blocks GitHub Actions IPs.</p>
         </div>
       </div>
       <div class="setup-step">
         <div>
           <h4>Paste the deployment prompt into Claude</h4>
-          <p>Copy the prompt below and paste it into a fresh Claude session. Claude will build every file, walk you through GitHub Secrets configuration, and get everything running. No coding experience needed.</p>
+          <p>Copy the prompt below and paste it into a fresh Claude session. Claude will build every file, walk you through GitHub and Railway configuration, and get everything running. No coding experience needed.</p>
         </div>
       </div>
     </div>

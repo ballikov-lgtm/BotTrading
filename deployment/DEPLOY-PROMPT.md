@@ -18,18 +18,23 @@ in any file you create. All sensitive values go into GitHub Secrets only.
 OVERVIEW
 ───────────────────────────────────────────────
 
-This system runs entirely in the cloud using GitHub Actions (free tier).
-No server or VPS is needed. It trades crypto futures on Bitget exchange 24/7.
+This system uses two cloud platforms:
+- Railway ($5/month) runs the trading bot 24/7 — required because Bitget's API is
+  protected by Cloudflare which blocks GitHub Actions IPs from making authenticated
+  trading calls. Railway uses clean IPs that pass through without issue.
+- GitHub Actions (free tier) runs research, monitoring and the live dashboard.
 
 Components to build:
-1. bot-ironclad.js      — Main trading bot (runs every 15 min during active sessions)
-2. research.js          — Market research + live HTML dashboard (runs 9am + 6pm UK)
-3. monitor.js           — Fund balance monitor (runs with research)
-4. .github/workflows/ironclad.yml  — Trading bot scheduler
-5. .github/workflows/research.yml  — Research + dashboard scheduler
-6. rules-ironclad.json  — Strategy configuration file
-7. package.json         — Node.js dependencies
-8. docs/index.html      — Live dashboard (auto-generated, hosted on GitHub Pages)
+1. bot-ironclad.js      — Main trading bot (called by Railway runner every 15 min)
+2. railway-runner.js    — Railway entry point, pulls state from GitHub on startup,
+                          runs bot on 15-min loop
+3. railway.json         — Railway deployment config
+4. research.js          — Market research + live HTML dashboard (runs 9am + 6pm UK)
+5. monitor.js           — Fund balance monitor (runs with research)
+6. .github/workflows/research.yml  — Research + dashboard scheduler (GitHub Actions)
+7. rules-ironclad.json  — Strategy configuration file
+8. package.json         — Node.js dependencies (start script points to railway-runner.js)
+9. docs/index.html      — Live dashboard (auto-generated, hosted on GitHub Pages)
 
 ───────────────────────────────────────────────
 STEP 1 — SOFTWARE PREREQUISITES
@@ -54,9 +59,15 @@ Guide me through installing the following if I don't have them already:
    - Complete KYC verification
    - Enable futures trading
    - Create an API key: Account → API Management → Create API
-     Permissions needed: Read + Trade (NO Withdrawal permission)
-     IP restriction: leave blank for GitHub Actions compatibility
+     Permissions needed: Read + Trade on Futures (NO Withdrawal permission)
+     Passphrase: use letters and numbers only — no special characters
+     IP restriction: leave blank (Railway uses dynamic IPs)
    - Note down: API Key, Secret Key, Passphrase
+
+5. A Railway account — https://railway.app
+   - Sign up with your GitHub account (simplest)
+   - Create a new project called "Ironclad"
+   - You will deploy to Railway in Step 5
 
 ───────────────────────────────────────────────
 STEP 2 — CREATE THE GITHUB REPOSITORY
@@ -357,6 +368,8 @@ STEP 4 — GITHUB SECRETS CONFIGURATION
 After building all files, guide me through adding these secrets:
 GitHub repo → Settings → Secrets and variables → Actions → New repository secret
 
+These secrets are used by the research and monitor workflows on GitHub Actions:
+
 Required secrets:
   BITGET_API_KEY          Your Bitget API key
   BITGET_SECRET_KEY       Your Bitget secret key
@@ -379,18 +392,49 @@ Enable the live dashboard:
 4. Save — dashboard will be live at https://YOUR_USERNAME.github.io/cryptolanz/
 
 ───────────────────────────────────────────────
-STEP 6 — FIRST RUN TEST
+STEP 6 — RAILWAY DEPLOYMENT (TRADING BOT)
+───────────────────────────────────────────────
+
+The trading bot must run on Railway — Bitget's Cloudflare WAF blocks GitHub
+Actions IPs from making authenticated API calls.
+
+1. Go to https://railway.app and sign up with your GitHub account
+2. Create a new project called "Ironclad"
+3. Inside the project → + New → GitHub Repo → select your cryptolanz repo
+4. Railway will detect railway.json and use `node railway-runner.js` as the start command
+5. Go to the service → Variables tab and add:
+
+   BITGET_API_KEY          Your Bitget API key
+   BITGET_SECRET_KEY       Your Bitget secret key
+   BITGET_PASSPHRASE       Your Bitget passphrase (letters/numbers only — no special chars)
+   GITHUB_TOKEN            A GitHub Personal Access Token with repo Contents read access
+                           (github.com → Settings → Developer settings → Fine-grained tokens
+                            → BotTrading repo → Contents: read)
+   PORTFOLIO_USD           1000
+   MAX_TRADE_USD           100
+   LEVERAGE                3
+   MAX_TRADES_PER_DAY      3
+   MAX_DAILY_LOSS_USD      50
+   IRONCLAD_PAPER          true  (set to "false" only when ready to go live)
+
+6. Railway deploys automatically — watch the logs for "Ironclad Railway runner started"
+7. The bot will pull state from GitHub on startup and run every 15 minutes
+
+IMPORTANT: In Railway service Settings, ensure Serverless is OFF (toggle to the left).
+The bot must stay always-on to maintain its 15-minute schedule.
+
+───────────────────────────────────────────────
+STEP 7 — FIRST RUN TEST
 ───────────────────────────────────────────────
 
 1. Push all files to GitHub: `git add . && git commit -m "Initial deploy" && git push`
-2. Go to GitHub → Actions → "Ironclad Trading Bot" → Run workflow (manual trigger)
-3. Watch the logs — it should scan all 10 symbols, detect trends, log any signals found
-4. Check that state files (trades-ironclad.csv, open-positions-ironclad.json etc.) are committed back to the repo
-5. Go to Actions → "Daily Market Research" → Run workflow
-6. Check that docs/index.html was generated and GitHub Pages shows the dashboard
+2. Railway will deploy automatically from the GitHub push
+3. Watch Railway logs — you should see all 9 symbols scanned with trend analysis
+4. Go to GitHub → Actions → "Daily Market Research" → Run workflow manually
+5. Check that docs/index.html was generated and GitHub Pages shows the dashboard
 
 ───────────────────────────────────────────────
-STEP 7 — PAPER TRADE FOR AT LEAST 2 WEEKS
+STEP 8 — PAPER TRADE FOR AT LEAST 2 WEEKS
 ───────────────────────────────────────────────
 
 Leave IRONCLAD_PAPER = true until you have:
