@@ -157,7 +157,7 @@ const SYMBOLS = [
   'LINKUSDT', /* 'HYPEUSDT' — excluded: manual live position open, re-add when closed */
   'VIRTUALUSDT', 'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
   // ── Added 2026-05-06: lagging / independent-narrative tokens ──────────────
-  'PENDLEUSDT',   // Yield/RWA — own DeFi cycle, independent of BTC
+  // 'PENDLEUSDT', // Removed — CoinGecko rank #138, below top 100 liquidity threshold
   'RENDERUSDT',   // DePIN/AI — GPU compute demand driven
   'TAOUSDT',      // Bittensor AI — subnet narrative, genuinely independent
   'AVAXUSDT',     // L1 breaking out of consolidation
