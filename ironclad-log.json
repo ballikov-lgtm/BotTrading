@@ -1,5 +1,54 @@
 [
   {
+    "timestamp": "2026-05-06T00:17:42.055Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:41.811Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:41.561Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:41.301Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:41.045Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:40.792Z",
+    "symbol": "XRPUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-06T00:17:40.541Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
     "timestamp": "2026-05-06T00:17:18.804Z",
     "symbol": "JUPUSDT",
     "htfTrend": "neutral",
@@ -2449,146 +2498,5 @@
     "swingLow": 0.1503,
     "reason": "HTF bullish + 15m swing low breakout above $0.18",
     "orderId": "IRONCLAD-PAPER-1777890287901"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:47.715Z",
-    "symbol": "ONDOUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:47.535Z",
-    "symbol": "APTUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:47.346Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:47.173Z",
-    "symbol": "HYPEUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 41.09,
-    "stopLoss": 40.8558,
-    "tp1": 41.5087,
-    "tp2": 42.4948,
-    "tp3": 43.551,
-    "rr1": 1.79,
-    "rr2": 6,
-    "rr3": 10.51,
-    "slAfterTp1": 41.09,
-    "slAfterTp2": 41.5087,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 39.24940688616861,
-      "ema50": 40.053160000000005,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        39.2663,
-        40.1233,
-        40.816,
-        41.5087,
-        42.4948,
-        43.751,
-        45.3476,
-        47.3787
-      ]
-    },
-    "swingHigh": 43.751,
-    "swingLow": 37.881,
-    "reason": "HTF bullish + 15m swing low breakout above $41.04",
-    "orderId": "IRONCLAD-PAPER-1777890287173"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:46.984Z",
-    "symbol": "LINKUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:46.807Z",
-    "symbol": "XRPUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-04T10:24:46.635Z",
-    "symbol": "SOLUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 83.959,
-    "stopLoss": 83.5792,
-    "tp1": 85.025,
-    "tp2": 87.0109,
-    "tp3": 87.607,
-    "rr1": 2.81,
-    "rr2": 8.04,
-    "rr3": 9.61,
-    "slAfterTp1": 83.959,
-    "slAfterTp2": 85.025,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 87.60695191212483,
-      "ema50": 85.24419999999998,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        87.0109,
-        88.2395,
-        89.2325,
-        90.2255,
-        91.6392,
-        93.44,
-        95.7289,
-        98.6405
-      ]
-    },
-    "swingHigh": 93.44,
-    "swingLow": 85.025,
-    "reason": "HTF bullish + 15m swing low breakout above $83.91",
-    "orderId": "IRONCLAD-PAPER-1777890286635"
   }
 ]
