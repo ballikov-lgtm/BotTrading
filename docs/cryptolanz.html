@@ -353,6 +353,7 @@
 <!-- ── HERO ─────────────────────────────────────────────────────────────── -->
 <div class="hero">
   <div class="hero-badge">⚡ Automated · Cloud-Native · 24/7</div>
+  <div style="display:inline-block;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.4);color:#3fb950;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:16px;margin-left:8px;">✦ Current Version: v1.5</div>
   <h1>Cryptolanz</h1>
   <p>Advanced, real-time tested crypto futures trading strategy.<br>
      Deploy in minutes. Runs entirely free on GitHub Actions.</p>
@@ -685,28 +686,36 @@
 <section id="patches">
   <div class="container">
     <h2>Updates &amp; Patches</h2>
-    <p class="section-sub">Already installed? Apply the latest patch to get current fixes and new features. Fresh installs use the deployment prompt below which is always up to date.</p>
+    <p class="section-sub">Already installed? Check your version below and apply any patches you're missing. The deployment prompt further down is always up to date for fresh installs.</p>
 
-    <table>
-      <thead>
-        <tr><th>Version</th><th>Date</th><th>Summary</th><th>Affects</th><th>Link</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="color:#3fb950;font-weight:700;font-family:monospace">v1.5 ← latest</td>
-          <td style="color:var(--muted);font-size:13px">6 May 2026</td>
-          <td>
-            <strong style="color:var(--text)">Critical API fix — orders now actually fire</strong><br>
-            <span style="font-size:13px;color:var(--muted)">Fixed Bitget endpoint (kebab-case), margin mode (isolated), one-way position side format. Expanded watchlist 10 → 18 pairs.</span>
-          </td>
-          <td style="font-size:13px;color:#f85149">All installs v1.0–1.4</td>
-          <td><a href="patches/patch-v1.5.html" style="color:#58a6ff;font-weight:600;font-size:13px">View patch →</a></td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- How to check your version -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:24px;font-size:14px;color:#c9d1d9;">
+      <strong style="color:var(--text)">🔍 How to check your version</strong> — open <code>rules-ironclad.json</code> in your repo. The <code>"strategy"</code> field shows your version, e.g. <code>"Cryptolanz Ironclad v1.4"</code>.
+    </div>
 
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-top:16px;font-size:13px;color:var(--muted)">
-      💡 <strong style="color:var(--text)">New installs:</strong> The deployment prompt below already includes all patches. You don't need to apply anything separately.
+    <!-- Latest patch card -->
+    <div style="background:var(--bg2);border:2px solid #3fb950;border-radius:12px;padding:24px 28px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <span style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.5);color:#3fb950;font-size:13px;font-weight:800;padding:3px 12px;border-radius:20px;font-family:monospace;">v1.5</span>
+            <span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.4);color:#f85149;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Critical Fix</span>
+            <span style="color:#8b949e;font-size:13px;">6 May 2026</span>
+          </div>
+          <h3 style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:8px;">Bitget API Fix — orders now actually fire</h3>
+          <p style="font-size:14px;color:#8b949e;margin:0;line-height:1.6;">Fixed 3 critical API bugs that silently blocked all live orders on v1.0–1.4. Also expanded watchlist from 10 → 18 pairs.</p>
+          <p style="font-size:13px;color:#f85149;margin:10px 0 0;font-weight:600;">⚠️ Affects all installs on v1.0–1.4 — if you haven't applied this, your bot has never placed a real trade.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;flex-shrink:0;">
+          <a href="patches/patch-v1.5.html" class="btn-primary" style="white-space:nowrap;">🔧 View Patch Instructions</a>
+          <span style="font-size:12px;color:#8b949e;text-align:right;">Step-by-step fix guide<br>+ code changes + error reference</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Older versions note -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;font-size:13px;color:var(--muted);">
+      ✅ <strong style="color:var(--text)">On v1.5 already?</strong> You're up to date. Check back here after any major update — new patches will appear above.
     </div>
   </div>
 </section>
