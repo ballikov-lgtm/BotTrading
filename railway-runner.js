@@ -20,9 +20,18 @@ const PULL_FILES = [
   'rules-ironclad.json',
 ];
 
-// State files live on Railway's persistent filesystem between runs.
-// We pull from GitHub on startup so state survives redeployments,
-// but we do NOT push back — pushing triggered a Railway redeploy loop.
+// Files to push TO GitHub after each run for visibility / dashboard.
+// Pushed to the 'logs' branch — Railway only watches 'main', so this
+// will NOT trigger a redeploy loop.
+const PUSH_FILES = [
+  'ironclad-log.json',
+  'trades-ironclad.csv',
+  'open-positions-ironclad.json',
+  'closed-positions-ironclad.json',
+  'hype-state.json',
+  'cooldown-ironclad.json',
+];
+const LOGS_BRANCH = 'logs';
 
 // ── GitHub API helpers ────────────────────────────────────────────────────────
 
@@ -52,25 +61,27 @@ async function pullFile(filename) {
   }
 }
 
-async function pushFile(filename) {
+async function pushFile(filename, branch = LOGS_BRANCH) {
   if (!fs.existsSync(filename)) return;
   try {
     const content = fs.readFileSync(filename, 'utf8');
     const encoded = Buffer.from(content).toString('base64');
 
-    // Get current SHA (required by GitHub API to update an existing file)
-    const existing = await githubRequest('GET', `/repos/${OWNER}/${REPO}/contents/${filename}`);
-    const sha      = existing.sha || null;
+    // Get current SHA from the target branch (required by GitHub API to update)
+    const existing = await githubRequest('GET',
+      `/repos/${OWNER}/${REPO}/contents/${filename}?ref=${branch}`);
+    const sha = existing.sha || null;
 
     const body = {
-      message: `Ironclad state ${new Date().toISOString().slice(0, 16)} UTC [skip ci]`,
+      message: `Railway log ${new Date().toISOString().slice(0, 16)} UTC`,
       content: encoded,
+      branch,
     };
     if (sha) body.sha = sha;
 
     const result = await githubRequest('PUT', `/repos/${OWNER}/${REPO}/contents/${filename}`, body);
     if (result.content) {
-      console.log(`  ↑ ${filename}`);
+      console.log(`  ↑ ${filename} → ${branch}`);
     } else {
       console.log(`  ⚠ Push issue for ${filename}: ${JSON.stringify(result).slice(0, 120)}`);
     }
@@ -106,6 +117,10 @@ async function runCycle() {
   } catch (e) {
     console.log(`HYPE manager error: ${e.message}`);
   }
+
+  // 4. Push state to 'logs' branch for visibility (safe — Railway watches 'main' only)
+  console.log('\n── Pushing state to logs branch ──');
+  for (const f of PUSH_FILES) await pushFile(f);
 
   console.log(`\n✓ Cycle complete. Next run in ${INTERVAL_MS / 60000} minutes.\n`);
 }
