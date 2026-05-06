@@ -6038,5 +6038,193 @@
     "closeDate": "2026-05-05",
     "closeTime": "18:00:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777962599637",
+    "symbol": "SOLUSDT",
+    "side": "long",
+    "entry": 85.46,
+    "stopLoss": 84.32,
+    "tp1": 87.01,
+    "tp2": 87.62,
+    "tp3": 88.05,
+    "qty": 0.585069,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "06:29:59",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 84.32,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 87.01,
+        "date": "2026-05-06",
+        "time": "03:00:00",
+        "pnl": 1.0882284109525004
+      },
+      {
+        "level": "tp2",
+        "price": 87.62,
+        "date": "2026-05-06",
+        "time": "07:00:00",
+        "pnl": 1.3269365785162717
+      },
+      {
+        "level": "tp3",
+        "price": 88.05,
+        "date": "2026-05-06",
+        "time": "08:30:00",
+        "pnl": 1.1364966065995805
+      }
+    ],
+    "realizedPnl": 3.5517,
+    "exitLevel": "tp3",
+    "exitPrice": 88.05,
+    "closeDate": "2026-05-06",
+    "closeTime": "08:30:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1778004120557",
+    "symbol": "SOLUSDT",
+    "side": "long",
+    "entry": 84.86,
+    "stopLoss": 83.89,
+    "tp1": 86.38,
+    "tp2": 87.01,
+    "tp3": 87.62,
+    "qty": 0.589213,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "18:02:00",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 83.89,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 86.38,
+        "date": "2026-05-05",
+        "time": "19:30:00",
+        "pnl": 1.0747112891821797
+      },
+      {
+        "level": "tp2",
+        "price": 87.01,
+        "date": "2026-05-06",
+        "time": "03:00:00",
+        "pnl": 1.3301319820881485
+      },
+      {
+        "level": "tp3",
+        "price": 87.62,
+        "date": "2026-05-06",
+        "time": "07:00:00",
+        "pnl": 1.2196559038416237
+      }
+    ],
+    "realizedPnl": 3.6245,
+    "exitLevel": "tp3",
+    "exitPrice": 87.62,
+    "closeDate": "2026-05-06",
+    "closeTime": "07:00:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1778013852099",
+    "symbol": "SOLUSDT",
+    "side": "long",
+    "entry": 84.42,
+    "stopLoss": 83.91,
+    "tp1": 84.97,
+    "tp2": 86.39,
+    "tp3": 87.01,
+    "qty": 0.592284,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "20:44:12",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 83.91,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 84.97,
+        "date": "2026-05-05",
+        "time": "20:45:00",
+        "pnl": 0.3909026297085979
+      },
+      {
+        "level": "tp2",
+        "price": 86.39,
+        "date": "2026-05-05",
+        "time": "20:45:00",
+        "pnl": 1.225124378109452
+      },
+      {
+        "level": "tp3",
+        "price": 87.01,
+        "date": "2026-05-06",
+        "time": "03:00:00",
+        "pnl": 1.1504975124378125
+      }
+    ],
+    "realizedPnl": 2.7665,
+    "exitLevel": "tp3",
+    "exitPrice": 87.01,
+    "closeDate": "2026-05-06",
+    "closeTime": "03:00:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777962599886",
+    "symbol": "XRPUSDT",
+    "side": "long",
+    "entry": 1.41,
+    "stopLoss": 1.4,
+    "tp1": 1.43,
+    "tp2": 1.44,
+    "tp3": 1.46,
+    "qty": 35.385704,
+    "totalUsd": 50,
+    "openDate": "2026-05-05",
+    "openTime": "06:29:59",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 1.4,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 1.43,
+        "date": "2026-05-06",
+        "time": "07:15:00",
+        "pnl": 0.8510638297872349
+      },
+      {
+        "level": "tp2",
+        "price": 1.44,
+        "date": "2026-05-06",
+        "time": "08:45:00",
+        "pnl": 1.1170212765957457
+      },
+      {
+        "level": "sl",
+        "price": 1.43,
+        "date": "2026-05-06",
+        "time": "13:00:00",
+        "pnl": 0.5319148936170218
+      }
+    ],
+    "realizedPnl": 2.5,
+    "exitLevel": "sl",
+    "exitPrice": 1.43,
+    "closeDate": "2026-05-06",
+    "closeTime": "13:00:00",
+    "outcome": "WIN"
   }
 ]
