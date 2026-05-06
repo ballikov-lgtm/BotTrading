@@ -1,5 +1,54 @@
 [
   {
+    "timestamp": "2026-05-06T00:23:08.299Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:08.046Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:07.791Z",
+    "symbol": "APTUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:07.538Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:07.282Z",
+    "symbol": "LINKUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:07.020Z",
+    "symbol": "XRPUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-06T00:23:06.762Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
     "timestamp": "2026-05-06T00:22:42.017Z",
     "symbol": "JUPUSDT",
     "htfTrend": "neutral",
@@ -1439,144 +1488,5 @@
     "htfTrend": "neutral",
     "signal": null,
     "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:24.326Z",
-    "symbol": "APTUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:24.067Z",
-    "symbol": "VIRTUALUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:23.810Z",
-    "symbol": "LINKUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:23.550Z",
-    "symbol": "XRPUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:23.286Z",
-    "symbol": "SOLUSDT",
-    "htfTrend": "bull",
-    "signal": "long",
-    "entry": 84.171,
-    "stopLoss": 83.881,
-    "tp1": 84.9622,
-    "tp2": 86.3842,
-    "tp3": 87.0109,
-    "rr1": 2.73,
-    "rr2": 7.63,
-    "rr3": 9.79,
-    "slAfterTp1": 84.171,
-    "slAfterTp2": 84.9622,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 86.3842100691746,
-      "ema50": 84.96223999999998,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        87.0109,
-        88.2395,
-        89.2325,
-        90.2255,
-        91.6392,
-        93.44,
-        95.7289,
-        98.6405
-      ]
-    },
-    "swingHigh": 93.44,
-    "swingLow": 85.025,
-    "reason": "HTF bullish + 15m swing low breakout above $84.12"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:22.286Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "bear",
-    "signal": "short",
-    "entry": 2351.8,
-    "stopLoss": 2392.4932,
-    "tp1": 2273.2,
-    "tp2": 2219.22,
-    "tp3": 2173.1,
-    "rr1": 1.93,
-    "rr2": 3.26,
-    "rr3": 4.39,
-    "slAfterTp1": 2351.8,
-    "slAfterTp2": 2273.2,
-    "split": [
-      0.4,
-      0.35,
-      0.25
-    ],
-    "emaLevels": {
-      "ema21": 2129.684215772076,
-      "ema50": 2216.2328,
-      "ema100": null,
-      "ema200": null
-    },
-    "fibLevels": {
-      "ratios": [
-        0.236,
-        0.382,
-        0.5,
-        0.618,
-        0.786,
-        1,
-        1.272,
-        1.618
-      ],
-      "levels": [
-        2112.5963,
-        2078.9769,
-        2051.805,
-        2024.6331,
-        1985.9478,
-        1936.67,
-        1874.0366,
-        1794.3631
-      ]
-    },
-    "swingHigh": 2166.94,
-    "swingLow": 1936.67,
-    "reason": "HTF bearish + 15m swing high breakdown below $2374.68"
-  },
-  {
-    "timestamp": "2026-05-06T00:09:21.279Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
   }
 ]
