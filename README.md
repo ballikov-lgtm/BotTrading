@@ -73,10 +73,11 @@ Fast intraday scalping on crypto futures. Looks for price near the VWAP with RSI
 
 Swing trading strategy using daily trend + 15-minute entry trigger. Confirms higher-timeframe trend via swing highs/lows, then enters on a 15m breakout in trend direction. Uses EMA levels and Fibonacci extensions for three-level take profit targets.
 
-- **Assets:** Crypto, US stocks (AAPL, NVDA, GOOGL), commodities (Gold, Oil)
-- **Exchange:** BitGet futures (3× leverage)
-- **Paper flag:** `IRONCLAD_PAPER=true` in `.env`
-- **Version:** v1.3
+- **Assets:** 18 crypto pairs — CoinGecko top 100 only (see [IRONCLAD-README.md](IRONCLAD-README.md) for full list)
+- **Exchange:** BitGet futures (3× leverage, isolated margin, one-way position mode)
+- **Deployment:** Railway (runs every 15 minutes via `railway-runner.js`)
+- **Paper flag:** `IRONCLAD_PAPER=true` in `.env` — must be string `false` to go live
+- **Version:** v1.4
 
 ---
 
@@ -185,4 +186,16 @@ node research.js         # Generate dashboard manually
 
 ## Cloud Deployment
 
-GitHub Actions runs the research agent on schedule — no server needed for the dashboard. For the trading bots, Railway or any cron-compatible host works. See `railway.json` and `.github/workflows/research.yml`.
+**Research agent:** GitHub Actions runs `research.js` at 9am and 6pm UK time — no server needed for the dashboard. See `.github/workflows/research.yml`.
+
+**Trading bots:** Railway runs `railway-runner.js` every 15 minutes. It syncs state from GitHub before each run and pushes logs back to the `logs` branch afterward.
+
+Required Railway environment variables:
+```
+BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE
+IRONCLAD_PAPER=false
+PORTFOLIO_USD, MAX_TRADE_USD, LEVERAGE, MAX_TRADES_PER_DAY
+GITHUB_TOKEN
+```
+
+See [IRONCLAD-README.md](IRONCLAD-README.md) for full BitGet API setup instructions including common errors and their fixes.

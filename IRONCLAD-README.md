@@ -108,19 +108,32 @@ This is the key — you're not guessing. You wait for price to **prove** it's re
 
 ## Symbols Monitored
 
-| Symbol | Market |
-|--------|--------|
-| BTCUSDT | Crypto |
-| ETHUSDT | Crypto |
-| SOLUSDT | Crypto |
-| XRPUSDT | Crypto |
-| LINKUSDT | Crypto |
-| HYPEUSDT | Crypto |
-| VIRTUALUSDT | Crypto |
-| AAPLUSDT | Stock |
-| NVDAUSDT | Stock |
-| GOOGLUSDT | Stock |
-| XAUUSDT | Commodity (Gold) |
+18 crypto pairs selected for liquidity (CoinGecko top 100) and low BTC correlation:
+
+| Symbol | Category |
+|--------|----------|
+| BTCUSDT | Core L1 |
+| ETHUSDT | Core L1 |
+| SOLUSDT | Core L1 |
+| XRPUSDT | Core L1 |
+| LINKUSDT | Oracle |
+| VIRTUALUSDT | AI Agent |
+| APTUSDT | L1 |
+| ONDOUSDT | RWA |
+| JUPUSDT | DEX |
+| RENDERUSDT | DePIN / AI |
+| TAOUSDT | Bittensor AI |
+| AVAXUSDT | L1 |
+| ZECUSDT | Privacy |
+| KASUSDT | BlockDAG |
+| TONUSDT | Telegram ecosystem |
+| NEARUSDT | L1 AI layer |
+| INJUSDT | DeFi L1 |
+| SUIUSDT | L1 |
+
+**Watchlist rule:** only trade coins in the CoinGecko top 100. Anything ranked lower has thin liquidity and wide spreads that hurt fill prices.
+
+Note: HYPEUSDT is excluded while a manual position is open — re-add once that position closes.
 
 ---
 
@@ -138,13 +151,85 @@ The backtest showed up to **50% drawdown** at times — meaning the account halv
 
 ## How It Runs
 
-The bot checks all 11 symbols automatically on the same smart schedule as the main bot:
-- Every 15 minutes during London open, US open and US close
-- Every 30 minutes mid-session
-- Every hour in quiet periods
-- Every 4 hours on weekends
+The bot runs on **Railway** (cloud server) via `railway-runner.js`, which loops every 15 minutes:
 
-Each run checks the daily trend first, then looks for a 15m entry trigger. If both align it logs a paper trade with entry, stop loss and take profit levels.
+1. Pulls latest state files from GitHub (`main` branch)
+2. Runs `bot-ironclad.js` — scans all 18 symbols for entry signals
+3. Runs `bot-hype-manager.js` — manages any manual HYPE position
+4. Pushes updated logs to the `logs` branch on GitHub for visibility
+
+Each scan checks the daily trend first, then looks for a 15m entry trigger. If both align and `IRONCLAD_PAPER=false`, a live market order is placed on BitGet.
+
+---
+
+## Going Live — BitGet API Setup
+
+This is where most people get caught. Follow these steps exactly:
+
+### 1. Create the API key
+
+In BitGet → Profile → API Management → Create API:
+- **Name:** anything (e.g. "IroncladBot")
+- **Passphrase:** alphanumeric only — no special characters (`$`, `@`, `!` etc). These break environment variable parsing.
+- **Permissions required:**
+  - ✅ Read-Write Futures Orders
+  - ✅ Read-Write Spot Trading (needed for some account info calls)
+  - ❌ IP whitelist — leave blank unless you have a fixed IP
+- **Do NOT enable** copy trading or withdrawal permissions
+
+> Note: "Futures Position" read is not available as a standalone permission on some account tiers. The bot works around this by using environment variables for position size instead of reading it from the API.
+
+### 2. Set BitGet to one-way position mode
+
+BitGet defaults to **hedge mode** (separate long/short positions). The bot uses **one-way mode**.
+
+In BitGet → Futures → Settings → Position Mode → select **One-Way**.
+
+If you skip this step, orders will fail with error `40774`.
+
+### 3. Set leverage
+
+The bot attempts to set leverage automatically via API but this requires an additional account permission (`set-leverage`) that isn't always available. If the API call fails it logs a warning and continues — it will use whatever leverage is already set on your account.
+
+**Manually set 3× isolated leverage** on each symbol you plan to trade before the bot goes live. You only need to do this once per symbol.
+
+### 4. Environment variables on Railway
+
+Add these to your Railway service:
+
+```
+BITGET_API_KEY=your_key
+BITGET_SECRET_KEY=your_secret
+BITGET_PASSPHRASE=your_passphrase   ← alphanumeric only
+IRONCLAD_PAPER=false                ← must be the string "false" — not blank, not 0
+PORTFOLIO_USD=500
+MAX_TRADE_USD=50
+LEVERAGE=3
+MAX_TRADES_PER_DAY=3
+GITHUB_TOKEN=your_github_pat        ← needed for state sync to/from GitHub
+```
+
+> **Critical:** `IRONCLAD_PAPER` must be set to the string `false` explicitly. If the variable is missing or blank, the bot defaults to paper mode.
+
+### 5. Create the logs branch on GitHub
+
+Before deploying to Railway, create a `logs` branch on your repo:
+
+```bash
+git checkout -b logs
+git push origin logs
+git checkout main
+```
+
+Railway only watches `main` — the bot pushes state to `logs` so you can see what's happening without triggering redeployments.
+
+### 6. GitHub Personal Access Token
+
+Create a PAT at GitHub → Settings → Developer Settings → Personal Access Tokens → Fine-grained:
+- **Repository access:** your trading repo only
+- **Permissions:** Contents → Read and Write
+
+Add it as `GITHUB_TOKEN` on Railway.
 
 ---
 
@@ -153,7 +238,26 @@ Each run checks the daily trend first, then looks for a 15m entry trigger. If bo
 | File | Purpose |
 |------|---------|
 | bot-ironclad.js | Main bot code |
+| bot-hype-manager.js | Manual HYPE position manager (TP1/TP2/TP3 + trailing stop) |
+| railway-runner.js | Cloud runner — loops every 15 min, syncs state to/from GitHub |
 | rules-ironclad.json | Strategy configuration |
 | trades-ironclad.csv | Trade log (entry, stop, target) |
 | ironclad-log.json | Detailed decision log per run |
+| open-positions-ironclad.json | Open position tracker |
+| closed-positions-ironclad.json | Closed trade P&L records |
+| cooldown-ironclad.json | Per-symbol cooldown tracker |
+| hype-state.json | HYPE manager state (which TPs have filled) |
 | IRONCLAD-README.md | This file |
+
+---
+
+## Common Errors & Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `40404 endpoint not found` | Wrong API endpoint format | Use kebab-case: `place-order` not `placeOrder` |
+| `400172 margin mode cannot be empty` | Missing marginMode field | Add `marginMode: 'isolated'` to order body |
+| `400172 side parameter mismatch` | Using hedge-mode side format | Use `side: 'buy'/'sell'` + `tradeSide: 'open'/'close'` |
+| `40774 unilateral position type` | Account in wrong position mode | Set BitGet to one-way mode, add `tradeSide: 'open'` |
+| `40014 incorrect permissions` | set-leverage requires extra permission | Non-fatal — bot catches this and continues |
+| Bot always in paper mode | `IRONCLAD_PAPER` not set to exact string `false` | Set Railway env var to `false` (string, not blank) |
