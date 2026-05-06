@@ -164,11 +164,11 @@ const SYMBOLS = [
   'ZECUSDT',      // Privacy coin — independent +190% trend
   'KASUSDT',      // BlockDAG — good fundamentals, pullback recovery
   // 'AMDUSDT',   // Tokenised stock — better as manual spot buy, removed 2026-05-06
-  // ── Watchlist: activate when BTC holds above $84K ─────────────────────────
-  // 'TONUSDT',   // #5 CoinGecko — explosive independent breakout, Telegram ecosystem
-  // 'NEARUSDT',  // AI blockchain — breakout today 2026-05-06, strong narrative
-  // 'INJUSDT',   // DeFi/perps — +36% trend, clean structure, top 40
-  // 'SUIUSDT',   // L1 recovering from lows — waking up, good fundamentals
+  // ── Activated 2026-05-06: pause these if 3+ consecutive losses (BTC sub-84K chop risk)
+  'TONUSDT',   // #5 CoinGecko — explosive independent breakout, Telegram ecosystem
+  'NEARUSDT',  // AI blockchain — breakout today, strong narrative
+  'INJUSDT',   // DeFi/perps — +36% trend, clean structure, top 40
+  'SUIUSDT',   // L1 recovering from lows — waking up, good fundamentals
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
