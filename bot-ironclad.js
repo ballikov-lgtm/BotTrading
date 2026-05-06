@@ -163,7 +163,7 @@ const SYMBOLS = [
   'AVAXUSDT',     // L1 breaking out of consolidation
   'ZECUSDT',      // Privacy coin — independent +190% trend
   'KASUSDT',      // BlockDAG — good fundamentals, pullback recovery
-  'AMDUSDT',      // Tokenised stock — AI/chip narrative, +94% trend
+  // 'AMDUSDT',   // Tokenised stock — better as manual spot buy, removed 2026-05-06
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
