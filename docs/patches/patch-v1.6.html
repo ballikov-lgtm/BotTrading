@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz Patch v1.6 — Ghost Trades Fix + HYPE Margin Mode</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1f2d3d;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --blue:   #58a6ff;
+      --yellow: #d29922;
+      --red:    #f85149;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 48px;
+      text-align: center;
+    }
+    .version-badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1rem; max-width: 560px; margin: 0 auto 24px; }
+    .hero .meta { color: var(--muted); font-size: 13px; }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    p { color: #c9d1d9; margin-bottom: 12px; font-size: 14px; }
+
+    /* Change cards */
+    .change-list { display: flex; flex-direction: column; gap: 14px; }
+    .change-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .change-card.critical { border-left: 3px solid var(--red); }
+    .change-card.improve  { border-left: 3px solid var(--blue); }
+    .change-card.fix      { border-left: 3px solid var(--yellow); }
+    .change-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .change-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .change-card p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .tag-critical { background: rgba(248,81,73,0.15); color: var(--red); }
+    .tag-improve  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-fix      { background: rgba(210,153,34,0.15); color: var(--yellow); }
+
+    /* Steps */
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 20px; }
+    .step {
+      display: flex;
+      gap: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .step p  { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .step p:last-child { margin: 0; }
+
+    /* Code */
+    code {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .c  { color: #8b949e; }
+    .k  { color: #79c0ff; }
+    .v  { color: #a5d6ff; }
+    .s  { color: #3fb950; }
+    .e  { color: #f85149; }
+    .g  { color: #3fb950; }
+
+    /* Alert boxes */
+    .alert {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .alert-warn  { background: rgba(210,153,34,0.1);  border: 1px solid rgba(210,153,34,0.4); color: var(--yellow); }
+    .alert-danger{ background: rgba(248,81,73,0.08);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red); }
+    .alert-ok    { background: rgba(63,185,80,0.08);  border: 1px solid rgba(63,185,80,0.3);  color: var(--green); }
+
+    /* Error table */
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th {
+      background: var(--bg2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #21262d; font-size: 13px; color: #c9d1d9; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { font-family: monospace; color: var(--red); font-size: 12px; }
+
+    /* Nav */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .nav a { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .version { font-size: 12px; color: var(--muted); }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="nav">
+  <a href="../cryptolanz.html">← Back to Cryptolanz</a>
+  <span class="version">Patch v1.6 — 7 May 2026</span>
+</div>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="version-badge">🔧 Patch v1.6</div>
+  <h1>Ghost Trades Fix + HYPE Margin Mode</h1>
+  <p>Two bugs discovered during live testing. Failed order attempts were filling the daily trade limit, and the HYPE TP manager couldn't place close orders due to the wrong margin mode.</p>
+  <div class="meta">Released 7 May 2026 &nbsp;·&nbsp; Requires v1.5 — apply in order</div>
+</div>
+
+<div class="container">
+
+  <!-- What changed -->
+  <section>
+    <h2>What Changed</h2>
+    <p class="sub">Both issues were invisible in paper trading — they only showed up once the bot was running live against the real API.</p>
+
+    <div class="change-list">
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Failed orders were logged to CSV — blocking future signals</h4>
+          <p>When a live order failed (API error, wrong endpoint, bad params), the bot still wrote it to <code>trades-ironclad.csv</code> with <code>orderId: unknown</code>. Since the daily trade limit counts CSV entries per symbol, these ghost entries ate up the limit — so after a few failed cycles, every symbol showed "Daily limit reached" even though no real trades had opened. Fix: orders are now only logged to the CSV and open-positions tracker when a real <code>orderId</code> is returned by the API.</p>
+        </div>
+      </div>
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>HYPE TP manager: error 400172 "margin mode cannot be empty"</h4>
+          <p>After the v1.5 fix removed <code>marginMode</code> from close orders (which caused error 22002), Bitget started returning 400172 — the field is required but must match the position's actual margin mode. The HYPE position was opened in <strong>crossed</strong> margin mode (manual open), so close orders must also specify <code>marginMode: "crossed"</code>. The bot was cycling every 15 min without ever placing the TP1 order.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">🛡️</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Leverage passed inline in order body — no separate API call needed</h4>
+          <p>The separate <code>set-leverage</code> API call requires an "Account Management" permission (error 40014) that standard futures API keys don't have. This caused new positions to open at whatever leverage was already set on the account (e.g. 10×) rather than the configured 3×. Fix: <code>leverage</code> is now passed directly in the <code>place-order</code> body, which sets it at order time without needing the extra permission.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- How to apply -->
+  <section>
+    <h2>How to Apply This Patch</h2>
+    <p class="sub">Two steps — estimated time 5 minutes.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div>
+          <h4>Pull the latest code from GitHub</h4>
+          <p>In your local repo folder:</p>
+          <pre>git pull origin main</pre>
+          <p>This brings in the fixed <code>bot-ironclad.js</code> (ghost order fix + inline leverage) and <code>bot-hype-manager.js</code> (crossed margin mode). No manual file edits needed.</p>
+          <div class="alert alert-ok">✅ All three fixes are already committed to the repo. <code>git pull</code> is all you need for the code.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Redeploy to Railway</h4>
+          <p>Railway auto-deploys when you push to <code>main</code>. If you just pulled (not pushed), trigger a redeploy:</p>
+          <pre>git commit --allow-empty -m "Trigger redeploy — patch v1.6" &amp;&amp; git push origin main</pre>
+          <p>Or use the Railway dashboard → your service → Redeploy.</p>
+          <div class="alert alert-warn">⚠️ If you have a HYPE position open: check what margin mode it was opened in (BitGet → Futures → Positions → tap the position → margin mode shown). If it was <strong>isolated</strong> rather than crossed, you'll need to change <code>marginMode: 'crossed'</code> to <code>marginMode: 'isolated'</code> in <code>bot-hype-manager.js</code> line ~110 before deploying.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- What the fixes look like -->
+  <section>
+    <h2>Code Reference</h2>
+    <p class="sub">For transparency — exactly what changed in each file.</p>
+
+    <h3 style="font-size:1rem;margin:0 0 8px;color:var(--text)">bot-ironclad.js — Ghost order prevention</h3>
+    <p>After <code>placeOrder()</code> returns, check for a real orderId before logging:</p>
+    <pre><span class="c">// Before (v1.5) — always logged regardless of success:</span>
+<span class="e">appendTrade(row);
+addOpenPosition({ id: order.orderId || 'unknown', ... });</span>
+
+<span class="c">// After (v1.6) — only log when order actually landed:</span>
+<span class="g">const realOrderId = order?.orderId || order?.data?.orderId;
+if (!realOrderId &amp;&amp; !CONFIG.paperTrading) {
+  console.log('  ✗ Order failed — NOT logging (no orderId).');
+  continue;
+}
+appendTrade(row);
+addOpenPosition({ ... });</span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">bot-hype-manager.js — Correct margin mode on close orders</h3>
+    <pre><span class="c">// Before (v1.5) — marginMode omitted → error 400172:</span>
+<span class="e">const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', {
+  symbol, productType, marginCoin,
+  side: 'sell', tradeSide: 'close', ...
+});</span>
+
+<span class="c">// After (v1.6) — marginMode matches position (crossed):</span>
+<span class="g">const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', {
+  symbol, productType, marginCoin,
+  marginMode: 'crossed',
+  side: 'sell', tradeSide: 'close', ...
+});</span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">bot-ironclad.js — Inline leverage on open orders</h3>
+    <pre><span class="c">// Before (v1.5) — relied on separate set-leverage call (fails silently):</span>
+<span class="e">await setLeverage(symbol, CONFIG.leverage); <span class="c">// error 40014 — no effect</span>
+const body = { symbol, side, tradeSide: 'open', ... };</span>
+
+<span class="c">// After (v1.6) — leverage passed directly in order body:</span>
+<span class="g">const body = {
+  symbol, side, tradeSide: 'open',
+  leverage: CONFIG.leverage.toString(), <span class="c">// set at order time, no permission needed</span>
+  ...
+};</span></pre>
+
+  </section>
+
+  <!-- Error reference -->
+  <section>
+    <h2>Error Code Reference</h2>
+    <p class="sub">All errors encountered during go-live testing — updated for v1.6.</p>
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Message</th><th>Cause</th><th>Fix (v1.6)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>40404</td>
+          <td>Invalid endpoint</td>
+          <td>camelCase endpoint e.g. <code>placeOrder</code></td>
+          <td>Use kebab-case: <code>place-order</code></td>
+        </tr>
+        <tr>
+          <td>40774</td>
+          <td>Invalid side</td>
+          <td><code>side: "open_long"</code> — hedge-mode format</td>
+          <td><code>side: "buy"</code> + <code>tradeSide: "open"</code></td>
+        </tr>
+        <tr>
+          <td>22002</td>
+          <td>No position to close</td>
+          <td><code>marginMode</code> on close order doesn't match position</td>
+          <td>Match marginMode to how position was opened (<code>crossed</code> or <code>isolated</code>)</td>
+        </tr>
+        <tr>
+          <td>400172</td>
+          <td>Margin mode cannot be empty</td>
+          <td><code>marginMode</code> omitted on close orders</td>
+          <td>Always specify <code>marginMode</code> — must match position</td>
+        </tr>
+        <tr>
+          <td>40014</td>
+          <td>No permission</td>
+          <td>Account Management permission missing on API key</td>
+          <td>Pass <code>leverage</code> in order body — no separate call needed</td>
+        </tr>
+        <tr>
+          <td>40012</td>
+          <td>Invalid API key</td>
+          <td>Key not yet active or IP not whitelisted</td>
+          <td>Wait 60s after creation; whitelist Railway server IP</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>Daily limit reached</td>
+          <td>Ghost entries from failed orders filled the CSV limit</td>
+          <td>Fixed in v1.6. Remove <code>unknown</code> rows from CSV if needed.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Disclaimer -->
+  <section>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7">
+      ⚠️ <strong style="color:var(--text)">Disclaimer:</strong> This bot is provided for educational purposes only. Cryptocurrency futures trading involves substantial risk of loss and is not suitable for all investors. Past performance — including paper trading results and backtests — does not guarantee future results. 3× leverage amplifies both gains and losses. You may lose your entire investment. Never trade with money you cannot afford to lose. Always paper trade thoroughly before going live. This is not financial advice.
+    </p>
+  </section>
+
+</div>
+
+<footer>Cryptolanz · Patch v1.6 · Not financial advice</footer>
+
+</body>
+</html>
