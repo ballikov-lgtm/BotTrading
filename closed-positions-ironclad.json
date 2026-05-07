@@ -6226,5 +6226,92 @@
     "closeDate": "2026-05-06",
     "closeTime": "13:00:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777962599119",
+    "symbol": "BTCUSDT",
+    "side": "long",
+    "entry": 80037.2,
+    "stopLoss": 79340.11,
+    "tp1": 81082.84,
+    "tp2": 81779.93,
+    "tp3": 82825.57,
+    "qty": 0.000625,
+    "totalUsd": 50.02,
+    "openDate": "2026-05-05",
+    "openTime": "06:29:59",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 79340.11,
+    "tp1Hit": true,
+    "tp2Hit": true,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 81082.84,
+        "date": "2026-05-05",
+        "time": "07:30:00",
+        "pnl": 0.7841790487423345
+      },
+      {
+        "level": "tp2",
+        "price": 81779.93,
+        "date": "2026-05-06",
+        "time": "08:30:00",
+        "pnl": 1.1435922587246903
+      },
+      {
+        "level": "sl",
+        "price": 81082.84,
+        "date": "2026-05-06",
+        "time": "23:00:00",
+        "pnl": 0.490111905463959
+      }
+    ],
+    "realizedPnl": 2.4179,
+    "exitLevel": "sl",
+    "exitPrice": 81082.84,
+    "closeDate": "2026-05-06",
+    "closeTime": "23:00:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "IRONCLAD-PAPER-1777973393289",
+    "symbol": "BTCUSDT",
+    "side": "long",
+    "entry": 79673.4,
+    "stopLoss": 77952.9,
+    "tp1": 82254.15,
+    "tp2": 83974.65,
+    "tp3": 86555.4,
+    "qty": 0.000628,
+    "totalUsd": 50.03,
+    "openDate": "2026-05-05",
+    "openTime": "09:29:53",
+    "strategy": "Ironclad v1.5",
+    "currentSl": 77952.9,
+    "tp1Hit": true,
+    "tp2Hit": false,
+    "partialCloses": [
+      {
+        "level": "tp1",
+        "price": 82254.15,
+        "date": "2026-05-06",
+        "time": "10:45:00",
+        "pnl": 1.9446629238867685
+      },
+      {
+        "level": "sl",
+        "price": 79673.4,
+        "date": "2026-05-07",
+        "time": "15:15:00",
+        "pnl": 0
+      }
+    ],
+    "realizedPnl": 1.9447,
+    "exitLevel": "sl",
+    "exitPrice": 79673.4,
+    "closeDate": "2026-05-07",
+    "closeTime": "15:15:00",
+    "outcome": "WIN"
   }
 ]
