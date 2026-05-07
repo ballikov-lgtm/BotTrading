@@ -287,13 +287,29 @@ async function monitorIronclad() {
   const closed      = loadClosed(CLOSED_PATH);
   const closedIds   = new Set(closed.map(p => p.id));
 
-  // Load all trades from CSV that have enough data (entry + SL + TP1 minimum)
-  const positions = parseCSV('./trades-ironclad.csv')
+  // Load all trades from CSV that have enough data (entry + SL + TP1 minimum).
+  // Live trades are managed by Bitget's own SL/TP orders — do NOT simulate those
+  // via candles (candle wicks can touch a level that Bitget never actually filled).
+  // Only paper trades use candle simulation as a substitute for a real exchange.
+  const allRows = parseCSV('./trades-ironclad.csv');
+  const liveSkipped = allRows.filter(r => {
+    const entry = parseFloat(r.entry_price);
+    const sl    = parseFloat(r.stop_loss);
+    const tp1   = parseFloat(r.tp1);
+    return r.order_id && r.order_id !== 'unknown' && entry > 0 && sl > 0 && tp1 > 0
+      && !closedIds.has(r.order_id) && r.mode === 'live';
+  });
+  if (liveSkipped.length) {
+    console.log(`  ⚡ ${liveSkipped.length} live trade(s) skipped — Bitget manages their SL/TP natively`);
+  }
+
+  const positions = allRows
     .filter(r => {
       const entry = parseFloat(r.entry_price);
       const sl    = parseFloat(r.stop_loss);
       const tp1   = parseFloat(r.tp1);
-      return r.order_id && r.order_id !== 'unknown' && entry > 0 && sl > 0 && tp1 > 0 && !closedIds.has(r.order_id);
+      return r.order_id && r.order_id !== 'unknown' && entry > 0 && sl > 0 && tp1 > 0
+        && !closedIds.has(r.order_id) && r.mode !== 'live';
     })
     .map(r => {
       const sl = parseFloat(r.stop_loss);
@@ -311,6 +327,7 @@ async function monitorIronclad() {
         openDate:      r.date,
         openTime:      r.time,
         strategy:      r.strategy,
+        mode:          r.mode || 'paper',
         // Mutable state
         currentSl:     sl,
         tp1Hit:        false,
