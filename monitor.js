@@ -293,7 +293,7 @@ async function monitorIronclad() {
       const entry = parseFloat(r.entry_price);
       const sl    = parseFloat(r.stop_loss);
       const tp1   = parseFloat(r.tp1);
-      return r.order_id && entry > 0 && sl > 0 && tp1 > 0 && !closedIds.has(r.order_id);
+      return r.order_id && r.order_id !== 'unknown' && entry > 0 && sl > 0 && tp1 > 0 && !closedIds.has(r.order_id);
     })
     .map(r => {
       const sl = parseFloat(r.stop_loss);
@@ -348,7 +348,7 @@ async function monitorVwap() {
       const entry = parseFloat(r.price);
       const sl    = parseFloat(r.stop_loss);
       const tp    = parseFloat(r.take_profit);
-      return r.order_id && entry > 0 && sl > 0 && tp > 0 && !closedIds.has(r.order_id);
+      return r.order_id && r.order_id !== 'unknown' && entry > 0 && sl > 0 && tp > 0 && !closedIds.has(r.order_id);
     })
     .map(r => ({
       id:          r.order_id,
