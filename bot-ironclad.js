@@ -1015,6 +1015,13 @@ async function run() {
     const qty   = calcQuantity(entry.entry, entry.stopLoss);
     const order = await placeOrder(symbol, entry.signal, qty, entry.entry, entry.stopLoss, tps.tp1);
 
+    // Only log and register if the order actually landed (has a real orderId)
+    const realOrderId = order?.orderId || order?.data?.orderId;
+    if (!realOrderId && !CONFIG.paperTrading) {
+      console.log(`  ✗ Order failed — NOT logging to CSV or open positions (no orderId).`);
+      continue;
+    }
+
     const fibLevels = calcFibLevels(entry.signal, entry.entry, htf.swingHighs, htf.swingLows);
     writeLog({
       timestamp: new Date().toISOString(),
