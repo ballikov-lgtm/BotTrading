@@ -21,6 +21,11 @@ jobs:
 
       - run: npm install
 
+      - name: Fetch live trade history from logs branch
+        run: |
+          git fetch origin logs
+          git checkout origin/logs -- trades-ironclad.csv || echo "No trades-ironclad.csv on logs branch yet — skipping"
+
       - name: Run position monitor
         run: node monitor.js
 

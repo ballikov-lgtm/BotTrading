@@ -525,16 +525,22 @@ async function bitgetRequest(method, path, body = null) {
 }
 
 async function setLeverage(symbol, leverage) {
-  // Note: requires futures account write permission. Wrapped in try/catch — if API key
-  // only has Futures Order permission, leverage must be set manually in the Bitget app.
+  // Bitget set-leverage returns errors as JSON (code != '00000'), not thrown exceptions.
+  // Try/catch alone is not enough — must inspect result.code after each call.
   for (const holdSide of ['long', 'short']) {
     try {
-      await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
+      const result = await bitgetRequest('POST', '/api/v2/mix/account/set-leverage', {
         symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
         leverage: leverage.toString(), holdSide,
       });
+      if (result.code === '00000') {
+        console.log(`  ✓ Leverage set to ${leverage}x (${holdSide})`);
+      } else {
+        console.log(`  ⚠️  set-leverage failed (${holdSide}): code=${result.code} msg="${result.msg}"`);
+        console.log(`     → Check API key has "Futures > Read/Write" permission, or set leverage manually in Bitget app`);
+      }
     } catch (e) {
-      console.log(`  ⚠️  set-leverage warning (${holdSide}): ${e.message} — using existing leverage`);
+      console.log(`  ⚠️  set-leverage network error (${holdSide}): ${e.message}`);
     }
   }
 }
@@ -935,6 +941,15 @@ async function run() {
     const cooldown = isOnCooldown(symbol);
     if (cooldown.active) {
       console.log(`  ⏳ Cooldown active — ${cooldown.minsLeft} min remaining (until ${cooldown.until.slice(11, 16)} UTC)`);
+      continue;
+    }
+
+    // Open-position guard — never enter a symbol that already has an active position.
+    // Prevents duplicate orders across bot cycles (e.g. 3 APT entries with same TP levels).
+    const openPositions = loadOpenPositions();
+    const alreadyOpen = openPositions.some(p => p.symbol === symbol);
+    if (alreadyOpen) {
+      console.log(`  ⏭ Position already open — skipping`);
       continue;
     }
 
