@@ -1,6 +1,151 @@
 {
-  "generated": "2026-05-07T07:35:31.855Z",
-  "date": "2026-05-07",
-  "summary": "⚠️ Market research unavailable — Perplexity did not return valid data. Trade history and signals will update on the next run.",
-  "signals": []
+  "generated": "2026-05-06T21:21:19.394Z",
+  "date": "2026-05-06",
+  "summary": "Markets are showing bullish momentum with Bitcoin surging amid dollar weakness and positive ETF inflows, while forex pairs like EUR/USD break higher on rate cut expectations. Commodities such as gold benefit from the weakening USD, though some crypto analysts note short-term correction risks after recent highs. Overall sentiment leans positive driven by macro easing and institutional accumulation.",
+  "signals": [
+    {
+      "token": "BTC",
+      "name": "Bitcoin",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "Bitcoin gearing up for pullback to $65,500 liquidity trap zone to load up before rallying higher while retail panics.",
+      "source": "DegenDave / ChartHackers",
+      "price_level": "$65,500 liquidity trap",
+      "chart_pattern": "liquidity trap pullback",
+      "bitget": true
+    },
+    {
+      "token": "ALTCOINS",
+      "name": "Altcoins",
+      "category": "crypto",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "Altcoins positioned to rally next following Bitcoin's rally.",
+      "source": "DegenDave / ChartHackers",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "EURUSD",
+      "name": "EUR/USD",
+      "category": "forex",
+      "signal": "bull",
+      "risk": "low",
+      "reason": "Breaks above 1.20+ as dollar crashes across the board due to weak 50K NFP print signaling September rate cut.",
+      "source": "CapitalStreetFX",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "USDJPY",
+      "name": "USD/JPY",
+      "category": "forex",
+      "signal": "bear",
+      "risk": "medium",
+      "reason": "Falls to 149-151 range amid broad dollar weakness from disappointing NFP data.",
+      "source": "CapitalStreetFX",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "XAU",
+      "name": "Gold",
+      "category": "commodity",
+      "signal": "bull",
+      "risk": "low",
+      "reason": "Benefits from dollar crash and sticky inflation in a macro easing environment.",
+      "source": "CapitalStreetFX, YouTube analysis",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "UKO",
+      "name": "Brent Crude Oil",
+      "category": "commodity",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "No clear directional signals in today's commentary amid mixed global economic outlook.",
+      "source": "General market scans",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": false
+    },
+    {
+      "token": "ETH",
+      "name": "Ethereum",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "Limited specific mentions today, following Bitcoin's lead in broader crypto rally but lacking unique catalysts.",
+      "source": "Kraken Blog macro context",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "SOL",
+      "name": "Solana",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No direct commentary found today despite ongoing onchain innovation trends.",
+      "source": "General crypto scans",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "XRP",
+      "name": "XRP",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "medium",
+      "reason": "Absent from today's top discussions amid Bitcoin-dominated crypto sentiment.",
+      "source": "General crypto scans",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "LINK",
+      "name": "Chainlink",
+      "category": "crypto",
+      "signal": "neutral",
+      "risk": "high",
+      "reason": "No specific signals or mentions in recent 24-hour analysis.",
+      "source": "General crypto scans",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "AAPL",
+      "name": "Apple",
+      "category": "stock",
+      "signal": "neutral",
+      "risk": "low",
+      "reason": "No targeted commentary today in provided market scans.",
+      "source": "General stock scans",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    },
+    {
+      "token": "NVDA",
+      "name": "Nvidia",
+      "category": "stock",
+      "signal": "bull",
+      "risk": "medium",
+      "reason": "Mega-cap tech fuels initial May rally in line with S&P 500 targets.",
+      "source": "YouTube forecasts playlist",
+      "price_level": null,
+      "chart_pattern": null,
+      "bitget": true
+    }
+  ]
 }
