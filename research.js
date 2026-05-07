@@ -351,6 +351,11 @@ function readSidAccount() {
 function calcTradePnl(trade, safetyLog, livePrices = {}, closedPositions = new Map()) {
   const LEVERAGE = 3;
 
+  // Ghost orders (orderId 'unknown') never actually reached the exchange —
+  // API returned an error and no position was opened. Skip P&L estimation
+  // entirely so they don't pollute the wins/losses counts or estimated P&L.
+  if (!trade.orderId || trade.orderId === 'unknown') return null;
+
   // 1. Realized — use if the position monitor has already closed this trade
   const closed = closedPositions.get(trade.orderId);
   if (closed) {
