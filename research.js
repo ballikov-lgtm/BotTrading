@@ -970,6 +970,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="research">📊 Market Research</button>
     <button class="tab-btn"        data-tab="history">📈 Trade History</button>
+    <button class="tab-btn"        data-tab="setup">⚙️ Setup Guide</button>
   </nav>
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -1106,6 +1107,99 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     <div id="pagination"></div>
 
   </div><!-- /tab-history -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 3 — Setup Guide                                                     -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div id="tab-setup" class="tab-pane">
+
+    <div class="summary">
+      <strong>Ironclad Bot — Go-Live Setup Guide</strong><br>
+      Everything you need to deploy and configure the bot from scratch. Follow the steps in order.
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num" style="color:#3fb950">18</div><div class="label">Symbols</div></div>
+      <div class="stat"><div class="num" style="color:#58a6ff">3×</div><div class="label">Leverage</div></div>
+      <div class="stat"><div class="num" style="color:#d29922">15m</div><div class="label">Cycle</div></div>
+      <div class="stat"><div class="num" style="color:#e6edf3">~$30</div><div class="label">Monthly Cost</div></div>
+    </div>
+
+    <h3 style="color:#e6edf3;margin:24px 0 12px">📋 Watchlist (18 Pairs — CoinGecko Top 100 Only)</h3>
+    <table>
+      <thead><tr><th>Symbol</th><th>Category</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>BTCUSDT</td><td>🪙 Crypto</td><td>Core pair</td></tr>
+        <tr><td>ETHUSDT</td><td>🪙 Crypto</td><td>Core pair</td></tr>
+        <tr><td>SOLUSDT</td><td>🪙 Crypto</td><td>Core pair</td></tr>
+        <tr><td>XRPUSDT</td><td>🪙 Crypto</td><td>Core pair</td></tr>
+        <tr><td>LINKUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>AVAXUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>SUIUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>INJUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>RENDERUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>TAOUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>VIRTUALUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>HYPEUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>APTUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>JUPUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>ONDOUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>NEARUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>TONUSDT</td><td>🪙 Crypto</td><td></td></tr>
+        <tr><td>KASUSDT</td><td>🪙 Crypto</td><td>High supply — verify min order size</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:#e6edf3;margin:24px 0 12px">🚀 Go-Live Checklist</h3>
+    <table>
+      <thead><tr><th>#</th><th>Step</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>BitGet API Keys</strong></td><td>Enable: Futures Trading. Do NOT enable: Withdrawals or Account Management. IP whitelist your Railway server IP.</td></tr>
+        <tr><td>2</td><td><strong>One-Way Position Mode</strong></td><td>BitGet → Futures → Settings → Position Mode → One-Way. Required or orders will fail.</td></tr>
+        <tr><td>3</td><td><strong>Set Leverage</strong></td><td>Set each symbol to 3× in BitGet manually before first run. Bot passes leverage inline but account default matters.</td></tr>
+        <tr><td>4</td><td><strong>GitHub PAT</strong></td><td>Settings → Developer Settings → Personal Access Tokens → Fine-grained. Repo: BotTrading. Permissions: Contents (read &amp; write).</td></tr>
+        <tr><td>5</td><td><strong>Create logs branch</strong></td><td>In GitHub, create a branch named exactly <code>logs</code> from main. Railway pushes state here every 15 min.</td></tr>
+        <tr><td>6</td><td><strong>Railway Environment Vars</strong></td><td>Set all vars from .env.example: BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE, GITHUB_TOKEN, IRONCLAD_PAPER=false, LEVERAGE=3, PORTFOLIO_USD, MAX_TRADE_USD, MAX_TRADES_PER_DAY, MAX_DAILY_LOSS_USD</td></tr>
+        <tr><td>7</td><td><strong>Deploy to Railway</strong></td><td>Connect GitHub repo → main branch → Start command: <code>node railway-runner.js</code>. Do NOT use npm start.</td></tr>
+        <tr><td>8</td><td><strong>Verify first run</strong></td><td>Check Railway logs for "Railway run" header and "Leverage: 3×". Confirm no API errors in first cycle.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:#e6edf3;margin:24px 0 12px">⚠️ Common Errors &amp; Fixes</h3>
+    <table>
+      <thead><tr><th>Error Code</th><th>Message</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>40404</td><td>Invalid endpoint</td><td>Use kebab-case: <code>place-order</code> not <code>placeOrder</code></td></tr>
+        <tr><td>22002</td><td>No position to close</td><td>marginMode on close order doesn't match position — use the same mode the position was opened in</td></tr>
+        <tr><td>400172</td><td>Margin mode cannot be empty</td><td>Must specify marginMode on close orders — use <code>crossed</code> or <code>isolated</code> to match position</td></tr>
+        <tr><td>40014</td><td>No permission</td><td>Account Management permission not granted — bot passes leverage inline in order body instead</td></tr>
+        <tr><td>40012</td><td>Invalid API key</td><td>Key not yet active (wait 60s) or IP not whitelisted</td></tr>
+        <tr><td>—</td><td>Daily limit reached</td><td>Symbol hit MAX_TRADES_PER_DAY limit. Resets at UTC midnight. Raise limit via Railway env var if needed.</td></tr>
+        <tr><td>—</td><td>State resets every cycle</td><td>Ensure state files pull from <code>logs</code> branch, not <code>main</code>. Check railway-runner.js PULL_STATE_FILES.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:#e6edf3;margin:24px 0 12px">📁 Key Files</h3>
+    <table>
+      <thead><tr><th>File</th><th>Branch</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>bot-ironclad.js</td><td>main</td><td>Core strategy logic</td></tr>
+        <tr><td>bot-hype-manager.js</td><td>main</td><td>Manual position TP manager</td></tr>
+        <tr><td>railway-runner.js</td><td>main</td><td>Orchestrator — pulls state, runs bots, pushes state</td></tr>
+        <tr><td>rules-ironclad.json</td><td>main</td><td>Strategy config (symbols, leverage, risk)</td></tr>
+        <tr><td>research-signals.json</td><td>main</td><td>AI research signals — written by GitHub Actions daily</td></tr>
+        <tr><td>trades-ironclad.csv</td><td>logs</td><td>Full trade history — only successful orders (real orderId)</td></tr>
+        <tr><td>open-positions-ironclad.json</td><td>logs</td><td>Live position tracker</td></tr>
+        <tr><td>hype-state.json</td><td>logs</td><td>HYPE manager state — TP stage tracking</td></tr>
+        <tr><td>cooldown-ironclad.json</td><td>logs</td><td>Per-symbol cooldown timestamps</td></tr>
+      </tbody>
+    </table>
+
+    <p style="color:#8b949e;font-size:0.8rem;margin-top:32px;padding:16px;border:1px solid #30363d;border-radius:6px">
+      ⚠️ <strong>Disclaimer:</strong> This bot is provided for educational purposes only. Cryptocurrency futures trading involves substantial risk of loss. Past performance (including backtests) does not guarantee future results. 3× leverage amplifies both gains and losses. Never trade with money you cannot afford to lose. This is not financial advice. Always paper trade thoroughly before going live.
+    </p>
+
+  </div><!-- /tab-setup -->
 
   <footer>Data sourced from public trader commentary · Not financial advice · Paper trading mode active</footer>
 
