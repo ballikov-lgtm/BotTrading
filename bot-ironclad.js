@@ -545,6 +545,46 @@ async function setLeverage(symbol, leverage) {
   }
 }
 
+// ── Live Position Monitoring via Bitget API ───────────────────────────────────
+// Candle simulation is only valid for paper trades (no real exchange to check).
+// For live trades, Bitget manages the actual SL/TP orders. We query:
+//   a) all-position  → is the position still open?
+//   b) position/history → what was the actual exit price and P&L?
+
+async function fetchAllBitgetPositions() {
+  try {
+    const result = await bitgetRequest('GET',
+      '/api/v2/mix/position/all-position?productType=USDT-FUTURES&marginCoin=USDT', null);
+    if (result.code !== '00000') {
+      console.log(`  ⚠️  all-position: code=${result.code} msg="${result.msg}"`);
+      return null; // null = API error — do NOT assume positions are closed
+    }
+    return result.data || [];
+  } catch (e) {
+    console.log(`  ⚠️  fetchAllBitgetPositions: ${e.message}`);
+    return null;
+  }
+}
+
+async function fetchBitgetPositionHistory(symbol) {
+  try {
+    const result = await bitgetRequest('GET',
+      `/api/v2/mix/position/history?productType=USDT-FUTURES&symbol=${symbol}&limit=20`, null);
+    if (result.code !== '00000') return [];
+    return result.data?.list || (Array.isArray(result.data) ? result.data : []);
+  } catch { return []; }
+}
+
+// Try to match a close price to a known SL or TP level (within 0.5% tolerance).
+function inferExitLevel(pos, closePrice) {
+  const near = (a, b) => b > 0 && Math.abs(a - b) / b < 0.005;
+  if (near(closePrice, pos.stopLoss)) return 'sl';
+  if (pos.tp3 && near(closePrice, pos.tp3)) return 'tp3';
+  if (pos.tp2 && near(closePrice, pos.tp2)) return 'tp2';
+  if (pos.tp1 && near(closePrice, pos.tp1)) return 'tp1';
+  return null; // unknown — caller falls back to P&L sign
+}
+
 async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
   if (CONFIG.paperTrading) {
     console.log(`  [IRONCLAD PAPER ${CONFIG.leverage}x] ${side.toUpperCase()} ${quantity} ${symbol} @ $${entry}`);
@@ -809,16 +849,121 @@ async function checkPositions() {
     return;
   }
 
-  console.log(`\n── Position Monitor: ${openPositions.length} open position(s) ──`);
+  // Distinguish live vs paper by ID prefix. Live IDs are Bitget numeric strings;
+  // paper IDs always start with 'IRONCLAD-PAPER-'.
+  const isPaper = p => !p.id || p.id.startsWith('IRONCLAD-PAPER') || p.mode === 'paper';
+  const livePos  = openPositions.filter(p => !isPaper(p));
+  const paperPos = openPositions.filter(p =>  isPaper(p));
+
+  console.log(`\n── Position Monitor: ${livePos.length} live + ${paperPos.length} paper open ──`);
 
   const stillOpen = [];
 
-  for (const pos of openPositions) {
+  // ── LIVE: check actual Bitget position status ─────────────────────────────
+  // Bitget manages real SL/TP orders. Candle simulation is NOT used — a candle
+  // wick touching a level ≠ Bitget's order actually filling.
+  if (livePos.length) {
+    const bitgetAll = await fetchAllBitgetPositions();
+
+    if (bitgetAll === null) {
+      // API unreachable — don't touch live positions this run to avoid false closures
+      console.log('  ⚠️  Bitget API unavailable — live positions unchanged this run');
+      stillOpen.push(...livePos);
+    } else {
+      // Normalise Bitget symbol names (strip _UMCBL suffix if present)
+      const bitgetBySymbol = {};
+      for (const bp of bitgetAll) {
+        const sym = bp.symbol?.replace(/_UMCBL$|_SPBL$/, '');
+        if (sym) bitgetBySymbol[sym] = bp;
+      }
+
+      // Group our tracked positions by symbol — Bitget merges same-symbol orders
+      const bySymbol = {};
+      for (const pos of livePos) {
+        (bySymbol[pos.symbol] = bySymbol[pos.symbol] || []).push(pos);
+      }
+
+      for (const [symbol, group] of Object.entries(bySymbol)) {
+        const bp = bitgetBySymbol[symbol];
+
+        if (bp) {
+          // Still open on Bitget ✓
+          const unreal = parseFloat(bp.unrealizedPL || 0);
+          const size   = parseFloat(bp.total || bp.available || 0);
+          console.log(`  ⏳ ${symbol} LIVE — open on Bitget (size ${size.toFixed(4)}, unrealized ${unreal >= 0 ? '+' : ''}$${unreal.toFixed(2)})`);
+          stillOpen.push(...group);
+
+        } else {
+          // Gone from Bitget — closed by SL, TP, or manual close
+          console.log(`  🔍 ${symbol} — no longer open on Bitget, fetching history…`);
+          const history = await fetchBitgetPositionHistory(symbol);
+
+          // Find the matching close (opened after our earliest tracked open time)
+          const earliestOpenTs = Math.min(...group.map(p =>
+            new Date(`${p.openDate}T${p.openTime}Z`).getTime()
+          ));
+          const match = history.find(h => parseInt(h.closeTime || 0) > earliestOpenTs)
+                     || history[0]
+                     || null;
+
+          // Total qty across all entries for this symbol (needed to apportion P&L)
+          const totalQty = group.reduce((s, p) => s + (p.qty || 0), 0);
+
+          for (const pos of group) {
+            let realizedPnl, exitPrice, exitLevel, closeDate, closeTime, outcome;
+
+            if (match) {
+              const rawPnl = parseFloat(match.pnl || match.netProfit || 0);
+              // Apportion P&L proportionally when multiple entries exist for the symbol
+              realizedPnl = parseFloat((rawPnl * (pos.qty / totalQty)).toFixed(4));
+              exitPrice   = parseFloat(match.closeAvgPrice || 0);
+              const closeTs = parseInt(match.closeTime || Date.now());
+              closeDate   = new Date(closeTs).toISOString().slice(0, 10);
+              closeTime   = new Date(closeTs).toISOString().slice(11, 19);
+              exitLevel   = inferExitLevel(pos, exitPrice) || (realizedPnl >= 0 ? 'tp1' : 'sl');
+              outcome     = realizedPnl >= 0 ? 'WIN' : 'LOSS';
+            } else {
+              // History not found — record as closed but P&L unknown
+              realizedPnl = 0;
+              exitPrice   = 0;
+              exitLevel   = 'unknown';
+              closeDate   = new Date().toISOString().slice(0, 10);
+              closeTime   = new Date().toISOString().slice(11, 19);
+              outcome     = 'UNKNOWN';
+            }
+
+            closedPositions.push({
+              ...pos,
+              realizedPnl,
+              exitLevel,
+              exitPrice,
+              closeDate,
+              closeTime,
+              outcome,
+              source: match ? 'bitget' : 'bitget-nohistory',
+            });
+
+            const icon   = outcome === 'WIN' ? '✅' : outcome === 'LOSS' ? '❌' : '❓';
+            const pnlStr = exitPrice
+              ? ` · exit $${exitPrice} · P&L: ${realizedPnl >= 0 ? '+' : ''}$${Math.abs(realizedPnl).toFixed(2)} (Bitget)`
+              : ' · P&L unknown (history not found)';
+            console.log(`  ${icon} ${pos.symbol} ${pos.side} ${outcome}${pnlStr}`);
+
+            if (outcome === 'LOSS') setCooldown(pos.symbol);
+          }
+        }
+      }
+    }
+  }
+
+  // ── PAPER: candle simulation ──────────────────────────────────────────────
+  // No real exchange — walk OHLC candles to detect SL/TP hits. Tracks the
+  // 3-TP split plan: 40% at TP1 (SL→BE), 35% at TP2 (SL→TP1), 25% at TP3.
+  for (const pos of paperPos) {
     process.stdout.write(`  ▶ ${pos.symbol} ${pos.side.toUpperCase()} @ $${pos.entry} (${pos.openDate}) … `);
 
     let candles;
     try {
-      // 500 candles × 15m = ~125 hours (~5 days). Catches most recent entries.
       candles = await fetchCandles(pos.symbol, '15m', 500);
     } catch (err) {
       console.log(`candles unavailable (${err.message}) — skipping`);
@@ -826,7 +971,6 @@ async function checkPositions() {
       continue;
     }
 
-    // Only candles that closed AFTER the position was opened
     const openTs   = new Date(`${pos.openDate}T${pos.openTime}Z`).getTime();
     const relevant = candles.filter(c => c.time > openTs);
 
@@ -839,7 +983,6 @@ async function checkPositions() {
     const result = simulatePosition(pos, relevant);
 
     if (!result.fullyExited) {
-      // Update mutable state so we carry forward any TP1/TP2 hits and SL moves
       stillOpen.push({
         ...pos,
         tp1Hit:        result.tp1Hit,
@@ -857,11 +1000,10 @@ async function checkPositions() {
       console.log(`still open [${progress}] SL→${slLabel}`);
 
     } else {
-      // Fully exited — record in closed positions
       const lastClose = result.lastClose;
       const outcome   = result.partialCloses.some(c => c.level !== 'sl') ? 'WIN'
                       : result.partialCloses.every(c => c.level === 'sl') ? 'LOSS'
-                      : 'BE'; // Break-even (stopped at entry after TP1)
+                      : 'BE';
 
       closedPositions.push({
         ...pos,
@@ -879,17 +1021,13 @@ async function checkPositions() {
       const icon = outcome === 'WIN' ? '✅' : outcome === 'BE' ? '🟡' : '❌';
       console.log(`${icon} ${outcome} — last exit ${lastClose.level.toUpperCase()} @ $${lastClose.price} · P&L: ${result.realizedPnl >= 0 ? '+' : ''}$${result.realizedPnl}`);
 
-      // Trigger cooldown on clean stop-out (no TP hit). BE outcomes (TP1 hit, then
-      // stopped at entry) are profitable and do NOT trigger cooldown — the setup worked.
       if (outcome === 'LOSS') setCooldown(pos.symbol);
     }
   }
 
   const numClosed = openPositions.length - stillOpen.length;
-
   saveOpenPositions(stillOpen);
   saveClosedPositions(closedPositions);
-
   console.log(`  ── ${numClosed} closed this run, ${stillOpen.length} still open ──`);
 }
 
@@ -1087,6 +1225,7 @@ async function run() {
       id:       order.orderId || order.data?.orderId || 'unknown',
       symbol,
       side:     entry.signal,
+      mode:     CONFIG.paperTrading ? 'paper' : 'live',  // used by checkPositions to route paper vs Bitget API
       entry:    entry.entry,
       stopLoss: entry.stopLoss,
       tp1:      tps.tp1,
