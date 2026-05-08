@@ -20,7 +20,7 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.6'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio
+const BOT_VERSION = 'v1.7'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -545,11 +545,63 @@ async function setLeverage(symbol, leverage) {
   }
 }
 
+// ── Live Order Management ─────────────────────────────────────────────────────
+// Place 3 explicit limit close orders after opening a live position. This
+// implements the real 3-TP split (40/35/25%) on Bitget rather than relying on
+// a single presetStopSurplusPrice which closes 100% at TP1 — making paper
+// simulation and live trading actually comparable.
+
+async function placeLimitClose(symbol, side, qty, price) {
+  const body = {
+    symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
+    marginMode: 'isolated',
+    side:      side === 'long' ? 'sell' : 'buy',
+    tradeSide: 'close',
+    orderType: 'limit',
+    price:     price.toString(),
+    size:      qty.toString(),
+  };
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
+  if (r.code !== '00000') {
+    console.log(`  ⚠️  Limit close FAILED @ $${price}: code=${r.code} msg="${r.msg}"`);
+    return null;
+  }
+  return r.data?.orderId || null;
+}
+
+async function getOrderDetail(symbol, orderId) {
+  try {
+    const r = await bitgetRequest('GET',
+      `/api/v2/mix/order/detail?symbol=${symbol}&productType=USDT-FUTURES&orderId=${orderId}`, null);
+    if (r.code !== '00000') return null;
+    return r.data;
+  } catch { return null; }
+}
+
+// Set (or replace) the position-level stop loss via the TPSL endpoint.
+// Called automatically when TP1 or TP2 fills to trail the stop.
+async function setPositionSL(symbol, holdSide, triggerPrice) {
+  const body = {
+    symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
+    holdSide,
+    triggerPrice: triggerPrice.toString(),
+    tpslType: 'sl',
+  };
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-tpsl', body);
+  if (r.code !== '00000') {
+    console.log(`  ⚠️  SL move FAILED to $${triggerPrice}: code=${r.code} msg="${r.msg}"`);
+    return null;
+  }
+  console.log(`  ✅ SL moved to $${triggerPrice}`);
+  return r.data?.orderId || null;
+}
+
 // ── Live Position Monitoring via Bitget API ───────────────────────────────────
 // Candle simulation is only valid for paper trades (no real exchange to check).
 // For live trades, Bitget manages the actual SL/TP orders. We query:
 //   a) all-position  → is the position still open?
-//   b) position/history → what was the actual exit price and P&L?
+//   b) TP order detail → has TP1/TP2 filled so we can trail the SL?
+//   c) position/history → actual exit price and P&L when fully closed?
 
 async function fetchAllBitgetPositions() {
   try {
@@ -585,35 +637,63 @@ function inferExitLevel(pos, closePrice) {
   return null; // unknown — caller falls back to P&L sign
 }
 
-async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1) {
+async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1, tp2, tp3) {
   if (CONFIG.paperTrading) {
     console.log(`  [IRONCLAD PAPER ${CONFIG.leverage}x] ${side.toUpperCase()} ${quantity} ${symbol} @ $${entry}`);
-    console.log(`  SL: $${stopLoss}  TP1: $${tp1}  (TP2/TP3 logged — trail SL manually or via BitGet app)`);
+    console.log(`  SL: $${stopLoss}  TP1: $${tp1}  TP2: $${tp2}  TP3: $${tp3}  (40/35/25% split simulated)`);
     return { orderId: 'IRONCLAD-PAPER-' + Date.now() };
   }
+
   await setLeverage(symbol, CONFIG.leverage);
-  // Bitget v2 one-way position mode: side=buy/sell + tradeSide=open/close
-  // Endpoint is kebab-case: place-order (not camelCase placeOrder)
+
+  // Step 1: Open with market order + SL only.
+  // presetStopSurplusPrice is intentionally OMITTED — it closes 100% at TP1.
+  // Instead we place 3 explicit limit close orders below so the real 3-TP split
+  // (40/35/25%) matches the paper simulation and is comparable.
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
-    leverage:   CONFIG.leverage.toString(),   // set leverage inline — avoids needing account permission
+    leverage:   CONFIG.leverage.toString(),
     side:      side === 'long' ? 'buy' : 'sell',
     tradeSide: 'open',
     orderType: 'market', size: quantity.toString(),
-    // SL and TP1 set natively on BitGet — exchange manages these automatically.
-    // TP2 and TP3 are logged separately; move SL to BE manually after TP1 hits.
-    presetStopLossPrice:    stopLoss.toString(),
-    presetStopSurplusPrice: tp1.toString(),
+    presetStopLossPrice: stopLoss.toString(),
   };
   const result = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
   if (result.code !== '00000') {
     console.log(`  ⚠️  Order FAILED for ${symbol}: code=${result.code} msg="${result.msg}"`);
     console.log(`     Body sent: ${JSON.stringify(body)}`);
-  } else {
-    console.log(`  ✅ Order placed: ${symbol} ${side.toUpperCase()} — orderId: ${result.data?.orderId}`);
+    return result;
   }
-  return result;
+
+  const orderId = result.data?.orderId;
+  console.log(`  ✅ Order placed: ${symbol} ${side.toUpperCase()} — orderId: ${orderId}`);
+
+  // Step 2: Place 3 limit close orders (40% / 35% / 25% split).
+  // Tiny delay to let Bitget register the position before accepting close orders.
+  await new Promise(r => setTimeout(r, 1500));
+
+  const qty40 = parseFloat((quantity * 0.40).toFixed(6));
+  const qty35 = parseFloat((quantity * 0.35).toFixed(6));
+  const qty25 = parseFloat(Math.max(0, quantity - qty40 - qty35).toFixed(6)); // remainder — avoids float drift
+
+  console.log(`  Placing 3-TP limit closes: ${qty40}@$${tp1} / ${qty35}@$${tp2} / ${qty25}@$${tp3}`);
+
+  // Fire all three in parallel — they're independent orders
+  const [tp1OrderId, tp2OrderId, tp3OrderId] = await Promise.all([
+    placeLimitClose(symbol, side, qty40, tp1),
+    placeLimitClose(symbol, side, qty35, tp2),
+    placeLimitClose(symbol, side, qty25, tp3),
+  ]);
+
+  if (tp1OrderId) console.log(`  ✅ TP1 limit close: ${tp1OrderId}`);
+  if (tp2OrderId) console.log(`  ✅ TP2 limit close: ${tp2OrderId}`);
+  if (tp3OrderId) console.log(`  ✅ TP3 limit close: ${tp3OrderId}`);
+  if (!tp1OrderId || !tp2OrderId || !tp3OrderId) {
+    console.log(`  ⚠️  Some TP limit closes failed — check manually on Bitget`);
+  }
+
+  return { orderId, tp1OrderId, tp2OrderId, tp3OrderId };
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────
@@ -887,11 +967,58 @@ async function checkPositions() {
         const bp = bitgetBySymbol[symbol];
 
         if (bp) {
-          // Still open on Bitget ✓
+          // Still open on Bitget ✓ — check TP order fills and trail SL
           const unreal = parseFloat(bp.unrealizedPL || 0);
           const size   = parseFloat(bp.total || bp.available || 0);
           console.log(`  ⏳ ${symbol} LIVE — open on Bitget (size ${size.toFixed(4)}, unrealized ${unreal >= 0 ? '+' : ''}$${unreal.toFixed(2)})`);
-          stillOpen.push(...group);
+
+          // For each position in this symbol group, check if any TP limit orders have filled
+          // and automatically trail the stop loss (BE after TP1, TP1-price after TP2).
+          const updatedGroup = [];
+          for (const pos of group) {
+            let updated = { ...pos };
+            const holdSide = pos.side === 'long' ? 'long' : 'short';
+            const now8601  = new Date().toISOString();
+            const nowDate  = now8601.slice(0, 10);
+            const nowTime  = now8601.slice(11, 19);
+
+            // ── TP1 fill check ─────────────────────────────────────────────────
+            if (!updated.tp1Hit && updated.tp1OrderId) {
+              const detail = await getOrderDetail(symbol, updated.tp1OrderId);
+              if (detail?.state === 'filled' || detail?.status === 'filled') {
+                const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp1);
+                const pnlPart   = (pos.side === 'long' ? 1 : -1) *
+                  (fillPrice - pos.entry) * (pos.qty * 0.40) * CONFIG.leverage;
+                const partials  = [...(updated.partialCloses || []),
+                  { price: fillPrice, level: 'tp1', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
+                ];
+                console.log(`  ✅ ${symbol} TP1 filled @ $${fillPrice} — SL → break-even ($${pos.entry})`);
+                updated = { ...updated, tp1Hit: true, currentSl: pos.entry, partialCloses: partials };
+                // Move the exchange SL to break-even
+                await setPositionSL(symbol, holdSide, pos.entry);
+              }
+            }
+
+            // ── TP2 fill check (only after TP1 confirmed) ──────────────────────
+            if (updated.tp1Hit && !updated.tp2Hit && updated.tp2OrderId) {
+              const detail = await getOrderDetail(symbol, updated.tp2OrderId);
+              if (detail?.state === 'filled' || detail?.status === 'filled') {
+                const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp2);
+                const pnlPart   = (pos.side === 'long' ? 1 : -1) *
+                  (fillPrice - pos.entry) * (pos.qty * 0.35) * CONFIG.leverage;
+                const partials  = [...(updated.partialCloses || []),
+                  { price: fillPrice, level: 'tp2', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
+                ];
+                console.log(`  ✅ ${symbol} TP2 filled @ $${fillPrice} — SL → TP1 ($${pos.tp1})`);
+                updated = { ...updated, tp2Hit: true, currentSl: pos.tp1, partialCloses: partials };
+                // Trail the exchange SL to TP1 price (locks in profit on remaining 25%)
+                await setPositionSL(symbol, holdSide, pos.tp1);
+              }
+            }
+
+            updatedGroup.push(updated);
+          }
+          stillOpen.push(...updatedGroup);
 
         } else {
           // Gone from Bitget — closed by SL, TP, or manual close
@@ -1166,7 +1293,7 @@ async function run() {
     }
 
     const qty   = calcQuantity(entry.entry, entry.stopLoss);
-    const order = await placeOrder(symbol, entry.signal, qty, entry.entry, entry.stopLoss, tps.tp1);
+    const order = await placeOrder(symbol, entry.signal, qty, entry.entry, entry.stopLoss, tps.tp1, tps.tp2, tps.tp3);
 
     // Only log and register if the order actually landed (has a real orderId)
     const realOrderId = order?.orderId || order?.data?.orderId;
@@ -1222,20 +1349,24 @@ async function run() {
 
     // Register in open-positions tracker so the monitor can detect SL/TP hits
     addOpenPosition({
-      id:       order.orderId || order.data?.orderId || 'unknown',
+      id:          order.orderId || order.data?.orderId || 'unknown',
       symbol,
-      side:     entry.signal,
-      mode:     CONFIG.paperTrading ? 'paper' : 'live',  // used by checkPositions to route paper vs Bitget API
-      entry:    entry.entry,
-      stopLoss: entry.stopLoss,
-      tp1:      tps.tp1,
-      tp2:      tps.tp2,
-      tp3:      tps.tp3,
+      side:        entry.signal,
+      mode:        CONFIG.paperTrading ? 'paper' : 'live', // routes paper→candle sim, live→Bitget API
+      entry:       entry.entry,
+      stopLoss:    entry.stopLoss,
+      tp1:         tps.tp1,
+      tp2:         tps.tp2,
+      tp3:         tps.tp3,
+      // Live TP order IDs — used by checkPositions() to trail the SL as each fills
+      tp1OrderId:  order.tp1OrderId  || null,
+      tp2OrderId:  order.tp2OrderId  || null,
+      tp3OrderId:  order.tp3OrderId  || null,
       qty,
-      totalUsd: parseFloat((qty * entry.entry).toFixed(2)),
-      openDate: now.toISOString().slice(0, 10),
-      openTime: now.toISOString().slice(11, 19),
-      strategy: `${BOT_NAME} ${BOT_VERSION}`,
+      totalUsd:    parseFloat((qty * entry.entry).toFixed(2)),
+      openDate:    now.toISOString().slice(0, 10),
+      openTime:    now.toISOString().slice(11, 19),
+      strategy:    `${BOT_NAME} ${BOT_VERSION}`,
     });
 
     console.log(`  Trade logged.`);
