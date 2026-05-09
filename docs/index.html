@@ -863,7 +863,7 @@
     <table>
       <thead><tr><th>#</th><th>Step</th><th>Detail</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td><strong>BitGet API Keys</strong></td><td>Enable: Futures Trading. Do NOT enable: Withdrawals or Account Management. IP whitelist your Railway server IP.</td></tr>
+        <tr><td>1</td><td><strong>BitGet API Keys</strong></td><td>Enable: <strong>Holdings</strong> + <strong>Trade</strong> under USDT-M Futures. "Holdings" is Bitget's label for position-read — without it the bot cannot detect SL/TP closures. Do NOT enable Withdrawals. Passphrase must be alphanumeric only. IP whitelist your Railway server IP.</td></tr>
         <tr><td>2</td><td><strong>One-Way Position Mode</strong></td><td>BitGet → Futures → Settings → Position Mode → One-Way. Required or orders will fail.</td></tr>
         <tr><td>3</td><td><strong>Set Leverage</strong></td><td>Set each symbol to 3× in BitGet manually before first run. Bot passes leverage inline but account default matters.</td></tr>
         <tr><td>4</td><td><strong>GitHub PAT</strong></td><td>Settings → Developer Settings → Personal Access Tokens → Fine-grained. Repo: BotTrading. Permissions: Contents (read &amp; write).</td></tr>
@@ -881,7 +881,7 @@
         <tr><td>40404</td><td>Invalid endpoint</td><td>Use kebab-case: <code>place-order</code> not <code>placeOrder</code></td></tr>
         <tr><td>22002</td><td>No position to close</td><td>marginMode on close order doesn't match position — use the same mode the position was opened in</td></tr>
         <tr><td>400172</td><td>Margin mode cannot be empty</td><td>Must specify marginMode on close orders — use <code>crossed</code> or <code>isolated</code> to match position</td></tr>
-        <tr><td>40014</td><td>No permission</td><td>Account Management permission not granted — bot passes leverage inline in order body instead</td></tr>
+        <tr><td>40014</td><td>No permission / future pos read</td><td>API key missing "Holdings" permission under USDT-M Futures → Bitget → Profile → API Management → Edit key → enable Holdings → Save. Without this the bot cannot detect when SL/TP fires.</td></tr>
         <tr><td>40012</td><td>Invalid API key</td><td>Key not yet active (wait 60s) or IP not whitelisted</td></tr>
         <tr><td>—</td><td>Daily limit reached</td><td>Symbol hit MAX_TRADES_PER_DAY limit. Resets at UTC midnight. Raise limit via Railway env var if needed.</td></tr>
         <tr><td>—</td><td>State resets every cycle</td><td>Ensure state files pull from <code>logs</code> branch, not <code>main</code>. Check railway-runner.js PULL_STATE_FILES.</td></tr>
