@@ -353,7 +353,7 @@
 <!-- ── HERO ─────────────────────────────────────────────────────────────── -->
 <div class="hero">
   <div class="hero-badge">⚡ Automated · Cloud-Native · 24/7</div>
-  <div style="display:inline-block;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.4);color:#3fb950;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:16px;margin-left:8px;">✦ Current Version: v1.6</div>
+  <div style="display:inline-block;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.4);color:#3fb950;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:16px;margin-left:8px;">✦ Current Version: v1.8</div>
   <h1>Cryptolanz</h1>
   <p>Advanced, real-time tested crypto futures trading strategy.<br>
      Deploy in minutes. Runs entirely free on GitHub Actions.</p>
@@ -367,7 +367,7 @@
   </div>
 
   <a href="#deploy" class="btn-primary">🚀 Deploy Now</a>
-  <a href="patches/patch-v1.6.html" class="btn-secondary" style="border-color:#3fb950;color:#3fb950;">🔧 Update — v1.6</a>
+  <a href="patches/patch-v1.8.html" class="btn-secondary" style="border-color:#3fb950;color:#3fb950;">🔧 Update — v1.8</a>
   <a href="#strategy" class="btn-secondary">How It Works</a>
 </div>
 
@@ -664,7 +664,7 @@
       <div class="setup-step">
         <div>
           <h4>Create a Bitget account</h4>
-          <p>Sign up at <a href="https://www.bitget.com" style="color:var(--blue)">bitget.com</a>. Complete KYC and enable futures trading. Create an API key with <strong>Read + Trade (Futures)</strong> permissions. Use a simple alphanumeric passphrase — no special characters.</p>
+          <p>Sign up at <a href="https://www.bitget.com" style="color:var(--blue)">bitget.com</a>. Complete KYC and enable futures trading. Create an API key with <strong>Futures: Holdings + Trade</strong> permissions (Bitget labels position-read as "Holdings" — not "Read"). Use a simple alphanumeric passphrase — no special characters.</p>
         </div>
       </div>
       <div class="setup-step">
@@ -694,27 +694,63 @@
       <strong style="color:var(--text)">🔍 How to check your version</strong> — open <code>rules-ironclad.json</code> in your repo. The <code>"strategy"</code> field shows your version, e.g. <code>"Cryptolanz Ironclad v1.4"</code>.
     </div>
 
-    <!-- v1.6 patch card (latest) -->
+    <!-- v1.8 patch card (latest) -->
     <div style="background:var(--bg2);border:2px solid #3fb950;border-radius:12px;padding:24px 28px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
         <div style="flex:1;min-width:200px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <span style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.5);color:#3fb950;font-size:13px;font-weight:800;padding:3px 12px;border-radius:20px;font-family:monospace;">v1.6</span>
-            <span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.4);color:#f85149;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Critical Fix</span>
-            <span style="color:#8b949e;font-size:13px;">7 May 2026</span>
+            <span style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.5);color:#3fb950;font-size:13px;font-weight:800;padding:3px 12px;border-radius:20px;font-family:monospace;">v1.8</span>
+            <span style="background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.4);color:#d4a017;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Improvement</span>
+            <span style="color:#8b949e;font-size:13px;">9 May 2026</span>
           </div>
-          <h3 style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:8px;">Ghost trades fix — daily limits no longer blocked by failed orders</h3>
-          <p style="font-size:14px;color:#8b949e;margin:0;line-height:1.6;">Failed orders were silently logged to the CSV, eating the daily trade limit. Also fixes HYPE TP manager (error 400172) and ensures correct leverage is applied on all new positions.</p>
-          <p style="font-size:13px;color:#f85149;margin:10px 0 0;font-weight:600;">⚠️ Affects v1.5 — symbols may show "Daily limit reached" despite having no real trades open.</p>
+          <h3 style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:8px;">Accurate fill prices + position monitoring + Holdings permission fix</h3>
+          <p style="font-size:14px;color:#8b949e;margin:0;line-height:1.6;">Entry prices now record Bitget's actual fill price (not the signal price). Position monitoring upgraded to use the "Holdings" API permission correctly — the bot can now detect SL/TP closures reliably. Compound position sizing added for growing portfolios.</p>
+          <p style="font-size:13px;color:#d4a017;margin:10px 0 0;font-weight:600;">⚠️ Requires Bitget API key update — enable "Holdings" under USDT-M Futures in API Management.</p>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;flex-shrink:0;">
-          <a href="patches/patch-v1.6.html" class="btn-primary" style="white-space:nowrap;">🔧 View Patch Instructions</a>
+          <a href="patches/patch-v1.8.html" class="btn-primary" style="white-space:nowrap;">🔧 View Patch Instructions</a>
           <span style="font-size:12px;color:#8b949e;text-align:right;">Step-by-step fix guide<br>+ code changes + error reference</span>
         </div>
       </div>
     </div>
 
-    <!-- v1.5 patch card (previous) -->
+    <!-- v1.7 patch card -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <span style="background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.4);color:#58a6ff;font-size:13px;font-weight:800;padding:3px 12px;border-radius:20px;font-family:monospace;">v1.7</span>
+            <span style="background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.4);color:#d4a017;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Improvement</span>
+            <span style="color:#8b949e;font-size:13px;">8 May 2026</span>
+          </div>
+          <h3 style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:8px;">Real 3-TP split with limit close orders + auto-trail SL</h3>
+          <p style="font-size:14px;color:#8b949e;margin:0;line-height:1.6;">TPs now fire as real limit close orders on Bitget (not just internal tracking). TP fill monitoring checks order status every cycle. Stop loss automatically trails to break-even at TP1 and to TP1 price after TP2.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;flex-shrink:0;">
+          <a href="patches/patch-v1.7.html" class="btn-secondary" style="white-space:nowrap;">View v1.7 Patch</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- v1.6 patch card (previous) -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <span style="background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.4);color:#58a6ff;font-size:13px;font-weight:800;padding:3px 12px;border-radius:20px;font-family:monospace;">v1.6</span>
+            <span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.4);color:#f85149;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Critical Fix</span>
+            <span style="color:#8b949e;font-size:13px;">7 May 2026</span>
+          </div>
+          <h3 style="font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:8px;">Ghost trades fix — daily limits no longer blocked by failed orders</h3>
+          <p style="font-size:14px;color:#8b949e;margin:0;line-height:1.6;">Failed orders were silently logged to the CSV, eating the daily trade limit. Also fixes HYPE TP manager (error 400172) and ensures correct leverage is applied on all new positions.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;flex-shrink:0;">
+          <a href="patches/patch-v1.6.html" class="btn-secondary" style="white-space:nowrap;">View v1.6 Patch</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- v1.5 patch card -->
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px 28px;margin-bottom:16px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
         <div style="flex:1;min-width:200px;">
@@ -734,7 +770,7 @@
 
     <!-- Up to date note -->
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;font-size:13px;color:var(--muted);">
-      ✅ <strong style="color:var(--text)">On v1.6 already?</strong> You're up to date. Check back here after any major update — new patches will appear above.
+      ✅ <strong style="color:var(--text)">On v1.8 already?</strong> You're up to date. Check back here after any major update — new patches will appear above.
     </div>
   </div>
 </section>
@@ -796,7 +832,7 @@ package.json:
 
 rules-ironclad.json:
 {
-  "strategy": "Cryptolanz Ironclad v1.6",
+  "strategy": "Cryptolanz Ironclad v1.8",
   "timeframes": { "htf": "1D", "ltf": "15m" },
   "swing_detection": {
     "swing_lookback": 2, "trend_swing_count": 2,
@@ -971,7 +1007,9 @@ research.js — Two jobs:
 
 STEP 4 — BITGET ACCOUNT SETUP (CRITICAL — DO THIS BEFORE DEPLOYING)
 ─────────────────────────────────────────────────────────────────────
-1. API Key permissions needed: Read-Write Futures Orders + Read-Write Spot Trading
+1. API Key permissions needed: Futures → Holdings + Trade (USDT-M Futures section).
+   "Holdings" is Bitget's label for position-read access — without it the bot cannot
+   detect when your SL/TP fires and positions will stay "open" in the tracker indefinitely.
    Passphrase MUST be alphanumeric only — no $, @, ! or special characters.
    These break environment variable parsing and cause silent auth failures.
 
