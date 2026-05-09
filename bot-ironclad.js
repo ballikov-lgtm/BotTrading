@@ -12,7 +12,7 @@ const CONFIG = {
   mode:            process.env.MODE                  || 'futures',
   leverage:        parseInt(process.env.LEVERAGE)             || 3,
   portfolioUsd:    parseFloat(process.env.PORTFOLIO_USD)      || 1000,
-  maxTradeUsd:     parseFloat(process.env.MAX_TRADE_USD)      || 100,
+  maxTradePct:     parseFloat(process.env.MAX_TRADE_PCT)      || 0.19, // 19% of portfolio = ~£50 margin at 3x on £1000 account. Scales automatically when compounding.
   maxPerDay:       parseInt(process.env.MAX_TRADES_PER_DAY)   || 3,
   paperTrading:    process.env.IRONCLAD_PAPER !== 'false',     // Separate paper flag
   maxDailyLossUsd: parseFloat(process.env.MAX_DAILY_LOSS_USD) || 50, // Daily drawdown circuit-breaker (5% of $1000)
@@ -20,7 +20,7 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.7'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL
+const BOT_VERSION = 'v1.8'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL · v1.8 percentage-based position sizing (compounds with account) + smart re-entry (only cap at 3/day when coin is losing)
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -186,6 +186,26 @@ function countTodayTrades(symbol) {
   const lines = fs.readFileSync(TRADES_PATH, 'utf8').trim().split('\n');
   const today = todayString();
   return lines.slice(1).filter(l => l.startsWith(today) && l.includes(symbol)).length;
+}
+
+function isCoinLosingToday(symbol) {
+  // Returns true if today's net realizedPnl on this symbol is negative.
+  // Used to decide whether to enforce the maxPerDay cap:
+  //   losing coin → cap at 3 entries (avoid chasing a bad trend)
+  //   winning coin → allow unlimited re-entries (bull run, don't cut it short)
+  if (!fs.existsSync(CLOSED_PATH)) return false;
+  try {
+    const closed = JSON.parse(fs.readFileSync(CLOSED_PATH, 'utf8'));
+    const today  = todayString();
+    const todayTrades = closed.filter(p =>
+      p.symbol === symbol && (p.closeDate === today || p.openDate === today)
+    );
+    if (todayTrades.length === 0) return false;
+    const netPnl = todayTrades.reduce((sum, p) => sum + (p.realizedPnl || 0), 0);
+    return netPnl < 0;
+  } catch {
+    return false;
+  }
 }
 
 function appendTrade(row) {
@@ -699,12 +719,12 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1, tp2, tp3
 // ── Position Sizing ───────────────────────────────────────────────────────────
 
 function calcQuantity(entry, stopLoss) {
-  const riskUsd    = CONFIG.portfolioUsd * 0.01; // 1% risk
-  const stopDist   = Math.abs(entry - stopLoss);
+  const riskUsd     = CONFIG.portfolioUsd * 0.01;                      // 1% of account at risk per trade
+  const maxTradeUsd = CONFIG.portfolioUsd * CONFIG.maxTradePct;         // notional cap scales with account (compounding-ready)
+  const stopDist    = Math.abs(entry - stopLoss);
   const stopDistPct = stopDist / entry;
-  // With leverage, effective stop distance is multiplied
-  const effectiveRisk = stopDistPct * CONFIG.leverage;
-  const sizeUsd    = Math.min(riskUsd / effectiveRisk, CONFIG.maxTradeUsd);
+  const effectiveRisk = stopDistPct * CONFIG.leverage;                  // leverage multiplies the stop's impact on equity
+  const sizeUsd     = Math.min(riskUsd / effectiveRisk, maxTradeUsd);
   return parseFloat((sizeUsd / entry).toFixed(6));
 }
 
@@ -1171,6 +1191,7 @@ async function run() {
   console.log(`Strategy  : ${rules.strategy}`);
   console.log(`HTF       : ${rules.timeframes.htf}  LTF: ${rules.timeframes.ltf}`);
   console.log(`Leverage  : ${CONFIG.leverage}x  Paper: ${CONFIG.paperTrading}`);
+  console.log(`Sizing    : ${(CONFIG.maxTradePct * 100).toFixed(0)}% notional cap = $${(CONFIG.portfolioUsd * CONFIG.maxTradePct).toFixed(0)} max / ~$${(CONFIG.portfolioUsd * CONFIG.maxTradePct / CONFIG.leverage).toFixed(0)} margin per trade`);
   console.log(`Symbols   : ${SYMBOLS.length} pairs`);
   console.log(`Research  : ${researchData ? `${researchData.signals.length} signals loaded` : 'No signal file — technicals only'}`);
   console.log(`─`.repeat(60));
@@ -1196,9 +1217,10 @@ async function run() {
   for (const symbol of SYMBOLS) {
     console.log(`\n▶ ${symbol}`);
 
-    // Daily trade limit per symbol
-    if (countTodayTrades(symbol) >= CONFIG.maxPerDay) {
-      console.log(`  Daily limit reached — skipping`);
+    // Daily trade limit per symbol — only enforced when the coin is losing today.
+    // If today's trades on this symbol are net positive (bull run), allow unlimited re-entries.
+    if (countTodayTrades(symbol) >= CONFIG.maxPerDay && isCoinLosingToday(symbol)) {
+      console.log(`  Daily limit reached (coin losing today) — skipping`);
       continue;
     }
 
