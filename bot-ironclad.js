@@ -572,29 +572,25 @@ async function setLeverage(symbol, leverage) {
 // simulation and live trading actually comparable.
 
 async function placeLimitClose(symbol, side, qty, price) {
-  // Bitget hedge-mode isolated positions require the /close-positions endpoint.
-  // The regular /place-order endpoint returns [22002] "No position to close"
-  // for these position types even when the position clearly exists.
+  // NOTE: /close-positions is a MARKET close — do NOT use it for limit TPs.
+  // TODO: [22002] from place-order still unresolved for hedge-mode isolated positions.
+  // Using place-order for now — it fails silently (no fill) which is safer than
+  // close-positions which immediately market-closes the position.
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
-    holdSide:  side,   // 'long' or 'short' — required by close-positions
+    marginMode: 'isolated',
+    side:      side === 'long' ? 'sell' : 'buy',
+    tradeSide: 'close',
     orderType: 'limit',
     price:     price.toString(),
     size:      qty.toString(),
   };
-  const r = await bitgetRequest('POST', '/api/v2/mix/order/close-positions', body);
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
   if (r.code !== '00000') {
     console.log(`  ⚠️  Limit close FAILED @ $${price}: code=${r.code} msg="${r.msg}"`);
     return null;
   }
-  // close-positions returns { successList: [{orderId}], failureList: [] }
-  const success = r.data?.successList?.[0];
-  if (!success) {
-    const fail = r.data?.failureList?.[0];
-    console.log(`  ⚠️  Limit close failureList @ $${price}: ${JSON.stringify(fail)}`);
-    return null;
-  }
-  return success.orderId;
+  return r.data?.orderId || null;
 }
 
 async function getOrderDetail(symbol, orderId) {
