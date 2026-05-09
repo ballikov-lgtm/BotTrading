@@ -572,21 +572,29 @@ async function setLeverage(symbol, leverage) {
 // simulation and live trading actually comparable.
 
 async function placeLimitClose(symbol, side, qty, price) {
+  // Bitget hedge-mode isolated positions require the /close-positions endpoint.
+  // The regular /place-order endpoint returns [22002] "No position to close"
+  // for these position types even when the position clearly exists.
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
-    marginMode: 'isolated',
-    side:      side === 'long' ? 'sell' : 'buy',
-    tradeSide: 'close',
+    holdSide:  side,   // 'long' or 'short' — required by close-positions
     orderType: 'limit',
     price:     price.toString(),
     size:      qty.toString(),
   };
-  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/close-positions', body);
   if (r.code !== '00000') {
     console.log(`  ⚠️  Limit close FAILED @ $${price}: code=${r.code} msg="${r.msg}"`);
     return null;
   }
-  return r.data?.orderId || null;
+  // close-positions returns { successList: [{orderId}], failureList: [] }
+  const success = r.data?.successList?.[0];
+  if (!success) {
+    const fail = r.data?.failureList?.[0];
+    console.log(`  ⚠️  Limit close failureList @ $${price}: ${JSON.stringify(fail)}`);
+    return null;
+  }
+  return success.orderId;
 }
 
 async function getOrderDetail(symbol, orderId) {
@@ -712,22 +720,46 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1, tp2, tp3
   const orderId = result.data?.orderId;
   console.log(`  ✅ Order placed: ${symbol} ${side.toUpperCase()} — orderId: ${orderId}`);
 
-  // Step 2: Place 3 limit close orders (40% / 35% / 25% split).
-  // Tiny delay to let Bitget register the position before accepting close orders.
-  await new Promise(r => setTimeout(r, 1500));
+  // Step 2: Fetch actual fill price before placing TP orders.
+  // Market fills can differ from the signal entry price; using the wrong price
+  // causes TPs to land on the wrong side of entry (e.g. TP1 below entry for a long).
+  await new Promise(r => setTimeout(r, 3000)); // wait for fill to settle
+  let fillPrice = entry; // fallback to signal price
+  let fillQty   = quantity;
+  const fillDetail = await getOrderDetail(symbol, orderId);
+  if (fillDetail?.priceAvg && parseFloat(fillDetail.priceAvg) > 0) {
+    fillPrice = parseFloat(fillDetail.priceAvg);
+    if (fillDetail.size && parseFloat(fillDetail.size) > 0) fillQty = parseFloat(fillDetail.size);
+    console.log(`  📊 Fill price: $${fillPrice}${fillPrice !== entry ? ` (signal was $${entry})` : ''}`);
+  }
 
-  const qty40 = parseFloat((quantity * 0.40).toFixed(6));
-  const qty35 = parseFloat((quantity * 0.35).toFixed(6));
-  const qty25 = parseFloat(Math.max(0, quantity - qty40 - qty35).toFixed(6)); // remainder — avoids float drift
+  // Validate TPs against the actual fill price — replace any that sit on the wrong
+  // side of entry (stale S/R level calculated before the fill was known).
+  const risk      = Math.abs(fillPrice - stopLoss);
+  const isLong    = side === 'long';
+  const validFor  = p => isLong ? p > fillPrice * 1.001 : p < fillPrice * 0.999;
+  const fallback  = (mult) => isLong ? fillPrice + risk * mult : fillPrice - risk * mult;
+  const fixedTp1  = validFor(tp1) ? tp1 : parseFloat(fallback(1.5).toFixed(4));
+  const fixedTp2  = validFor(tp2) ? tp2 : parseFloat(fallback(2.5).toFixed(4));
+  const fixedTp3  = validFor(tp3) ? tp3 : parseFloat(fallback(4.0).toFixed(4));
+  if (fixedTp1 !== tp1) console.log(`  ⚠️  TP1 corrected: ${tp1} → ${fixedTp1} (was wrong side of fill price)`);
+  if (fixedTp2 !== tp2) console.log(`  ⚠️  TP2 corrected: ${tp2} → ${fixedTp2}`);
+  if (fixedTp3 !== tp3) console.log(`  ⚠️  TP3 corrected: ${tp3} → ${fixedTp3}`);
 
-  console.log(`  Placing 3-TP limit closes: ${qty40}@$${tp1} / ${qty35}@$${tp2} / ${qty25}@$${tp3}`);
+  // Step 3: Place 3 limit close orders (40% / 35% / 25% split).
+  const qty40 = parseFloat((fillQty * 0.40).toFixed(6));
+  const qty35 = parseFloat((fillQty * 0.35).toFixed(6));
+  const qty25 = parseFloat(Math.max(0, fillQty - qty40 - qty35).toFixed(6));
 
-  // Fire all three in parallel — they're independent orders
-  const [tp1OrderId, tp2OrderId, tp3OrderId] = await Promise.all([
-    placeLimitClose(symbol, side, qty40, tp1),
-    placeLimitClose(symbol, side, qty35, tp2),
-    placeLimitClose(symbol, side, qty25, tp3),
-  ]);
+  console.log(`  Placing 3-TP limit closes: ${qty40}@$${fixedTp1} / ${qty35}@$${fixedTp2} / ${qty25}@$${fixedTp3}`);
+
+  // Place sequentially — Bitget only allows one pending close order per position
+  // at a time; parallel placement causes [22002] errors on the 2nd and 3rd orders.
+  const tp1OrderId = await placeLimitClose(symbol, side, qty40, fixedTp1);
+  await new Promise(r => setTimeout(r, 2000));
+  const tp2OrderId = await placeLimitClose(symbol, side, qty35, fixedTp2);
+  await new Promise(r => setTimeout(r, 2000));
+  const tp3OrderId = await placeLimitClose(symbol, side, qty25, fixedTp3);
 
   if (tp1OrderId) console.log(`  ✅ TP1 limit close: ${tp1OrderId}`);
   if (tp2OrderId) console.log(`  ✅ TP2 limit close: ${tp2OrderId}`);
@@ -736,7 +768,8 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1, tp2, tp3
     console.log(`  ⚠️  Some TP limit closes failed — check manually on Bitget`);
   }
 
-  return { orderId, tp1OrderId, tp2OrderId, tp3OrderId };
+  return { orderId, tp1OrderId, tp2OrderId, tp3OrderId,
+           fillPrice, fillQty, fixedTp1, fixedTp2, fixedTp3 };
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────
@@ -1368,23 +1401,14 @@ async function run() {
       continue;
     }
 
-    // ── Fetch actual Bitget fill price (live orders only) ─────────────────────
-    // The signal entry price is the price detected at analysis time. The actual
-    // market-order fill may differ. We query Bitget immediately after placement
-    // so the CSV and open-positions always record the true exchange fill price.
-    let actualEntry = entry.entry;
-    let actualQty   = qty;
-    if (!CONFIG.paperTrading && realOrderId) {
-      await new Promise(r => setTimeout(r, 3000)); // Brief wait for fill to settle
-      const detail = await getOrderDetail(symbol, realOrderId);
-      if (detail?.priceAvg && parseFloat(detail.priceAvg) > 0) {
-        actualEntry = parseFloat(detail.priceAvg);
-        if (detail.size && parseFloat(detail.size) > 0) actualQty = parseFloat(detail.size);
-        console.log(`  📊 Bitget fill: $${actualEntry} (signal was $${entry.entry.toFixed(4)})${actualEntry !== entry.entry ? ' ⚠️ price differs' : ''}`);
-      } else {
-        console.log(`  ⚠️  Could not fetch fill price — recording signal entry $${entry.entry.toFixed(4)}`);
-      }
-    }
+    // ── Use fill price already fetched inside placeOrder ────────────────────────
+    // placeOrder now fetches the actual fill price before placing TP orders,
+    // so it's available here. Fallback to signal price if not available (paper mode).
+    const actualEntry = order?.fillPrice ?? entry.entry;
+    const actualQty   = order?.fillQty   ?? qty;
+    const actualTp1   = order?.fixedTp1  ?? tps.tp1;
+    const actualTp2   = order?.fixedTp2  ?? tps.tp2;
+    const actualTp3   = order?.fixedTp3  ?? tps.tp3;
 
     const fibLevels = calcFibLevels(entry.signal, entry.entry, htf.swingHighs, htf.swingLows);
     writeLog({
@@ -1395,7 +1419,7 @@ async function run() {
       signalEntry:  entry.entry,
       actualEntry,
       stopLoss:     entry.stopLoss,
-      tp1: tps.tp1, tp2: tps.tp2, tp3: tps.tp3,
+      tp1: actualTp1, tp2: actualTp2, tp3: actualTp3,
       rr1: tps.rr1, rr2: tps.rr2, rr3: tps.rr3,
       slAfterTp1:   tps.slPlan.afterTp1,
       slAfterTp2:   tps.slPlan.afterTp2,
@@ -1418,9 +1442,9 @@ async function run() {
       actualQty,
       actualEntry.toFixed(4),          // ← actual Bitget fill, not signal price
       entry.stopLoss.toFixed(4),
-      tps.tp1.toFixed(4),
-      tps.tp2.toFixed(4),
-      tps.tp3.toFixed(4),
+      actualTp1.toFixed(4),            // ← corrected TPs based on actual fill
+      actualTp2.toFixed(4),
+      actualTp3.toFixed(4),
       tps.rr1,
       tps.rr2,
       tps.rr3,
@@ -1440,9 +1464,9 @@ async function run() {
       mode:        CONFIG.paperTrading ? 'paper' : 'live',
       entry:       actualEntry,          // ← actual Bitget fill
       stopLoss:    entry.stopLoss,
-      tp1:         tps.tp1,
-      tp2:         tps.tp2,
-      tp3:         tps.tp3,
+      tp1:         actualTp1,   // ← corrected based on actual fill price
+      tp2:         actualTp2,
+      tp3:         actualTp3,
       tp1OrderId:  order.tp1OrderId  || null,
       tp2OrderId:  order.tp2OrderId  || null,
       tp3OrderId:  order.tp3OrderId  || null,
