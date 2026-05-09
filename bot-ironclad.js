@@ -1254,13 +1254,16 @@ async function checkPositions() {
               exitLevel   = inferExitLevel(pos, exitPrice) || (realizedPnl >= 0 ? 'tp1' : 'sl');
               outcome     = realizedPnl >= 0 ? 'WIN' : 'LOSS';
             } else {
-              // History not found — record as closed but P&L unknown
+              // History not found — position closed too recently, Bitget history hasn't settled.
+              // Record as LOSS and apply cooldown: it's far more likely a stop-out than all 3
+              // TPs filling silently. Without cooldown, the bot immediately re-enters the same
+              // losing setup — compounding the drawdown.
               realizedPnl = 0;
               exitPrice   = 0;
               exitLevel   = 'unknown';
               closeDate   = new Date().toISOString().slice(0, 10);
               closeTime   = new Date().toISOString().slice(11, 19);
-              outcome     = 'UNKNOWN';
+              outcome     = 'LOSS'; // Assume loss until history confirms otherwise
             }
 
             closedPositions.push({
@@ -1277,10 +1280,14 @@ async function checkPositions() {
             const icon   = outcome === 'WIN' ? '✅' : outcome === 'LOSS' ? '❌' : '❓';
             const pnlStr = exitPrice
               ? ` · exit $${exitPrice} · P&L: ${realizedPnl >= 0 ? '+' : ''}$${Math.abs(realizedPnl).toFixed(2)} (Bitget)`
-              : ' · P&L unknown (history not found)';
+              : ' · P&L unknown (assuming stop-out — cooldown applied)';
             console.log(`  ${icon} ${pos.symbol} ${pos.side} ${outcome}${pnlStr}`);
 
-            if (outcome === 'LOSS') setCooldown(pos.symbol);
+            // ALWAYS apply cooldown when a position disappears from Bitget:
+            // - LOSS: definitely a stop-out → cooldown prevents chasing
+            // - History not found: almost certainly a stop-out (TPs fill gradually, SL fires instantly)
+            // This was the root cause of the 3× JUP re-entry: UNKNOWN skipped cooldown.
+            if (outcome === 'LOSS' || exitLevel === 'unknown') setCooldown(pos.symbol);
           }
         }
       }
@@ -1398,6 +1405,25 @@ async function run() {
     return;
   }
 
+  // ── Pre-scan: fetch live Bitget positions as a hard guard against duplicate entries ──
+  // The tracker file can be stale if checkPositions couldn't determine P&L.
+  // This real-time check prevents opening a position while one already exists on exchange.
+  let liveSymbolsOnBitget = new Set();
+  if (!CONFIG.paperTrading) {
+    try {
+      const liveAll = await fetchAllBitgetPositions();
+      if (Array.isArray(liveAll)) {
+        for (const bp of liveAll) {
+          if (parseFloat(bp.total) > 0) {
+            const sym = bp.symbol?.replace(/_UMCBL$|_SPBL$/, '');
+            if (sym) liveSymbolsOnBitget.add(sym);
+          }
+        }
+        console.log(`Live on Bitget: ${[...liveSymbolsOnBitget].join(', ') || 'none'}`);
+      }
+    } catch {}
+  }
+
   for (const symbol of SYMBOLS) {
     console.log(`\n▶ ${symbol}`);
 
@@ -1416,11 +1442,20 @@ async function run() {
     }
 
     // Open-position guard — never enter a symbol that already has an active position.
-    // Prevents duplicate orders across bot cycles (e.g. 3 APT entries with same TP levels).
+    // TWO layers: (1) our local tracker file, (2) live Bitget positions (hard truth).
+    // The tracker can be stale if the bot crashed or history wasn't found. Checking Bitget
+    // directly prevents re-entry while a position is open but not yet in our tracker.
+    // This was the root cause of 3× JUP re-entry: SL fired, history not found → UNKNOWN
+    // outcome → no cooldown → tracker cleared → Bitget still showed position open → re-entered.
     const openPositions = loadOpenPositions();
     const alreadyOpen = openPositions.some(p => p.symbol === symbol);
     if (alreadyOpen) {
-      console.log(`  ⏭ Position already open — skipping`);
+      console.log(`  ⏭ Position already open (tracker) — skipping`);
+      continue;
+    }
+    // Hard guard: also check live Bitget positions regardless of tracker state
+    if (!CONFIG.paperTrading && liveSymbolsOnBitget.has(symbol)) {
+      console.log(`  ⏭ Position already open on Bitget (live check) — skipping`);
       continue;
     }
 
