@@ -482,6 +482,18 @@ async function run() {
   console.log(`Symbols : ${WATCHLIST.length} stocks/ETFs`);
   console.log(`─`.repeat(60));
 
+  // ── Weekend guard (stocks/ETFs only — markets are closed Sat/Sun) ─────────
+  // Any signal fired on a weekend is driven by Friday's stale close price.
+  // False entries are guaranteed — do nothing until Monday open.
+  const dayOfWeek = new Date().getUTCDay(); // 0=Sun, 6=Sat
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    const dayName = dayOfWeek === 6 ? 'Saturday' : 'Sunday';
+    console.log(`\n🚫 Weekend guard — ${dayName} UTC. Stock markets closed, no action taken.`);
+    console.log(`   Open positions will be reviewed at Monday market open.`);
+    console.log(`\n══ SID run complete ══`);
+    return;
+  }
+
   // Step 0: Check open positions for RSI-50 exits
   await checkPositions();
 
