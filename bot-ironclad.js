@@ -146,7 +146,7 @@ function checkDailyDrawdown() {
 }
 
 // Ironclad v1.6: Live mode. Portfolio $1000. Daily drawdown circuit-breaker added.
-// HYPEUSDT temporarily excluded — user has a manual live position open. Re-add once confirmed closed.
+// HYPEUSDT re-added — personal trades moved to separate exchange. This account is Ironclad strategy only.
 // v1.5: 3-hour cooldown after clean stop-out prevents re-entering the same failed setup.
 // Backtested vs 5 days of data: cooldown alone added +$38.81 (+37%) vs baseline.
 // SL 2% cap and TP1≥ATR filter were tested and found counterproductive — not applied.
@@ -154,7 +154,7 @@ const SYMBOLS = [
   // ── Core L1s ──────────────────────────────────────────────────────────────
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT',
   // ── Original watchlist ────────────────────────────────────────────────────
-  'LINKUSDT', /* 'HYPEUSDT' — excluded: manual live position open, re-add when closed */
+  'LINKUSDT', 'HYPEUSDT',
   'VIRTUALUSDT', 'APTUSDT', 'ONDOUSDT', 'JUPUSDT',
   // ── Added 2026-05-06: lagging / independent-narrative tokens ──────────────
   // 'PENDLEUSDT', // Removed — CoinGecko rank #138, below top 100 liquidity threshold
