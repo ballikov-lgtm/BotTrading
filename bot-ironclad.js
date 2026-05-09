@@ -1008,7 +1008,7 @@ async function checkPositions() {
               if (detail?.state === 'filled' || detail?.status === 'filled') {
                 const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp1);
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
-                  (fillPrice - pos.entry) * (pos.qty * 0.40) * CONFIG.leverage;
+                  (fillPrice - pos.entry) * (pos.qty * 0.40);  // qty is notional qty — no leverage multiplier
                 const partials  = [...(updated.partialCloses || []),
                   { price: fillPrice, level: 'tp1', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
                 ];
@@ -1025,7 +1025,7 @@ async function checkPositions() {
               if (detail?.state === 'filled' || detail?.status === 'filled') {
                 const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp2);
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
-                  (fillPrice - pos.entry) * (pos.qty * 0.35) * CONFIG.leverage;
+                  (fillPrice - pos.entry) * (pos.qty * 0.35);  // qty is notional qty — no leverage multiplier
                 const partials  = [...(updated.partialCloses || []),
                   { price: fillPrice, level: 'tp2', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
                 ];
@@ -1324,25 +1324,44 @@ async function run() {
       continue;
     }
 
+    // ── Fetch actual Bitget fill price (live orders only) ─────────────────────
+    // The signal entry price is the price detected at analysis time. The actual
+    // market-order fill may differ. We query Bitget immediately after placement
+    // so the CSV and open-positions always record the true exchange fill price.
+    let actualEntry = entry.entry;
+    let actualQty   = qty;
+    if (!CONFIG.paperTrading && realOrderId) {
+      await new Promise(r => setTimeout(r, 3000)); // Brief wait for fill to settle
+      const detail = await getOrderDetail(symbol, realOrderId);
+      if (detail?.priceAvg && parseFloat(detail.priceAvg) > 0) {
+        actualEntry = parseFloat(detail.priceAvg);
+        if (detail.size && parseFloat(detail.size) > 0) actualQty = parseFloat(detail.size);
+        console.log(`  📊 Bitget fill: $${actualEntry} (signal was $${entry.entry.toFixed(4)})${actualEntry !== entry.entry ? ' ⚠️ price differs' : ''}`);
+      } else {
+        console.log(`  ⚠️  Could not fetch fill price — recording signal entry $${entry.entry.toFixed(4)}`);
+      }
+    }
+
     const fibLevels = calcFibLevels(entry.signal, entry.entry, htf.swingHighs, htf.swingLows);
     writeLog({
-      timestamp: new Date().toISOString(),
+      timestamp:    new Date().toISOString(),
       symbol,
-      htfTrend:  htf.trend,
-      signal:    entry.signal,
-      entry:     entry.entry,
-      stopLoss:  entry.stopLoss,
+      htfTrend:     htf.trend,
+      signal:       entry.signal,
+      signalEntry:  entry.entry,
+      actualEntry,
+      stopLoss:     entry.stopLoss,
       tp1: tps.tp1, tp2: tps.tp2, tp3: tps.tp3,
       rr1: tps.rr1, rr2: tps.rr2, rr3: tps.rr3,
-      slAfterTp1: tps.slPlan.afterTp1,
-      slAfterTp2: tps.slPlan.afterTp2,
-      split:      tps.split,
+      slAfterTp1:   tps.slPlan.afterTp1,
+      slAfterTp2:   tps.slPlan.afterTp2,
+      split:        tps.split,
       emaLevels,
-      fibLevels:  { ratios: FIB_RATIOS, levels: fibLevels },
-      swingHigh:  htf.swingHighs[htf.swingHighs.length - 1]?.price,
-      swingLow:   htf.swingLows[htf.swingLows.length - 1]?.price,
-      reason:     entry.reason,
-      orderId:    order.orderId || order.data?.orderId,
+      fibLevels:    { ratios: FIB_RATIOS, levels: fibLevels },
+      swingHigh:    htf.swingHighs[htf.swingHighs.length - 1]?.price,
+      swingLow:     htf.swingLows[htf.swingLows.length - 1]?.price,
+      reason:       entry.reason,
+      orderId:      realOrderId,
     });
 
     const now = new Date();
@@ -1352,18 +1371,18 @@ async function run() {
       'BitGet',
       symbol,
       entry.signal,
-      qty,
-      entry.entry.toFixed(2),
-      entry.stopLoss.toFixed(2),
-      tps.tp1.toFixed(2),
-      tps.tp2.toFixed(2),
-      tps.tp3.toFixed(2),
+      actualQty,
+      actualEntry.toFixed(4),          // ← actual Bitget fill, not signal price
+      entry.stopLoss.toFixed(4),
+      tps.tp1.toFixed(4),
+      tps.tp2.toFixed(4),
+      tps.tp3.toFixed(4),
       tps.rr1,
       tps.rr2,
       tps.rr3,
-      tps.slPlan.afterTp1.toFixed(2),
-      (qty * entry.entry).toFixed(2),
-      order.orderId || order.data?.orderId || 'unknown',
+      tps.slPlan.afterTp1.toFixed(4),
+      (actualQty * actualEntry).toFixed(2),  // ← notional based on real fill
+      realOrderId,
       CONFIG.paperTrading ? 'paper' : 'live',
       `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
@@ -1371,21 +1390,20 @@ async function run() {
 
     // Register in open-positions tracker so the monitor can detect SL/TP hits
     addOpenPosition({
-      id:          order.orderId || order.data?.orderId || 'unknown',
+      id:          realOrderId,
       symbol,
       side:        entry.signal,
-      mode:        CONFIG.paperTrading ? 'paper' : 'live', // routes paper→candle sim, live→Bitget API
-      entry:       entry.entry,
+      mode:        CONFIG.paperTrading ? 'paper' : 'live',
+      entry:       actualEntry,          // ← actual Bitget fill
       stopLoss:    entry.stopLoss,
       tp1:         tps.tp1,
       tp2:         tps.tp2,
       tp3:         tps.tp3,
-      // Live TP order IDs — used by checkPositions() to trail the SL as each fills
       tp1OrderId:  order.tp1OrderId  || null,
       tp2OrderId:  order.tp2OrderId  || null,
       tp3OrderId:  order.tp3OrderId  || null,
-      qty,
-      totalUsd:    parseFloat((qty * entry.entry).toFixed(2)),
+      qty:         actualQty,            // ← actual filled quantity
+      totalUsd:    parseFloat((actualQty * actualEntry).toFixed(2)),
       openDate:    now.toISOString().slice(0, 10),
       openTime:    now.toISOString().slice(11, 19),
       strategy:    `${BOT_NAME} ${BOT_VERSION}`,
