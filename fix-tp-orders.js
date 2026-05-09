@@ -70,6 +70,43 @@ function roundToTick(price, symbol) {
   return Math.round(price / tick) * tick;
 }
 
+// ── Contract size steps per symbol (Bitget futures minimum trade unit) ────────
+// Sending a non-step-multiple size causes [22002] "No position to close".
+// XRP=1 because total position shows as integer (134).
+// RENDER=0.1 because total shows as decimal (93.7).
+// For unknown symbols fall back to 0.01 (safe for most mid-caps).
+const SIZE_STEP = {
+  BTCUSDT:    0.001,
+  ETHUSDT:    0.01,
+  SOLUSDT:    0.1,
+  AVAXUSDT:   0.1,
+  TAOUSDT:    0.01,
+  SUIUSDT:    1,
+  XRPUSDT:    1,
+  RENDERUSDT: 0.1,
+  LINKUSDT:   0.1,
+  HYPEUSDT:   0.1,
+  TONUSDT:    1,
+  NEARUSDT:   1,
+  INJUSDT:    0.1,
+  KASUSDT:    1,
+  ZECUSDT:    0.1,
+};
+
+// Floor to nearest step to avoid over-closing (never round up for close orders)
+function roundToStep(qty, symbol) {
+  const step = SIZE_STEP[symbol] || 0.01;
+  const decimals = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  const rounded = Math.floor(qty / step) * step;
+  return parseFloat(rounded.toFixed(decimals));
+}
+
+function sizeStr(qty, symbol) {
+  const step = SIZE_STEP[symbol] || 0.01;
+  const decimals = step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  return qty.toFixed(decimals);
+}
+
 // ── Fetch live positions from Bitget ─────────────────────────────────────────
 async function getLivePositions() {
   const path = '/api/v2/mix/position/all-position?productType=USDT-FUTURES&marginCoin=USDT';
@@ -78,37 +115,41 @@ async function getLivePositions() {
   return r.data.filter(p => parseFloat(p.total) > 0);
 }
 
-// ── Place one limit close order via close-positions endpoint ─────────────────
-// /api/v2/mix/order/close-positions is the correct endpoint for hedge-mode
-// isolated positions on Bitget (place-order returns [22002] for these)
+// ── Place one limit close order via place-order endpoint ──────────────────────
+// Uses place-order (NOT close-positions — that does immediate market close!).
+// Key fix: size MUST be rounded to the symbol's contract step size.
+// Fractional sizes (e.g. 53.6 for XRP where step=1) return [22002] silently.
+// Hedge-mode params: posSide identifies existing position, tradeSide='close'.
 async function placeLimitClose(symbol, side, qty, price) {
   const tickRounded = roundToTick(price, symbol);
   const tick = TICK[symbol] || 0.0001;
-  const decimals = tick < 0.001 ? 4 : tick < 0.01 ? 3 : tick < 0.1 ? 2 : 1;
-  const priceStr = tickRounded.toFixed(decimals);
-  const qtyStr   = qty.toFixed(6).replace(/\.?0+$/, '');
+  const pDecimals = tick < 0.001 ? 4 : tick < 0.01 ? 3 : tick < 0.1 ? 2 : 1;
+  const priceStr = tickRounded.toFixed(pDecimals);
+
+  const roundedQty = roundToStep(qty, symbol);
+  if (roundedQty <= 0) {
+    console.log(RED(`    ❌ Size rounds to 0 for ${symbol}: ${qty} (step=${SIZE_STEP[symbol] || 0.01})`));
+    return null;
+  }
+  const qtyStr = sizeStr(roundedQty, symbol);
 
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
-    holdSide: side,           // 'long' or 'short'
+    marginMode: 'isolated',
+    side:      side === 'long' ? 'sell' : 'buy',  // opposite of existing position
+    posSide:   side,                               // direction of the EXISTING position
+    tradeSide: 'close',
     orderType: 'limit',
     price:     priceStr,
     size:      qtyStr,
   };
-  const r = await bitgetReq('POST', '/api/v2/mix/order/close-positions', body);
+  console.log(YELLOW(`    Sending: ${JSON.stringify(body)}`));
+  const r = await bitgetReq('POST', '/api/v2/mix/order/place-order', body);
   if (r.code !== '00000') {
     console.log(RED(`    ❌ Limit close FAILED @ $${priceStr}: [${r.code}] ${r.msg}`));
-    console.log(YELLOW(`       Body: ${JSON.stringify(body)}`));
     return null;
   }
-  // close-positions returns { successList: [{orderId, ...}], failureList: [] }
-  const success = r.data?.successList?.[0];
-  if (!success) {
-    const fail = r.data?.failureList?.[0];
-    console.log(RED(`    ❌ close-positions failureList: ${JSON.stringify(fail)}`));
-    return null;
-  }
-  return success.orderId;
+  return r.data?.orderId || null;
 }
 
 // ── Validate / fix TP levels ──────────────────────────────────────────────────
@@ -192,17 +233,21 @@ async function main() {
     pos.tp3 = fixed.tp3;
 
     // Split actual exchange qty: 40% / 35% / 25%
-    const qty40 = parseFloat((liveQty * 0.40).toFixed(6));
-    const qty35 = parseFloat((liveQty * 0.35).toFixed(6));
-    const qty25 = parseFloat(Math.max(0, liveQty - qty40 - qty35).toFixed(6));
+    // Floor to symbol's contract step size — fractional sizes cause [22002] on Bitget.
+    const qty40 = roundToStep(liveQty * 0.40, pos.symbol);
+    const qty35 = roundToStep(liveQty * 0.35, pos.symbol);
+    const qty25 = roundToStep(Math.max(0, liveQty - qty40 - qty35), pos.symbol);
 
-    console.log(`  Placing: ${qty40}@$${pos.tp1} / ${qty35}@$${pos.tp2} / ${qty25}@$${pos.tp3}`);
+    console.log(`  Placing: ${sizeStr(qty40, pos.symbol)}@$${pos.tp1} / ${sizeStr(qty35, pos.symbol)}@$${pos.tp2} / ${sizeStr(qty25, pos.symbol)}@$${pos.tp3}`);
 
-    // Place sequentially — avoids Bitget rejecting parallel close orders
+    // Bitget only allows ONE pending close order per position at a time (hedge-mode rule).
+    // TP1 is placed here. TP2 will be placed automatically by the bot's monitoring loop
+    // when TP1 fills, and TP3 when TP2 fills. Attempts for TP2/TP3 below will likely
+    // return [22002] while TP1 is pending — that is expected, not a bug.
     const tp1Id = await placeLimitClose(pos.symbol, pos.side, qty40, pos.tp1);
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 1000));
     const tp2Id = await placeLimitClose(pos.symbol, pos.side, qty35, pos.tp2);
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 1000));
     const tp3Id = await placeLimitClose(pos.symbol, pos.side, qty25, pos.tp3);
 
     pos.tp1OrderId = tp1Id || null;

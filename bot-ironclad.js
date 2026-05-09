@@ -20,7 +20,7 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.8'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL · v1.8 percentage-based position sizing (compounds with account) + smart re-entry (only cap at 3/day when coin is losing)
+const BOT_VERSION = 'v1.9'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL · v1.8 percentage-based position sizing (compounds with account) + smart re-entry (only cap at 3/day when coin is losing) · v1.9 contract step-size rounding (fixes [22002] on fractional qty) + sequential TP placement (TP2 placed after TP1 fills, TP3 after TP2) + TP1 auto-retry in monitoring loop
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -221,6 +221,44 @@ function writeLog(entry) {
   }
   log.unshift(entry);
   fs.writeFileSync(SAFETY_LOG_PATH, JSON.stringify(log.slice(0, 200), null, 2));
+}
+
+// ── Contract size steps (minimum trade unit per symbol on Bitget USDT futures) ─
+// Sending a non-step-multiple qty to place-order returns [22002] "No position
+// to close" — Bitget's generic error for invalid close parameters.
+// Rule: always FLOOR the split qty to the nearest step (never round up — that
+// would try to close more than is held).
+// How to determine the step: look at the open position's `total` field.
+//   Integer → step = 1 (e.g. XRPUSDT shows 134)
+//   One decimal → step = 0.1 (e.g. RENDERUSDT shows 93.7)
+//   Two decimals → step = 0.01, etc.
+const SIZE_STEP = {
+  BTCUSDT:     0.001,
+  ETHUSDT:     0.01,
+  SOLUSDT:     0.1,
+  AVAXUSDT:    0.1,
+  TAOUSDT:     0.01,
+  SUIUSDT:     1,
+  XRPUSDT:     1,
+  RENDERUSDT:  0.1,
+  LINKUSDT:    0.1,
+  HYPEUSDT:    0.1,
+  VIRTUALUSDT: 1,
+  APTUSDT:     0.1,
+  ONDOUSDT:    1,
+  JUPUSDT:     1,
+  TONUSDT:     1,
+  NEARUSDT:    1,
+  INJUSDT:     0.1,
+  KASUSDT:     1,
+  ZECUSDT:     0.1,
+};
+
+// Floor qty to symbol's contract step — use for ALL close order sizes.
+function floorToStep(qty, symbol) {
+  const step = SIZE_STEP[symbol] || 0.01;
+  const decimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  return parseFloat((Math.floor(qty / step) * step).toFixed(decimals));
 }
 
 // ── Market Data ───────────────────────────────────────────────────────────────
@@ -572,9 +610,19 @@ async function setLeverage(symbol, leverage) {
 // simulation and live trading actually comparable.
 
 async function placeLimitClose(symbol, side, qty, price) {
-  // Hedge-mode isolated positions require posSide to identify which position to close.
-  // Without it, Bitget returns [22002] "No position to close" even when the position exists.
-  // Do NOT use /close-positions — that endpoint immediately market-closes (not a limit order).
+  // Hedge-mode: posSide = direction of EXISTING position, side = opposite (the order direction).
+  // CRITICAL: qty must be floored to the symbol's contract step size.
+  //   XRP step=1: sending 53.6 → [22002]. Sending 53 → success.
+  //   RENDER step=0.1: sending 37.48 → [22002]. Sending 37.4 → success.
+  // Do NOT use /close-positions — that endpoint immediately market-closes at current price.
+  const roundedQty = floorToStep(qty, symbol);
+  if (roundedQty <= 0) {
+    console.log(`  ⚠️  ${symbol} close size rounds to 0 (raw ${qty}, step ${SIZE_STEP[symbol] || 0.01}) — skipping`);
+    return null;
+  }
+  const step = SIZE_STEP[symbol] || 0.01;
+  const sDecimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
@@ -583,11 +631,12 @@ async function placeLimitClose(symbol, side, qty, price) {
     tradeSide: 'close',
     orderType: 'limit',
     price:     price.toString(),
-    size:      qty.toString(),
+    size:      roundedQty.toFixed(sDecimals),
   };
   const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
   if (r.code !== '00000') {
     console.log(`  ⚠️  Limit close FAILED @ $${price}: code=${r.code} msg="${r.msg}"`);
+    console.log(`     Body: ${JSON.stringify(body)}`);
     return null;
   }
   return r.data?.orderId || null;
@@ -743,9 +792,11 @@ async function placeOrder(symbol, side, quantity, entry, stopLoss, tp1, tp2, tp3
   if (fixedTp3 !== tp3) console.log(`  ⚠️  TP3 corrected: ${tp3} → ${fixedTp3}`);
 
   // Step 3: Place 3 limit close orders (40% / 35% / 25% split).
-  const qty40 = parseFloat((fillQty * 0.40).toFixed(6));
-  const qty35 = parseFloat((fillQty * 0.35).toFixed(6));
-  const qty25 = parseFloat(Math.max(0, fillQty - qty40 - qty35).toFixed(6));
+  // Floor to contract step size — fractional sizes (e.g. 53.6 for XRP step=1)
+  // cause [22002] "No position to close" on Bitget even when the position is open.
+  const qty40 = floorToStep(fillQty * 0.40, symbol);
+  const qty35 = floorToStep(fillQty * 0.35, symbol);
+  const qty25 = floorToStep(Math.max(0, fillQty - qty40 - qty35), symbol);
 
   console.log(`  Placing 3-TP limit closes: ${qty40}@$${fixedTp1} / ${qty35}@$${fixedTp2} / ${qty25}@$${fixedTp3}`);
 
@@ -1081,7 +1132,7 @@ async function checkPositions() {
               if (detail?.state === 'filled' || detail?.status === 'filled') {
                 const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp1);
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
-                  (fillPrice - pos.entry) * (pos.qty * 0.40);  // qty is notional qty — no leverage multiplier
+                  (fillPrice - pos.entry) * (pos.qty * 0.40);
                 const partials  = [...(updated.partialCloses || []),
                   { price: fillPrice, level: 'tp1', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
                 ];
@@ -1089,6 +1140,31 @@ async function checkPositions() {
                 updated = { ...updated, tp1Hit: true, currentSl: pos.entry, partialCloses: partials };
                 // Move the exchange SL to break-even
                 await setPositionSL(symbol, holdSide, pos.entry);
+
+                // TP1 just cleared — Bitget now allows a new pending close order.
+                // Place TP2 immediately (was blocked while TP1 was pending).
+                if (!updated.tp2OrderId && updated.tp2) {
+                  const qty35 = floorToStep(pos.qty * 0.35, symbol);
+                  if (qty35 > 0) {
+                    console.log(`  📋 ${symbol} placing TP2 now that TP1 slot freed…`);
+                    const tp2Id = await placeLimitClose(symbol, pos.side, qty35, pos.tp2);
+                    if (tp2Id) {
+                      console.log(`  ✅ ${symbol} TP2 order placed: ${tp2Id}`);
+                      updated.tp2OrderId = tp2Id;
+                    }
+                  }
+                }
+              }
+            } else if (!updated.tp1Hit && !updated.tp1OrderId && updated.tp1) {
+              // TP1 was never placed (initial placement failed) — try again now.
+              console.log(`  🔄 ${symbol} TP1 missing — attempting placement…`);
+              const qty40 = floorToStep(pos.qty * 0.40, symbol);
+              if (qty40 > 0) {
+                const tp1Id = await placeLimitClose(symbol, pos.side, qty40, pos.tp1);
+                if (tp1Id) {
+                  console.log(`  ✅ ${symbol} TP1 placed on retry: ${tp1Id}`);
+                  updated.tp1OrderId = tp1Id;
+                }
               }
             }
 
@@ -1098,7 +1174,7 @@ async function checkPositions() {
               if (detail?.state === 'filled' || detail?.status === 'filled') {
                 const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp2);
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
-                  (fillPrice - pos.entry) * (pos.qty * 0.35);  // qty is notional qty — no leverage multiplier
+                  (fillPrice - pos.entry) * (pos.qty * 0.35);
                 const partials  = [...(updated.partialCloses || []),
                   { price: fillPrice, level: 'tp2', date: nowDate, time: nowTime, pnl: parseFloat(pnlPart.toFixed(4)) }
                 ];
@@ -1106,6 +1182,19 @@ async function checkPositions() {
                 updated = { ...updated, tp2Hit: true, currentSl: pos.tp1, partialCloses: partials };
                 // Trail the exchange SL to TP1 price (locks in profit on remaining 25%)
                 await setPositionSL(symbol, holdSide, pos.tp1);
+
+                // TP2 just cleared — place TP3 immediately.
+                if (!updated.tp3OrderId && updated.tp3) {
+                  const qty25 = floorToStep(pos.qty * 0.25, symbol);
+                  if (qty25 > 0) {
+                    console.log(`  📋 ${symbol} placing TP3 now that TP2 slot freed…`);
+                    const tp3Id = await placeLimitClose(symbol, pos.side, qty25, pos.tp3);
+                    if (tp3Id) {
+                      console.log(`  ✅ ${symbol} TP3 order placed: ${tp3Id}`);
+                      updated.tp3OrderId = tp3Id;
+                    }
+                  }
+                }
               }
             }
 
