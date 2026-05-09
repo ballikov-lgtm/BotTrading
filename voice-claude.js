@@ -162,35 +162,19 @@ function stopRecording(proc) {
   });
 }
 
-// ── ElevenLabs Speech-to-Text ─────────────────────────────────────────────────
-async function transcribe(wavFile) {
-  const audioData = fs.readFileSync(wavFile);
-  const boundary  = 'VCBoundary' + Date.now();
+// ── Whisper Speech-to-Text (local, free, via Python) ─────────────────────────
+const TRANSCRIBE_PY = path.join(path.dirname(new URL(import.meta.url).pathname.slice(1)), 'transcribe.py');
 
-  // Build multipart body manually (works with node-fetch + binary data)
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model_id"\r\n\r\nscribe_v1\r\n`),
-    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n`),
-    audioData,
-    Buffer.from(`\r\n--${boundary}--\r\n`),
-  ]);
-
-  const res = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
-    method: 'POST',
-    headers: {
-      'xi-api-key': ELEVENLABS_KEY,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-    },
-    body,
+function transcribe(wavFile) {
+  // First run downloads the Whisper model (~145MB) — takes a minute, one-time only
+  const result = spawnSync('python', [TRANSCRIBE_PY, wavFile], {
+    encoding: 'utf-8',
+    timeout: 60000,  // 60s — first run needs time to download the model
   });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`STT ${res.status}: ${err.slice(0, 200)}`);
+  if (result.status !== 0) {
+    throw new Error(`Whisper error: ${(result.stderr || '').slice(0, 200)}`);
   }
-
-  const data = await res.json();
-  return (data.text || '').trim();
+  return (result.stdout || '').trim();
 }
 
 // ── Claude API ─────────────────────────────────────────────────────────────────
@@ -255,7 +239,7 @@ rl.on('line', async raw => {
     await stopRecording(recordProc);
 
     try {
-      const spoken = await transcribe(WAV_FILE);
+      const spoken = transcribe(WAV_FILE);
       if (!spoken) {
         process.stdout.write('                  \r');
         console.log(MUTED('  (nothing heard — try again)\n'));
