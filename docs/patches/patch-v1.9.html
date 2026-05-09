@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz Patch v1.9 — TP Limit Orders Now Working</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1f2d3d;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --blue:   #58a6ff;
+      --yellow: #d29922;
+      --red:    #f85149;
+      --orange: #e3702a;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #2a1a0d 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 48px;
+      text-align: center;
+    }
+    .version-badge {
+      display: inline-block;
+      background: rgba(227,112,42,0.12);
+      border: 1px solid rgba(227,112,42,0.5);
+      color: var(--orange);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #e3702a, #f85149);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1rem; max-width: 640px; margin: 0 auto 24px; }
+    .hero .meta { color: var(--muted); font-size: 13px; }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    p { color: #c9d1d9; margin-bottom: 12px; font-size: 14px; }
+
+    .change-list { display: flex; flex-direction: column; gap: 14px; }
+    .change-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .change-card.critical { border-left: 3px solid var(--red); }
+    .change-card.improve  { border-left: 3px solid var(--blue); }
+    .change-card.fix      { border-left: 3px solid var(--yellow); }
+    .change-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .change-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .change-card p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .tag-critical { background: rgba(248,81,73,0.15);  color: var(--red); }
+    .tag-improve  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-fix      { background: rgba(210,153,34,0.15); color: var(--yellow); }
+
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 20px; }
+    .step {
+      display: flex;
+      gap: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--orange);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .step p  { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .step p:last-child { margin: 0; }
+
+    code {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .c  { color: #8b949e; }
+    .k  { color: #79c0ff; }
+    .v  { color: #a5d6ff; }
+    .s  { color: #3fb950; }
+    .e  { color: #f85149; }
+    .g  { color: #3fb950; }
+
+    .alert {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .alert-warn  { background: rgba(210,153,34,0.1);  border: 1px solid rgba(210,153,34,0.4); color: var(--yellow); }
+    .alert-danger{ background: rgba(248,81,73,0.08);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red); }
+    .alert-ok    { background: rgba(63,185,80,0.08);  border: 1px solid rgba(63,185,80,0.3);  color: var(--green); }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .nav a { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .version { font-size: 12px; color: var(--muted); }
+
+    .latest-badge {
+      display: inline-block;
+      background: rgba(227,112,42,0.12);
+      border: 1px solid rgba(227,112,42,0.4);
+      color: var(--orange);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 20px;
+      margin-left: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+
+    .version-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 28px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<div class="nav">
+  <a href="../cryptolanz.html">← Back to Cryptolanz</a>
+  <span class="version">Patch v1.9 — 9 May 2026 <span class="latest-badge">Latest</span></span>
+</div>
+
+<div class="hero">
+  <div class="version-badge">✦ Latest — Patch v1.9</div>
+  <h1>TP Limit Orders — Fixed</h1>
+  <p>Take-profit orders now correctly sit on the Bitget orderbook as pending limit orders at your target prices. Three bugs were causing all TP orders to silently fail or fire immediately at market. This patch is cumulative — one page takes you from any previous version to v1.9.</p>
+  <div class="meta">Released 9 May 2026 &nbsp;·&nbsp; Works from any previous version (v1.0–v1.8)</div>
+</div>
+
+<div class="container">
+
+  <!-- What changed -->
+  <section>
+    <h2>What Changed</h2>
+    <p class="sub">All changes from v1.5 through v1.9 are included. If you're on any earlier version, this single patch page covers everything.</p>
+
+    <div class="alert alert-danger">
+      <strong>Three stacked bugs were causing all TP orders to fail since v1.7</strong><br><br>
+      Positions opened but no take-profit limit orders appeared on Bitget. The root causes have now been identified and fixed. No account changes are required — this is a code-only update.
+    </div>
+
+    <div class="version-group-label">New in v1.9</div>
+    <div class="change-list">
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Missing <code>posSide</code> field — Bitget hedge-mode positions require it on close orders</h4>
+          <p>Bitget's hedge-mode uses <code>posSide</code> (not <code>holdSide</code> or nothing) to identify which position a close order targets. Without it, every limit close attempt returned <code>[22002] No position to close</code> even though the position clearly existed. Adding <code>posSide: 'long'</code> or <code>posSide: 'short'</code> to the order body fixes this completely.</p>
+        </div>
+      </div>
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Wrong endpoint — <code>/close-positions</code> is a market close, not a limit order</h4>
+          <p>An attempted workaround switched to the <code>/close-positions</code> endpoint, which appeared to work but was actually executing an <strong>immediate market close</strong> of the position — not placing a pending limit order on the book. This caused positions to close at entry price within seconds of opening. The bot is back on <code>/place-order</code> with the correct <code>posSide</code> field.</p>
+        </div>
+      </div>
+
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Parallel TP placement — Bitget only allows one pending close order per position</h4>
+          <p>All three TP orders were fired simultaneously with <code>Promise.all</code>. Bitget accepts the first and rejects the other two with <code>[22002]</code> because a pending close order is already in flight. Fixed: orders are now placed sequentially with a 2-second gap between each one.</p>
+        </div>
+      </div>
+
+      <div class="change-card fix">
+        <div class="change-icon">🔧</div>
+        <div>
+          <div class="tag tag-fix">Fix</div>
+          <h4>TP levels validated against actual fill price before placement</h4>
+          <p>Previously TPs were calculated from the signal price and passed straight to the order placer. If the actual market fill came in higher than the signal price (common with market orders), TP1 could end up below the actual entry — an impossible target. The bot now fetches the confirmed fill price from Bitget before placing TP orders and recalculates any invalid level using R:R fallbacks (1.5R / 2.5R / 4.0R).</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.8</div>
+    <div class="change-list">
+      <div class="change-card improve">
+        <div class="change-icon">📍</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Entry prices record Bitget's actual fill price</h4>
+          <p>The bot fetches the confirmed fill price from Bitget after a market order lands and records that instead of the signal price.</p>
+        </div>
+      </div>
+      <div class="change-card improve">
+        <div class="change-icon">🔗</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Position monitoring upgraded — Holdings permission + safe fallback</h4>
+          <p>Uses the Holdings API permission to detect SL/TP closures. Falls back gracefully if permission is missing.</p>
+        </div>
+      </div>
+      <div class="change-card improve">
+        <div class="change-icon">📈</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Compound position sizing</h4>
+          <p>Position size scales with your portfolio balance each run rather than the fixed starting value.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.7</div>
+    <div class="change-list">
+      <div class="change-card improve">
+        <div class="change-icon">🎯</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Real TP limit close orders + fill monitoring + auto-trail SL</h4>
+          <p>TP levels fire as real limit close orders on Bitget. SL trails to break-even after TP1, and to TP1 price after TP2.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.6</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Ghost order prevention — failed orders no longer block the daily limit</h4>
+          <p>Failed API orders were being logged to the CSV, counting against the daily trade limit. Fixed: orders are only logged when a real <code>orderId</code> is returned.</p>
+        </div>
+      </div>
+      <div class="change-card improve">
+        <div class="change-icon">⚡</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Leverage set inline — no separate API call needed</h4>
+          <p>Leverage is passed directly in the <code>place-order</code> body, removing a dependency on a rarely-granted API permission.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.5</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Bitget API bugs — orders now actually fire</h4>
+          <p>Three silent API failures blocked all live orders on v1.0–v1.4. Watchlist expanded from 10 to 18 pairs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to apply -->
+  <section>
+    <h2>How to Apply</h2>
+    <p class="sub">No account or API key changes needed — this is a pure code update. Two steps.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div>
+          <h4>Pull the latest code on Railway</h4>
+          <p>Open your Railway project → go to the <strong>Deployments</strong> tab → click <strong>Redeploy</strong> on the latest commit. Railway will pull the updated <code>bot-ironclad.js</code> automatically.</p>
+          <p>Alternatively, if you manage deployments via git push, run in your local repo:</p>
+          <pre><span class="k">git</span> pull origin main</pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Confirm TP orders appear on Bitget after the next trade</h4>
+          <p>After the next signal fires and a position opens, go to Bitget Futures → <strong>Open Orders</strong>. You should see <strong>three pending limit orders</strong> sitting at your TP1, TP2, and TP3 price levels. If they appear, v1.9 is working correctly.</p>
+          <div class="alert alert-ok">✅ Orders showing as pending = working. No further action needed.</div>
+          <div class="alert alert-warn">⚠️ No orders visible = Railway may not have redeployed yet. Wait 2 minutes and check again, or trigger a manual redeploy.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Code reference -->
+  <section>
+    <h2>Code Reference</h2>
+    <p class="sub">What the fixed <code>placeLimitClose</code> function looks like in v1.9.</p>
+
+    <p>The critical change is adding <code>posSide</code> to the order body. This tells Bitget's hedge-mode engine which position side the close order belongs to:</p>
+
+<pre><span class="k">async function</span> <span class="v">placeLimitClose</span>(symbol, side, qty, price) {
+  <span class="c">// posSide = direction of the EXISTING position (long or short)</span>
+  <span class="c">// side    = opposite (sell to close long, buy to close short)</span>
+  <span class="c">// Without posSide, hedge-mode returns [22002] "No position to close"</span>
+  <span class="k">const</span> body = {
+    symbol, productType: <span class="s">'USDT-FUTURES'</span>, marginCoin: <span class="s">'USDT'</span>,
+    marginMode: <span class="s">'isolated'</span>,
+    side:      side === <span class="s">'long'</span> ? <span class="s">'sell'</span> : <span class="s">'buy'</span>,
+    <span class="g">posSide:   side,</span>   <span class="c">// ← the fix</span>
+    tradeSide: <span class="s">'close'</span>,
+    orderType: <span class="s">'limit'</span>,
+    price:     price.toString(),
+    size:      qty.toString(),
+  };
+  <span class="k">const</span> r = <span class="k">await</span> bitgetRequest(<span class="s">'POST'</span>, <span class="s">'/api/v2/mix/order/place-order'</span>, body);
+  <span class="k">if</span> (r.code !== <span class="s">'00000'</span>) {
+    console.log(<span class="e">`⚠️  Limit close FAILED @ $${price}: ${r.code} ${r.msg}`</span>);
+    <span class="k">return null</span>;
+  }
+  <span class="k">return</span> r.data?.orderId || <span class="k">null</span>;
+}</pre>
+
+    <p style="margin-top:16px">TP orders are placed sequentially (2 seconds apart) because Bitget only allows one pending close order per position at a time. TPs are also validated and recalculated against the actual fill price before being placed:</p>
+
+<pre><span class="c">// Fetch actual fill price from Bitget before placing TPs</span>
+<span class="k">const</span> fillDetail = <span class="k">await</span> getOrderDetail(symbol, orderId);
+<span class="k">const</span> fillPrice = parseFloat(fillDetail?.priceAvg) || entry;
+
+<span class="c">// Validate each TP — replace any on the wrong side of fill price</span>
+<span class="k">const</span> validFor = p => isLong ? p > fillPrice * <span class="v">1.001</span> : p < fillPrice * <span class="v">0.999</span>;
+<span class="k">const</span> fixedTp1 = validFor(tp1) ? tp1 : fallback(<span class="v">1.5</span>);  <span class="c">// 1.5R</span>
+<span class="k">const</span> fixedTp2 = validFor(tp2) ? tp2 : fallback(<span class="v">2.5</span>);  <span class="c">// 2.5R</span>
+<span class="k">const</span> fixedTp3 = validFor(tp3) ? tp3 : fallback(<span class="v">4.0</span>);  <span class="c">// 4.0R</span>
+
+<span class="c">// Sequential placement — 2s between each to avoid [22002] on 2nd and 3rd</span>
+<span class="k">const</span> tp1Id = <span class="k">await</span> placeLimitClose(symbol, side, qty40, fixedTp1);
+<span class="k">await</span> <span class="k">new</span> Promise(r => setTimeout(r, <span class="v">2000</span>));
+<span class="k">const</span> tp2Id = <span class="k">await</span> placeLimitClose(symbol, side, qty35, fixedTp2);
+<span class="k">await</span> <span class="k">new</span> Promise(r => setTimeout(r, <span class="v">2000</span>));
+<span class="k">const</span> tp3Id = <span class="k">await</span> placeLimitClose(symbol, side, qty25, fixedTp3);</pre>
+  </section>
+
+  <!-- What to verify -->
+  <section>
+    <h2>What to Verify After Updating</h2>
+    <p class="sub">One check after the next trade confirms everything is working.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Check</th>
+          <th>Where to look</th>
+          <th>Expected result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>TP orders on book</td>
+          <td>Bitget Futures → Open Orders</td>
+          <td>3 pending limit orders at TP1, TP2, TP3 prices</td>
+        </tr>
+        <tr>
+          <td>Position stays open</td>
+          <td>Bitget Futures → Positions</td>
+          <td>Position visible and not immediately closed</td>
+        </tr>
+        <tr>
+          <td>Railway logs</td>
+          <td>Railway → Deployments → latest → Logs</td>
+          <td><code>✅ TP1 limit close: [orderId]</code> lines for all 3</td>
+        </tr>
+        <tr>
+          <td>Order type</td>
+          <td>Bitget → Order History after fill</td>
+          <td>Shows as <strong>Limit</strong> close, not Market or Reduce Only</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<footer>
+  Cryptolanz Ironclad v1.9 &nbsp;·&nbsp; 9 May 2026 &nbsp;·&nbsp; <a href="../cryptolanz.html" style="color:var(--blue);text-decoration:none;">cryptolanz.html</a>
+</footer>
+
+</body>
+</html>
