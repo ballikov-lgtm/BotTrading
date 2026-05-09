@@ -572,14 +572,14 @@ async function setLeverage(symbol, leverage) {
 // simulation and live trading actually comparable.
 
 async function placeLimitClose(symbol, side, qty, price) {
-  // NOTE: /close-positions is a MARKET close — do NOT use it for limit TPs.
-  // TODO: [22002] from place-order still unresolved for hedge-mode isolated positions.
-  // Using place-order for now — it fails silently (no fill) which is safer than
-  // close-positions which immediately market-closes the position.
+  // Hedge-mode isolated positions require posSide to identify which position to close.
+  // Without it, Bitget returns [22002] "No position to close" even when the position exists.
+  // Do NOT use /close-positions — that endpoint immediately market-closes (not a limit order).
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
-    side:      side === 'long' ? 'sell' : 'buy',
+    side:      side === 'long' ? 'sell' : 'buy',  // opposite of position direction
+    posSide:   side,                               // direction of the EXISTING position
     tradeSide: 'close',
     orderType: 'limit',
     price:     price.toString(),
