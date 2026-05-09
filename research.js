@@ -343,6 +343,13 @@ function readSidAccount() {
   return null;
 }
 
+function readOpenPositions() {
+  try {
+    if (!fs.existsSync('./open-positions-ironclad.json')) return [];
+    return JSON.parse(fs.readFileSync('./open-positions-ironclad.json', 'utf8'));
+  } catch { return []; }
+}
+
 // Calculate P&L for a single trade.
 // Priority order:
 //   1. Realized P&L from position monitor (locked-in — never changes)
@@ -670,7 +677,7 @@ function categoryBadge(cat) {
   return map[cat] || '📊';
 }
 
-function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
+function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositions = []) {
   const td = tradeData.today;
   const at = tradeData.allTime;
 
@@ -725,6 +732,47 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
   // ── Today's P&L colour ─────────────────────────────────────────────────────
   const todayPnlColor  = td.pnl  >= 0 ? '#3fb950' : '#f85149';
   const totalPnlColor  = at.pnl  >= 0 ? '#3fb950' : '#f85149';
+
+  // ── Live Open Positions HTML ───────────────────────────────────────────────
+  const liveOpen   = openPositions.filter(p => p.mode === 'live');
+  const paperOpen  = openPositions.filter(p => p.mode !== 'live');
+  const openPosRows = openPositions.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;color:#8b949e;padding:20px">No positions currently open</td></tr>'
+    : openPositions.map(p => {
+        const modeLabel = p.mode === 'live'
+          ? '<span style="color:#3fb950">💰 Live</span>'
+          : '<span style="color:#d29922">📄 Paper</span>';
+        const side = (p.side || '').toLowerCase() === 'long' ? '🟢 Long' : '🔴 Short';
+        const notional = p.totalUsd ? `$${parseFloat(p.totalUsd).toFixed(2)}` : '—';
+        const tp1 = p.tp1 ? `$${parseFloat(p.tp1).toFixed(4)}` : '—';
+        const tp2 = p.tp2 ? `$${parseFloat(p.tp2).toFixed(4)}` : '—';
+        const sl  = p.stopLoss ? `$${parseFloat(p.stopLoss).toFixed(4)}` : '—';
+        return `<tr>
+          <td style="color:#c9d1d9">${p.openDate || '—'}</td>
+          <td style="color:#8b949e;font-size:13px">${p.openTime || '—'}</td>
+          <td style="font-weight:600">${p.symbol}</td>
+          <td>${side}</td>
+          <td style="color:#58a6ff">$${parseFloat(p.entry || 0).toFixed(4)}</td>
+          <td style="color:#f85149;font-size:13px">${sl}</td>
+          <td style="color:#3fb950;font-size:13px">${tp1} / ${tp2}</td>
+          <td style="color:#8b949e;font-size:13px">${notional}</td>
+          <td>${modeLabel}</td>
+        </tr>`;
+      }).join('');
+
+  const openPosHtml = `
+  <h2 style="margin:32px 0 12px;font-size:16px;color:#e6edf3">📂 Live Open Positions
+    <span style="font-size:12px;font-weight:400;color:#8b949e;margin-left:8px">${liveOpen.length} live · ${paperOpen.length} paper</span>
+  </h2>
+  <table style="margin-bottom:24px;border-top:2px solid #d29922;background:rgba(210,153,34,0.05)">
+    <thead>
+      <tr style="background:rgba(210,153,34,0.12)">
+        <th>Open Date</th><th>Time</th><th>Symbol</th><th>Side</th>
+        <th>Entry</th><th>Stop Loss</th><th>TP1 / TP2</th><th>Notional</th><th>Mode</th>
+      </tr>
+    </thead>
+    <tbody>${openPosRows}</tbody>
+  </table>`;
 
   // ── Recommendations HTML ───────────────────────────────────────────────────
   const recommendationsHtml = tradeData.recommendations.length ? `
@@ -1025,6 +1073,8 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       <tbody>${td.tradeRows}</tbody>
     </table>
 
+    ${openPosHtml}
+
     ${recommendationsHtml}
 
   </div><!-- /tab-research -->
@@ -1068,6 +1118,9 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     <div class="filter-bar">
       <label>Pair</label>
       <select id="filter-pair" onchange="onFilterChange()"><option value="">All Pairs</option></select>
+
+      <label>Date</label>
+      <select id="filter-date" onchange="onFilterChange()"><option value="">All Dates</option></select>
 
       <label>Month</label>
       <select id="filter-month" onchange="onFilterChange()"><option value="">All Months</option></select>
@@ -1238,6 +1291,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     const catLabel = { crypto: '🪙 Crypto', stock: '📈 Stock', forex: '💱 Forex', commodity: '🛢️ Commodity' };
 
     populateSelect('filter-pair',     new Set(TRADES.map(t => t.symbol)));
+    populateSelect('filter-date',     [...new Set(TRADES.map(t => t.date).filter(Boolean))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
     populateSelect('filter-month',    [...new Set(TRADES.map(t => t.month))].sort().reverse().reduce((s, v) => (s.add(v), s), new Set()));
     populateSelect('filter-category', new Set(TRADES.map(t => t.category)), v => catLabel[v] || v);
     populateSelect('filter-bot',      new Set(TRADES.map(t => t.bot).filter(Boolean)));
@@ -1247,6 +1301,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     // ── Filtering logic ───────────────────────────────────────────────────────
     function getFiltered() {
       const pair     = document.getElementById('filter-pair').value;
+      const date     = document.getElementById('filter-date').value;
       const month    = document.getElementById('filter-month').value;
       const category = document.getElementById('filter-category').value;
       const bot      = document.getElementById('filter-bot').value;
@@ -1257,6 +1312,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
       // Most recent first
       return [...TRADES].reverse().filter(t => {
         if (pair     && t.symbol       !== pair)     return false;
+        if (date     && t.date         !== date)     return false;
         if (month    && t.month        !== month)    return false;
         if (category && t.category     !== category) return false;
         if (bot      && t.bot          !== bot)      return false;
@@ -1415,7 +1471,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData) {
     }
 
     function resetFilters() {
-      ['filter-pair','filter-month','filter-category','filter-bot','filter-strategy','filter-version','filter-mode']
+      ['filter-pair','filter-date','filter-month','filter-category','filter-bot','filter-strategy','filter-version','filter-mode']
         .forEach(id => { document.getElementById(id).value = ''; });
       currentPage = 1;
       renderStats(TRADES);
@@ -1488,7 +1544,9 @@ async function run() {
   const safetyLog       = readSafetyLog();
   const closedPositions = readClosedPositions();
   const sidAccount      = readSidAccount();
+  const openPositions   = readOpenPositions();
   console.log(`Closed positions loaded: ${closedPositions.size} realized P&L record(s)`);
+  console.log(`Open positions loaded: ${openPositions.length} position(s)`);
   if (sidAccount) {
     const growth = ((sidAccount.accountUsd - sidAccount.startingUsd) / sidAccount.startingUsd * 100).toFixed(2);
     console.log(`SID account: $${sidAccount.accountUsd.toFixed(2)} (${growth >= 0 ? '+' : ''}${growth}% from $${sidAccount.startingUsd})`);
@@ -1525,7 +1583,7 @@ async function run() {
 
   // Generate and save HTML dashboard
   if (!fs.existsSync('./docs')) fs.mkdirSync('./docs');
-  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeData);
+  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeData, openPositions);
   fs.writeFileSync('./docs/index.html', html);
   console.log(`\nDashboard saved to docs/index.html`);
 }
