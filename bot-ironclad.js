@@ -657,22 +657,24 @@ async function placeLimitClose(symbol, side, qty, price) {
 }
 
 // Check if a plan (trigger) order has filled by looking in plan history.
+// Query format confirmed: symbol + planType=normal_plan (no marginCoin in URL).
 // Returns 'filled' | 'pending' | 'cancelled' | 'unknown'
 async function getPlanOrderStatus(symbol, orderId) {
   try {
-    // Check pending plan orders first (faster)
+    // Check pending plan orders first (faster path)
     const pending = await bitgetRequest('GET',
-      `/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&symbol=${symbol}&marginCoin=USDT&planType=normal_plan`, null);
+      `/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&symbol=${symbol}&planType=normal_plan`, null);
     if (pending.code === '00000') {
       const list = pending.data?.entrustedList || [];
       if (list.some(o => o.orderId === orderId)) return 'pending';
     }
     // Not in pending — check history (filled or cancelled)
     const hist = await bitgetRequest('GET',
-      `/api/v2/mix/order/orders-plan-history?productType=USDT-FUTURES&symbol=${symbol}&marginCoin=USDT&planType=normal_plan&limit=50`, null);
+      `/api/v2/mix/order/orders-plan-history?productType=USDT-FUTURES&symbol=${symbol}&planType=normal_plan&limit=50`, null);
     if (hist.code === '00000') {
-      const found = (hist.data?.entrustedList || []).find(o => o.orderId === orderId);
-      if (found) return found.status === 'executed' ? 'filled' : found.status;
+      const list = hist.data?.entrustedList || [];
+      const found = list.find(o => o.orderId === orderId);
+      if (found) return found.status === 'executed' ? 'filled' : (found.status || 'cancelled');
     }
     return 'unknown';
   } catch { return 'unknown'; }
