@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz Patch v1.7 — Real TP Orders + Auto-Trail SL</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1f2d3d;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --blue:   #58a6ff;
+      --yellow: #d29922;
+      --red:    #f85149;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2744 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 48px;
+      text-align: center;
+    }
+    .version-badge {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #58a6ff, #bc8cff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1rem; max-width: 560px; margin: 0 auto 24px; }
+    .hero .meta { color: var(--muted); font-size: 13px; }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    p { color: #c9d1d9; margin-bottom: 12px; font-size: 14px; }
+
+    .change-list { display: flex; flex-direction: column; gap: 14px; }
+    .change-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .change-card.critical { border-left: 3px solid var(--red); }
+    .change-card.improve  { border-left: 3px solid var(--blue); }
+    .change-card.fix      { border-left: 3px solid var(--yellow); }
+    .change-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .change-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .change-card p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .tag-critical { background: rgba(248,81,73,0.15);  color: var(--red); }
+    .tag-improve  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-fix      { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .tag-prev     { background: rgba(139,148,158,0.15); color: var(--muted); }
+
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 20px; }
+    .step {
+      display: flex;
+      gap: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      align-items: flex-start;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .step p  { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .step p:last-child { margin: 0; }
+
+    code {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .c  { color: #8b949e; }
+    .k  { color: #79c0ff; }
+    .v  { color: #a5d6ff; }
+    .s  { color: #3fb950; }
+    .e  { color: #f85149; }
+    .g  { color: #3fb950; }
+
+    .alert {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .alert-warn  { background: rgba(210,153,34,0.1);  border: 1px solid rgba(210,153,34,0.4); color: var(--yellow); }
+    .alert-danger{ background: rgba(248,81,73,0.08);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red); }
+    .alert-ok    { background: rgba(63,185,80,0.08);  border: 1px solid rgba(63,185,80,0.3);  color: var(--green); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th {
+      background: var(--bg2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #21262d; font-size: 13px; color: #c9d1d9; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { font-family: monospace; color: var(--red); font-size: 12px; }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .nav a { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .version { font-size: 12px; color: var(--muted); }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .version-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 28px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<div class="nav">
+  <a href="../cryptolanz.html">← Back to Cryptolanz</a>
+  <span class="version">Patch v1.7 — 8 May 2026</span>
+</div>
+
+<div class="hero">
+  <div class="version-badge">🔧 Patch v1.7</div>
+  <h1>Real TP Orders + Auto-Trail SL</h1>
+  <p>Take-profit levels now fire as real limit close orders on Bitget. The stop loss trails automatically to break-even at TP1 and to TP1 price after TP2. This patch is cumulative — works from any previous version.</p>
+  <div class="meta">Released 8 May 2026 &nbsp;·&nbsp; Works from any previous version (v1.0–v1.6)</div>
+</div>
+
+<div class="container">
+
+  <!-- What changed -->
+  <section>
+    <h2>What Changed</h2>
+    <p class="sub">This patch is cumulative. Everything from v1.5 and v1.6 is included — if you're coming from an older install you only need this one page.</p>
+
+    <div class="version-group-label">New in v1.7</div>
+    <div class="change-list">
+
+      <div class="change-card improve">
+        <div class="change-icon">🎯</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Take-profit levels now place real limit close orders on Bitget</h4>
+          <p>Previously TPs were tracked internally in simulation — the bot would mark a TP as hit but never actually place an order to close the position on Bitget. v1.7 places a real limit sell (or buy for shorts) order at each TP price the moment a position opens. Bitget executes the close automatically when the price is reached.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">🔍</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>TP fill monitoring — checks order status every cycle</h4>
+          <p>Each bot cycle checks whether outstanding TP limit orders have been filled. When TP1 fills, the bot records the partial close and advances the position state. This keeps the internal tracker in sync with what Bitget has actually executed.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">🛡️</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Stop loss trails automatically after each TP hit</h4>
+          <p>After TP1 fills: SL moves to entry price (break-even — the trade cannot lose money from this point). After TP2 fills: SL moves to TP1 price (locking in partial profit on the remaining position). The bot updates the stop loss order on Bitget via the modify-order endpoint.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.6</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Ghost order prevention — failed orders no longer block daily limit</h4>
+          <p>Failed API orders were being logged to the CSV with <code>orderId: unknown</code>, counting against the daily trade limit. Fix: orders are only logged when a real <code>orderId</code> is returned by Bitget.</p>
+        </div>
+      </div>
+      <div class="change-card improve">
+        <div class="change-icon">⚡</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Leverage set inline — no separate API call, no permission error</h4>
+          <p>Leverage is now passed directly in the <code>place-order</code> body rather than via a separate <code>set-leverage</code> call that requires an extra API permission (error 40014).</p>
+        </div>
+      </div>
+      <div class="change-card fix">
+        <div class="change-icon">🔧</div>
+        <div>
+          <div class="tag tag-fix">Fix</div>
+          <h4>Margin mode on close orders — prevents error 400172</h4>
+          <p><code>marginMode</code> is now always specified on close orders to match how the position was originally opened (<code>isolated</code>). Omitting it caused error 400172; using the wrong mode caused error 22002.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.5</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Bitget API bugs fixed — orders now actually fire</h4>
+          <p>Three silent API failures blocked all live orders on v1.0–1.4: wrong endpoint casing (<code>placeOrder</code> → <code>place-order</code>), wrong side format for one-way mode, and wrong margin mode. Watchlist also expanded from 10 to 18 pairs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to apply -->
+  <section>
+    <h2>How to Apply This Patch</h2>
+    <p class="sub">Two steps — estimated time 5 minutes. No account changes required for v1.7.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div>
+          <h4>Pull the latest code from GitHub</h4>
+          <p>In your local repo folder, run:</p>
+          <pre>git pull origin main</pre>
+          <p>This brings in the updated <code>bot-ironclad.js</code> with real TP orders, fill monitoring, and auto-trail SL. No manual file editing needed.</p>
+          <div class="alert alert-ok">✅ All v1.7 changes are committed to the repo. <code>git pull</code> is all you need for the code.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Redeploy to Railway</h4>
+          <p>Trigger a redeploy so Railway picks up the new code:</p>
+          <pre>git commit --allow-empty -m "Deploy patch v1.7" &amp;&amp; git push origin main</pre>
+          <p>Or in the Railway dashboard: your service → Redeploy.</p>
+          <div class="alert alert-warn">⚠️ If you have positions already open when you deploy: the bot will attempt to place TP limit orders for them on the next cycle. Check Railway logs to confirm they placed successfully (look for "TP1 order placed" lines).</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Code reference -->
+  <section>
+    <h2>Code Reference</h2>
+    <p class="sub">Key changes in bot-ironclad.js for transparency.</p>
+
+    <h3 style="font-size:1rem;margin:0 0 8px;color:var(--text)">Real TP limit close orders at position open</h3>
+    <pre><span class="c">// Before (v1.6) — TPs tracked in simulation only, no real orders placed:</span>
+<span class="e">addOpenPosition({ id: orderId, tp1, tp2, tp3, tp1Hit: false, ... });</span>
+
+<span class="c">// After (v1.7) — real limit close orders placed immediately:</span>
+<span class="g">addOpenPosition({ id: orderId, tp1, tp2, tp3, tp1Hit: false, ... });
+
+<span class="k">async function</span> placeTpOrder(symbol, closeSide, qty, tpPrice) {
+  <span class="k">return</span> <span class="k">await</span> bitgetRequest(<span class="s">'POST'</span>, <span class="s">'/api/v2/mix/order/place-order'</span>, {
+    symbol, productType: <span class="s">'USDT-FUTURES'</span>, marginCoin: <span class="s">'USDT'</span>,
+    marginMode: <span class="s">'isolated'</span>,
+    size: qty.toString(),
+    side: closeSide,       <span class="c">// 'sell' for long, 'buy' for short</span>
+    tradeSide: <span class="s">'close'</span>,
+    orderType: <span class="s">'limit'</span>,
+    price: tpPrice.toFixed(4),
+    leverage: CONFIG.leverage.toString(),
+  });
+}</span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">TP fill monitoring — run each cycle</h3>
+    <pre><span class="c">// After (v1.7) — check TP order status each bot cycle:</span>
+<span class="g"><span class="k">async function</span> checkTpFills(pos) {
+  <span class="k">if</span> (!pos.tp1OrderId || pos.tp1Hit) <span class="k">return</span>;
+  <span class="k">const</span> r = <span class="k">await</span> bitgetRequest(<span class="s">'GET'</span>,
+    <span class="s">`/api/v2/mix/order/detail?symbol=${pos.symbol}&amp;orderId=${pos.tp1OrderId}`</span>, <span class="k">null</span>);
+  <span class="k">if</span> (r?.data?.state === <span class="s">'filled'</span>) {
+    pos.tp1Hit = <span class="k">true</span>;
+    pos.currentSL = pos.entry;   <span class="c">// trail SL to break-even</span>
+    console.log(<span class="s">`  ✅ ${pos.symbol} TP1 filled — SL moved to break-even`</span>);
+  }
+}</span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">Auto-trail SL after each TP</h3>
+    <pre><span class="c">// After (v1.7) — SL trails automatically to lock in profit:</span>
+<span class="g"><span class="k">if</span> (pos.tp1Hit &amp;&amp; !pos.tp2Hit &amp;&amp; tp2Filled) {
+  pos.tp2Hit = <span class="k">true</span>;
+  pos.currentSL = pos.tp1;  <span class="c">// lock in TP1 profit on remaining position</span>
+  <span class="k">await</span> modifyStopLoss(pos.symbol, pos.currentSL);
+}
+<span class="k">if</span> (!pos.tp1Hit &amp;&amp; tp1Filled) {
+  pos.tp1Hit = <span class="k">true</span>;
+  pos.currentSL = pos.entry; <span class="c">// break-even — cannot lose</span>
+  <span class="k">await</span> modifyStopLoss(pos.symbol, pos.currentSL);
+}</span></pre>
+
+  </section>
+
+  <!-- Error reference -->
+  <section>
+    <h2>Error Code Reference</h2>
+    <p class="sub">All known errors through v1.7.</p>
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Message</th><th>Cause</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>40404</td>
+          <td>Invalid endpoint</td>
+          <td>camelCase endpoint e.g. <code>placeOrder</code></td>
+          <td>Use kebab-case: <code>place-order</code></td>
+        </tr>
+        <tr>
+          <td>40774</td>
+          <td>Invalid side</td>
+          <td><code>side: "open_long"</code> — hedge-mode format</td>
+          <td><code>side: "buy"</code> + <code>tradeSide: "open"</code></td>
+        </tr>
+        <tr>
+          <td>22002</td>
+          <td>No position to close</td>
+          <td><code>marginMode</code> on close order doesn't match position</td>
+          <td>Always use <code>isolated</code> — match how the position was opened</td>
+        </tr>
+        <tr>
+          <td>400172</td>
+          <td>Margin mode cannot be empty</td>
+          <td><code>marginMode</code> omitted on close orders</td>
+          <td>Always specify <code>marginMode: 'isolated'</code> on close orders</td>
+        </tr>
+        <tr>
+          <td>40014</td>
+          <td>No permission</td>
+          <td>Separate <code>set-leverage</code> call requires extra permission</td>
+          <td>Pass <code>leverage</code> in order body — no separate call needed (fixed in v1.6)</td>
+        </tr>
+        <tr>
+          <td>40012</td>
+          <td>Invalid API key</td>
+          <td>Key not yet active or IP not whitelisted</td>
+          <td>Wait 60s after creation; whitelist Railway server IP</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>Daily limit reached</td>
+          <td>Ghost entries from failed orders filled the CSV limit</td>
+          <td>Fixed in v1.6. Remove any <code>unknown</code> orderId rows from CSV if present.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7">
+      ⚠️ <strong style="color:var(--text)">Disclaimer:</strong> This bot is provided for educational purposes only. Cryptocurrency futures trading involves substantial risk of loss and is not suitable for all investors. Past performance — including paper trading results and backtests — does not guarantee future results. 3× leverage amplifies both gains and losses. You may lose your entire investment. Never trade with money you cannot afford to lose. Always paper trade thoroughly before going live. This is not financial advice.
+    </p>
+  </section>
+
+</div>
+
+<footer>Cryptolanz · Patch v1.7 · Not financial advice</footer>
+
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cryptolanz Patch v1.8 — Accurate Fill Prices + Position Monitoring + Holdings Permission</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1f2d3d;
+      --border: #30363d;
+      --text:   #e6edf3;
+      --muted:  #8b949e;
+      --green:  #3fb950;
+      --blue:   #58a6ff;
+      --yellow: #d29922;
+      --red:    #f85149;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0d1117 0%, #0d2613 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 60px 20px 48px;
+      text-align: center;
+    }
+    .version-badge {
+      display: inline-block;
+      background: rgba(63,185,80,0.12);
+      border: 1px solid rgba(63,185,80,0.5);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #3fb950, #58a6ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--muted); font-size: 1rem; max-width: 600px; margin: 0 auto 24px; }
+    .hero .meta { color: var(--muted); font-size: 13px; }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 52px 0; border-bottom: 1px solid var(--border); }
+    section:last-of-type { border-bottom: none; }
+    h2 { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    p { color: #c9d1d9; margin-bottom: 12px; font-size: 14px; }
+
+    .change-list { display: flex; flex-direction: column; gap: 14px; }
+    .change-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .change-card.critical { border-left: 3px solid var(--red); }
+    .change-card.improve  { border-left: 3px solid var(--blue); }
+    .change-card.fix      { border-left: 3px solid var(--yellow); }
+    .change-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .change-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .change-card p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+    .tag-critical { background: rgba(248,81,73,0.15);  color: var(--red); }
+    .tag-improve  { background: rgba(88,166,255,0.15); color: var(--blue); }
+    .tag-fix      { background: rgba(210,153,34,0.15); color: var(--yellow); }
+
+    .steps { counter-reset: step; display: flex; flex-direction: column; gap: 20px; }
+    .step {
+      display: flex;
+      gap: 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      align-items: flex-start;
+    }
+    .step-account::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--green);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      background: var(--blue);
+      color: #0d1117;
+      font-weight: 800;
+      font-size: 13px;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .step p  { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .step p:last-child { margin: 0; }
+
+    code {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      color: var(--blue);
+    }
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      color: #e6edf3;
+    }
+    .c  { color: #8b949e; }
+    .k  { color: #79c0ff; }
+    .v  { color: #a5d6ff; }
+    .s  { color: #3fb950; }
+    .e  { color: #f85149; }
+    .g  { color: #3fb950; }
+
+    .alert {
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .alert-warn  { background: rgba(210,153,34,0.1);  border: 1px solid rgba(210,153,34,0.4); color: var(--yellow); }
+    .alert-danger{ background: rgba(248,81,73,0.08);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red); }
+    .alert-ok    { background: rgba(63,185,80,0.08);  border: 1px solid rgba(63,185,80,0.3);  color: var(--green); }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th {
+      background: var(--bg2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #21262d; font-size: 13px; color: #c9d1d9; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td:first-child { font-family: monospace; color: var(--red); font-size: 12px; }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    .nav a { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 500; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .version { font-size: 12px; color: var(--muted); }
+
+    .latest-badge {
+      display: inline-block;
+      background: rgba(63,185,80,0.12);
+      border: 1px solid rgba(63,185,80,0.4);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 20px;
+      margin-left: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .version-group-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 28px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<div class="nav">
+  <a href="../cryptolanz.html">← Back to Cryptolanz</a>
+  <span class="version">Patch v1.8 — 9 May 2026 <span class="latest-badge">Latest</span></span>
+</div>
+
+<div class="hero">
+  <div class="version-badge">✦ Latest — Patch v1.8</div>
+  <h1>Accurate Fill Prices + Position Monitoring + Holdings Fix</h1>
+  <p>Entry prices now record Bitget's actual fill price. The bot can now properly detect SL/TP closures using the Holdings API permission. Compound position sizing added for growing portfolios. This patch is cumulative — one page takes you from any previous version to v1.8.</p>
+  <div class="meta">Released 9 May 2026 &nbsp;·&nbsp; Works from any previous version (v1.0–v1.7)</div>
+</div>
+
+<div class="container">
+
+  <!-- Account change callout — most important step -->
+  <section>
+    <h2>⚠️ Required Account Change First</h2>
+    <p class="sub">This must be done before deploying the code or position monitoring will not work.</p>
+
+    <div class="alert alert-danger">
+      <strong>Bitget API key update required — enable "Holdings" permission</strong><br><br>
+      v1.8 uses the Bitget position-read endpoint to detect when your SL or TP fires. This requires a permission Bitget labels <strong>"Holdings"</strong> (not "Read" or "Trade" — those are different things). Without it the bot cannot tell when a position has closed and it will stay "open" in the tracker indefinitely.<br><br>
+      <strong>How to enable it:</strong><br>
+      1. Log in to Bitget → click your profile icon (top right) → API Management<br>
+      2. Find your existing API key → click Edit<br>
+      3. Under <strong>USDT-M Futures</strong>: tick the <strong>Holdings</strong> toggle<br>
+      4. Save. No need to regenerate the key — the change takes effect immediately.
+    </div>
+  </section>
+
+  <!-- What changed -->
+  <section>
+    <h2>What Changed</h2>
+    <p class="sub">All changes from v1.5 through v1.8 are included. If you're on any earlier version, this single patch page covers everything.</p>
+
+    <div class="version-group-label">New in v1.8</div>
+    <div class="change-list">
+
+      <div class="change-card improve">
+        <div class="change-icon">📍</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Entry prices now record Bitget's actual fill price</h4>
+          <p>Previously the bot logged the signal price (the price at the moment the signal fired) as the entry price. In practice Bitget fills market orders at a slightly different price. The bot now fetches the confirmed fill price from Bitget immediately after an order lands and records that instead. Your CSV and dashboard will now always show what you actually paid.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">🔗</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Position monitoring upgraded — Holdings permission + safe fallback</h4>
+          <p>The bot now correctly calls Bitget's all-positions endpoint using the Holdings permission. If the permission is missing (code 40014) it returns a clear sentinel value rather than silently failing, and falls back to checking pending orders — so live positions are never incorrectly closed due to a permissions gap. The audit script also now flags 40014 as a hard failure (not a warning) so it's obvious before a trading session.</p>
+        </div>
+      </div>
+
+      <div class="change-card improve">
+        <div class="change-icon">📈</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Compound position sizing — grows with your portfolio</h4>
+          <p>Position size is now calculated from the current portfolio value each run rather than the fixed <code>PORTFOLIO_USD</code> starting value. As the portfolio grows from winning trades, each new position automatically scales up proportionally. Risk per trade remains fixed at 1%.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.7</div>
+    <div class="change-list">
+      <div class="change-card improve">
+        <div class="change-icon">🎯</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Real TP limit close orders + fill monitoring + auto-trail SL</h4>
+          <p>Take-profit levels fire as real limit close orders on Bitget. The bot monitors fill status each cycle. Stop loss trails to break-even after TP1 and to TP1 price after TP2.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.6</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Ghost order prevention — failed orders no longer block the daily limit</h4>
+          <p>Failed API orders were being logged to the CSV, counting against the daily trade limit. Fixed: orders are only logged when a real <code>orderId</code> is returned.</p>
+        </div>
+      </div>
+      <div class="change-card improve">
+        <div class="change-icon">⚡</div>
+        <div>
+          <div class="tag tag-improve">Improvement</div>
+          <h4>Leverage set inline in order body — no separate API call needed</h4>
+          <p>The separate <code>set-leverage</code> API call requires an extra permission that standard futures keys don't have. Leverage is now passed directly in the <code>place-order</code> body.</p>
+        </div>
+      </div>
+      <div class="change-card fix">
+        <div class="change-icon">🔧</div>
+        <div>
+          <div class="tag tag-fix">Fix</div>
+          <h4>Margin mode on close orders — prevents errors 400172 and 22002</h4>
+          <p><code>marginMode: 'isolated'</code> is now always specified on close orders to match how positions are opened.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-group-label" style="margin-top:32px">Included from v1.5</div>
+    <div class="change-list">
+      <div class="change-card critical">
+        <div class="change-icon">🚨</div>
+        <div>
+          <div class="tag tag-critical">Critical Fix</div>
+          <h4>Bitget API bugs fixed — orders now actually fire</h4>
+          <p>Three silent API failures blocked all live orders on v1.0–v1.4: wrong endpoint casing, wrong side format for one-way mode, wrong margin mode. Watchlist expanded from 10 to 18 pairs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to apply -->
+  <section>
+    <h2>How to Apply This Patch</h2>
+    <p class="sub">Three steps — estimated time 10 minutes including the Bitget account change.</p>
+
+    <div class="steps">
+
+      <div class="step">
+        <div>
+          <h4>Enable Holdings permission on your Bitget API key</h4>
+          <p>See the red box at the top of this page for the exact steps. This is required before the code update will work correctly.</p>
+          <div class="alert alert-warn">⚠️ Do this first. If you deploy the code without enabling Holdings, the bot will log a clear warning each cycle and fall back to safe mode (never false-closing a live position) — but SL/TP detection will be limited until the permission is enabled.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Pull the latest code from GitHub</h4>
+          <p>In your local repo folder:</p>
+          <pre>git pull origin main</pre>
+          <p>This brings in the updated <code>bot-ironclad.js</code> (fill price recording, Holdings-aware position monitoring, compound sizing) and <code>audit.js</code> (40014 now flags as hard failure).</p>
+          <div class="alert alert-ok">✅ All v1.8 changes are committed to the repo. <code>git pull</code> is all you need for the code.</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h4>Redeploy to Railway</h4>
+          <p>Trigger a redeploy so Railway picks up the new code:</p>
+          <pre>git commit --allow-empty -m "Deploy patch v1.8" &amp;&amp; git push origin main</pre>
+          <p>Or in the Railway dashboard: your service → Redeploy. After the first cycle, check Railway logs for <code>✅ all-position: X positions found</code> — that confirms Holdings is working.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Code reference -->
+  <section>
+    <h2>Code Reference</h2>
+    <p class="sub">Key changes in bot-ironclad.js for transparency.</p>
+
+    <h3 style="font-size:1rem;margin:0 0 8px;color:var(--text)">Actual fill price recording after order placement</h3>
+    <pre><span class="c">// Before (v1.7) — signal price used as entry:</span>
+<span class="e">appendTrade({ entry: signalPrice, ... });</span>
+
+<span class="c">// After (v1.8) — fetch confirmed fill price from Bitget:</span>
+<span class="g"><span class="k">const</span> detail = <span class="k">await</span> bitgetRequest(<span class="s">'GET'</span>,
+  <span class="s">`/api/v2/mix/order/detail?symbol=${symbol}&amp;orderId=${orderId}`</span>, <span class="k">null</span>);
+<span class="k">const</span> fillPrice = parseFloat(detail?.data?.priceAvg) || signalPrice;
+appendTrade({ entry: fillPrice, ... });  <span class="c">// real fill price, not signal</span></span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">Position monitoring — Holdings permission + safe sentinel</h3>
+    <pre><span class="c">// After (v1.8) — clear sentinel on 40014, never returns ambiguous null:</span>
+<span class="g"><span class="k">async function</span> fetchAllBitgetPositions() {
+  <span class="k">const</span> r = <span class="k">await</span> bitgetRequest(<span class="s">'GET'</span>,
+    <span class="s">'/api/v2/mix/position/all-position?productType=USDT-FUTURES&amp;marginCoin=USDT'</span>, <span class="k">null</span>);
+  <span class="k">if</span> (r.code === <span class="s">'00000'</span>) <span class="k">return</span> r.data || [];
+  <span class="k">if</span> (r.code === <span class="s">'40014'</span>) {
+    console.log(<span class="s">'  ⚠️  Holdings permission missing — enable in Bitget API Management'</span>);
+    <span class="k">return</span> <span class="s">'NO_READ_PERMISSION'</span>;  <span class="c">// sentinel: caller knows to fall back safely</span>
+  }
+  <span class="k">return</span> <span class="k">null</span>;  <span class="c">// network / other error</span>
+}</span>
+
+<span class="c">// checkPositions() handles the sentinel — never false-closes a live position:</span>
+<span class="g"><span class="k">if</span> (bitgetAll === <span class="s">'NO_READ_PERMISSION'</span>) {
+  stillOpen.push(...livePositions);  <span class="c">// keep all open — safe default</span>
+}</span></pre>
+
+    <h3 style="font-size:1rem;margin:24px 0 8px;color:var(--text)">Compound position sizing</h3>
+    <pre><span class="c">// Before (v1.7) — fixed starting portfolio value:</span>
+<span class="e"><span class="k">const</span> risk = CONFIG.portfolioUsd * 0.01;</span>
+
+<span class="c">// After (v1.8) — current portfolio value, grows with wins:</span>
+<span class="g"><span class="k">const</span> currentPortfolio = await getCurrentPortfolioValue(); <span class="c">// sum of balance + unrealized</span>
+<span class="k">const</span> risk = currentPortfolio * 0.01;  <span class="c">// 1% of actual current value</span></span></pre>
+
+  </section>
+
+  <!-- Error reference -->
+  <section>
+    <h2>Error Code Reference</h2>
+    <p class="sub">All known errors through v1.8 — complete reference.</p>
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Message</th><th>Cause</th><th>Fix</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>40404</td>
+          <td>Invalid endpoint</td>
+          <td>camelCase endpoint e.g. <code>placeOrder</code></td>
+          <td>Use kebab-case: <code>place-order</code></td>
+        </tr>
+        <tr>
+          <td>40774</td>
+          <td>Invalid side</td>
+          <td><code>side: "open_long"</code> — hedge-mode format</td>
+          <td><code>side: "buy"</code> + <code>tradeSide: "open"</code></td>
+        </tr>
+        <tr>
+          <td>22002</td>
+          <td>No position to close</td>
+          <td><code>marginMode</code> on close order doesn't match position</td>
+          <td>Always use <code>isolated</code> — match how the position was opened</td>
+        </tr>
+        <tr>
+          <td>400172</td>
+          <td>Margin mode cannot be empty</td>
+          <td><code>marginMode</code> omitted on close orders</td>
+          <td>Always specify <code>marginMode: 'isolated'</code> on close orders</td>
+        </tr>
+        <tr>
+          <td>40014</td>
+          <td>No permission / future pos read</td>
+          <td>API key missing "Holdings" permission under USDT-M Futures</td>
+          <td>Bitget → Profile → API Management → Edit key → enable Holdings → Save</td>
+        </tr>
+        <tr>
+          <td>40012</td>
+          <td>Invalid API key</td>
+          <td>Key not yet active or IP not whitelisted</td>
+          <td>Wait 60s after creation; whitelist Railway server IP</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>Daily limit reached</td>
+          <td>Ghost entries from failed orders filled the CSV limit (pre-v1.6)</td>
+          <td>Fixed in v1.6. Remove any rows with <code>unknown</code> as orderId from CSV.</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>Wrong entry price in dashboard</td>
+          <td>Signal price used instead of fill price (pre-v1.8)</td>
+          <td>Fixed in v1.8. Existing rows can be corrected from Bitget order history export.</td>
+        </tr>
+        <tr>
+          <td>—</td>
+          <td>Position stays "open" after SL/TP fires</td>
+          <td>Holdings permission missing — bot cannot read position status from Bitget</td>
+          <td>Enable Holdings in Bitget API Management (see top of this page)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7">
+      ⚠️ <strong style="color:var(--text)">Disclaimer:</strong> This bot is provided for educational purposes only. Cryptocurrency futures trading involves substantial risk of loss and is not suitable for all investors. Past performance — including paper trading results and backtests — does not guarantee future results. 3× leverage amplifies both gains and losses. You may lose your entire investment. Never trade with money you cannot afford to lose. Always paper trade thoroughly before going live. This is not financial advice.
+    </p>
+  </section>
+
+</div>
+
+<footer>Cryptolanz · Patch v1.8 · Latest version · Not financial advice</footer>
+
+</body>
+</html>
