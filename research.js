@@ -595,22 +595,26 @@ async function fetchBitgetPairs() {
 async function fetchMarketResearch(date) {
   const prompt = `Today is ${date}. You are a financial market research analyst.
 
-Search the web RIGHT NOW for the latest posts, videos, and commentary from top traders and analysts across crypto, forex, and commodities published TODAY or in the last 24 hours.
+Search the web RIGHT NOW for the latest posts, videos, tweets, and commentary from top traders and analysts published TODAY or in the last 24 hours.
 
-Focus on these sources if available:
-- Crypto Banter (Ran Neuner and team)
-- Michael van de Poppe
-- Altcoin Daily
-- Miles Deutscher
-- Crypto Rover
-- Forex Factory
-- Bloomberg, Reuters market commentary
-- Reddit: r/CryptoCurrency, r/Forex, r/investing
-- Any other high-profile traders or analysts with significant following
+PRIMARY SOURCES — search these specifically first:
+- DegenDave / ChartHackers (YouTube, Twitter/X) — crypto swing trade picks and chart analysis
+- Crypto Banter (Ran Neuner and team) — daily altcoin calls
+- Michael van de Poppe — altcoin and macro crypto analysis
+- Miles Deutscher — altcoin narratives and emerging picks
+- Altcoin Daily — token spotlights
+- Crypto Rover — short-term trade setups
+- Bloomberg, Reuters — macro and equities commentary
+- Forex Factory — FX sentiment
+- Reddit r/CryptoCurrency, r/algotrading — community picks
 
-For each token, coin, forex pair, commodity, or stock mentioned with a clear bullish or bearish view, extract it.
+TASK 1 — DISCOVER NEW OPPORTUNITIES (most important):
+Look for any crypto token NOT in the list below that analysts are calling bullish or bearish TODAY. These are the coins we already track — anything BEYOND this list is a new discovery:
+BTC, ETH, SOL, XRP, LINK, AVAX, SUI, INJ, RENDER, TAO, VIRTUAL, HYPE, APT, JUP, ONDO, NEAR, TON, KAS.
+If DegenDave, Miles Deutscher, or any major analyst is mentioning a specific altcoin with a strong view today, include it even if it's obscure.
 
-IMPORTANT: Always include today's sentiment for these specific tokens even if not widely discussed — search for them specifically: BTC, ETH, SOL, XRP, LINK (Chainlink), HYPE (Hyperliquid), VIRTUAL, AAPL (Apple), NVDA (Nvidia), GOOGL (Alphabet/Google), XAU (Gold), UKO (Brent Crude Oil).
+TASK 2 — UPDATE EXISTING WATCHLIST:
+Include today's sentiment for each of these tokens (search specifically if needed): BTC, ETH, SOL, XRP, LINK (Chainlink), HYPE (Hyperliquid), VIRTUAL, AAPL (Apple), NVDA (Nvidia), GOOGL (Alphabet/Google), XAU (Gold), UKO (Brent Crude Oil).
 
 Return ONLY a valid JSON object in this exact format, no other text:
 {
@@ -623,7 +627,9 @@ Return ONLY a valid JSON object in this exact format, no other text:
       "signal": "bull",
       "risk": "low",
       "reason": "one sentence why",
-      "source": "who said it"
+      "source": "who said it",
+      "price_level": "key price level mentioned if any",
+      "chart_pattern": "pattern name if mentioned"
     }
   ]
 }
@@ -632,10 +638,11 @@ Rules:
 - signal must be: "bull", "bear", or "neutral"
 - risk must be: "low", "medium", or "high"
 - category must be: "crypto", "forex", "commodity", or "stock"
-- Include at least 10 tokens/pairs if possible
+- Aim for 15+ tokens/pairs — prioritise NEW discoveries over repeating watchlist items
 - Include a mix of crypto, forex, and commodities
-- Keep reason to one clear sentence
-- If sentiment is mixed, use "neutral"`;
+- Keep reason to one clear sentence citing the specific analyst or source
+- If sentiment is mixed, use "neutral"
+- price_level and chart_pattern are optional — include if mentioned, otherwise null`;
 
   const res  = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
