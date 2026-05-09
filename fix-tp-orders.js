@@ -115,40 +115,50 @@ async function getLivePositions() {
   return r.data.filter(p => parseFloat(p.total) > 0);
 }
 
-// ── Place one limit close order via place-order endpoint ──────────────────────
-// Uses place-order (NOT close-positions — that does immediate market close!).
-// Key fix: size MUST be rounded to the symbol's contract step size.
-// Fractional sizes (e.g. 53.6 for XRP where step=1) return [22002] silently.
-// Hedge-mode params: posSide identifies existing position, tradeSide='close'.
+// ── Place one plan (trigger) TP order ────────────────────────────────────────
+// Uses place-plan-order with planType=normal_plan (the ONLY endpoint that works
+// for placing pending partial close orders on Bitget hedge-mode isolated positions).
+//
+// Why NOT place-order?  Returns [22002] for ALL parameter combinations tested.
+// Why NOT close-positions? Immediately market-closes the position — not a limit order.
+//
+// Multiple plan orders CAN coexist on the same position (unlike regular limit orders).
+// When triggerPrice is hit, Bitget places a limit order at `price` to close `size` lots.
 async function placeLimitClose(symbol, side, qty, price) {
-  const tickRounded = roundToTick(price, symbol);
-  const tick = TICK[symbol] || 0.0001;
-  const pDecimals = tick < 0.001 ? 4 : tick < 0.01 ? 3 : tick < 0.1 ? 2 : 1;
-  const priceStr = tickRounded.toFixed(pDecimals);
-
   const roundedQty = roundToStep(qty, symbol);
   if (roundedQty <= 0) {
     console.log(RED(`    ❌ Size rounds to 0 for ${symbol}: ${qty} (step=${SIZE_STEP[symbol] || 0.01})`));
     return null;
   }
-  const qtyStr = sizeStr(roundedQty, symbol);
+  const step = SIZE_STEP[symbol] || 0.01;
+  const sDecimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  const qtyStr = roundedQty.toFixed(sDecimals);
+
+  // Price precision: at least 4 dp (most symbols) or more if tick requires
+  const tick = TICK[symbol] || 0.0001;
+  const pDecimals = Math.max(4, tick < 0.001 ? 4 : tick < 0.01 ? 3 : tick < 0.1 ? 2 : 1);
+  const priceStr = roundToTick(price, symbol).toFixed(pDecimals);
 
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
-    side:      side === 'long' ? 'sell' : 'buy',  // opposite of existing position
-    posSide:   side,                               // direction of the EXISTING position
-    tradeSide: 'close',
-    orderType: 'limit',
-    price:     priceStr,
-    size:      qtyStr,
+    side:         side === 'long' ? 'sell' : 'buy',  // opposite of existing position
+    posSide:      side,                               // direction of the EXISTING position
+    tradeSide:    'close',
+    planType:     'normal_plan',
+    triggerType:  'fill_price',
+    triggerPrice: priceStr,
+    price:        priceStr,
+    orderType:    'limit',
+    size:         qtyStr,
   };
   console.log(YELLOW(`    Sending: ${JSON.stringify(body)}`));
-  const r = await bitgetReq('POST', '/api/v2/mix/order/place-order', body);
+  const r = await bitgetReq('POST', '/api/v2/mix/order/place-plan-order', body);
   if (r.code !== '00000') {
-    console.log(RED(`    ❌ Limit close FAILED @ $${priceStr}: [${r.code}] ${r.msg}`));
+    console.log(RED(`    ❌ Plan TP FAILED @ $${priceStr}: [${r.code}] ${r.msg}`));
     return null;
   }
+  console.log(GREEN(`    ✅ Plan TP placed @ $${priceStr}: orderId=${r.data?.orderId}`));
   return r.data?.orderId || null;
 }
 
@@ -240,14 +250,11 @@ async function main() {
 
     console.log(`  Placing: ${sizeStr(qty40, pos.symbol)}@$${pos.tp1} / ${sizeStr(qty35, pos.symbol)}@$${pos.tp2} / ${sizeStr(qty25, pos.symbol)}@$${pos.tp3}`);
 
-    // Bitget only allows ONE pending close order per position at a time (hedge-mode rule).
-    // TP1 is placed here. TP2 will be placed automatically by the bot's monitoring loop
-    // when TP1 fills, and TP3 when TP2 fills. Attempts for TP2/TP3 below will likely
-    // return [22002] while TP1 is pending — that is expected, not a bug.
+    // Plan orders support multiple pending at once — place all 3 TPs together.
     const tp1Id = await placeLimitClose(pos.symbol, pos.side, qty40, pos.tp1);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 600));
     const tp2Id = await placeLimitClose(pos.symbol, pos.side, qty35, pos.tp2);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 600));
     const tp3Id = await placeLimitClose(pos.symbol, pos.side, qty25, pos.tp3);
 
     pos.tp1OrderId = tp1Id || null;

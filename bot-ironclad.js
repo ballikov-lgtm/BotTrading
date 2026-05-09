@@ -610,11 +610,21 @@ async function setLeverage(symbol, leverage) {
 // simulation and live trading actually comparable.
 
 async function placeLimitClose(symbol, side, qty, price) {
-  // Hedge-mode: posSide = direction of EXISTING position, side = opposite (the order direction).
+  // Uses place-plan-order (trigger/plan order) — the only Bitget v2 endpoint that
+  // successfully places pending partial close orders on hedge-mode isolated positions.
+  //
+  // Why not place-order?
+  //   place-order returns [22002] for all parameter combinations tested. Root cause unknown
+  //   but may be an API quirk for hedge+isolated positions. Plan orders bypass this.
+  //
+  // Why not close-positions?
+  //   close-positions immediately market-closes the entire position — it is NOT a limit order.
+  //
+  // Plan order behaviour:
+  //   When triggerPrice is reached, Bitget places a limit order at `price` to close `size`
+  //   contracts. Multiple plan orders can coexist on the same position (no 1-at-a-time limit).
+  //
   // CRITICAL: qty must be floored to the symbol's contract step size.
-  //   XRP step=1: sending 53.6 → [22002]. Sending 53 → success.
-  //   RENDER step=0.1: sending 37.48 → [22002]. Sending 37.4 → success.
-  // Do NOT use /close-positions — that endpoint immediately market-closes at current price.
   const roundedQty = floorToStep(qty, symbol);
   if (roundedQty <= 0) {
     console.log(`  ⚠️  ${symbol} close size rounds to 0 (raw ${qty}, step ${SIZE_STEP[symbol] || 0.01}) — skipping`);
@@ -622,24 +632,50 @@ async function placeLimitClose(symbol, side, qty, price) {
   }
   const step = SIZE_STEP[symbol] || 0.01;
   const sDecimals = step < 0.001 ? 4 : step < 0.01 ? 3 : step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  const priceStr = price.toFixed(sDecimals < 4 ? 4 : sDecimals);  // at least 4dp for price
 
   const body = {
     symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT',
     marginMode: 'isolated',
-    side:      side === 'long' ? 'sell' : 'buy',  // opposite of position direction
-    posSide:   side,                               // direction of the EXISTING position
-    tradeSide: 'close',
-    orderType: 'limit',
-    price:     price.toString(),
-    size:      roundedQty.toFixed(sDecimals),
+    side:         side === 'long' ? 'sell' : 'buy',  // opposite of position direction
+    posSide:      side,                               // direction of the EXISTING position
+    tradeSide:    'close',
+    planType:     'normal_plan',
+    triggerType:  'fill_price',
+    triggerPrice: priceStr,
+    price:        priceStr,
+    orderType:    'limit',
+    size:         roundedQty.toFixed(sDecimals),
   };
-  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-order', body);
+  const r = await bitgetRequest('POST', '/api/v2/mix/order/place-plan-order', body);
   if (r.code !== '00000') {
-    console.log(`  ⚠️  Limit close FAILED @ $${price}: code=${r.code} msg="${r.msg}"`);
+    console.log(`  ⚠️  Plan TP FAILED @ $${priceStr}: code=${r.code} msg="${r.msg}"`);
     console.log(`     Body: ${JSON.stringify(body)}`);
     return null;
   }
   return r.data?.orderId || null;
+}
+
+// Check if a plan (trigger) order has filled by looking in plan history.
+// Returns 'filled' | 'pending' | 'cancelled' | 'unknown'
+async function getPlanOrderStatus(symbol, orderId) {
+  try {
+    // Check pending plan orders first (faster)
+    const pending = await bitgetRequest('GET',
+      `/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&symbol=${symbol}&marginCoin=USDT&planType=normal_plan`, null);
+    if (pending.code === '00000') {
+      const list = pending.data?.entrustedList || [];
+      if (list.some(o => o.orderId === orderId)) return 'pending';
+    }
+    // Not in pending — check history (filled or cancelled)
+    const hist = await bitgetRequest('GET',
+      `/api/v2/mix/order/orders-plan-history?productType=USDT-FUTURES&symbol=${symbol}&marginCoin=USDT&planType=normal_plan&limit=50`, null);
+    if (hist.code === '00000') {
+      const found = (hist.data?.entrustedList || []).find(o => o.orderId === orderId);
+      if (found) return found.status === 'executed' ? 'filled' : found.status;
+    }
+    return 'unknown';
+  } catch { return 'unknown'; }
 }
 
 async function getOrderDetail(symbol, orderId) {
@@ -1128,9 +1164,9 @@ async function checkPositions() {
 
             // ── TP1 fill check ─────────────────────────────────────────────────
             if (!updated.tp1Hit && updated.tp1OrderId) {
-              const detail = await getOrderDetail(symbol, updated.tp1OrderId);
-              if (detail?.state === 'filled' || detail?.status === 'filled') {
-                const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp1);
+              const status = await getPlanOrderStatus(symbol, updated.tp1OrderId);
+              if (status === 'filled') {
+                const fillPrice = pos.tp1; // plan order executes at trigger price
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
                   (fillPrice - pos.entry) * (pos.qty * 0.40);
                 const partials  = [...(updated.partialCloses || []),
@@ -1140,20 +1176,8 @@ async function checkPositions() {
                 updated = { ...updated, tp1Hit: true, currentSl: pos.entry, partialCloses: partials };
                 // Move the exchange SL to break-even
                 await setPositionSL(symbol, holdSide, pos.entry);
-
-                // TP1 just cleared — Bitget now allows a new pending close order.
-                // Place TP2 immediately (was blocked while TP1 was pending).
-                if (!updated.tp2OrderId && updated.tp2) {
-                  const qty35 = floorToStep(pos.qty * 0.35, symbol);
-                  if (qty35 > 0) {
-                    console.log(`  📋 ${symbol} placing TP2 now that TP1 slot freed…`);
-                    const tp2Id = await placeLimitClose(symbol, pos.side, qty35, pos.tp2);
-                    if (tp2Id) {
-                      console.log(`  ✅ ${symbol} TP2 order placed: ${tp2Id}`);
-                      updated.tp2OrderId = tp2Id;
-                    }
-                  }
-                }
+                // Plan orders support multiple pending at once — TP2/TP3 are already placed.
+                // (No need to place TP2 here; it was already placed alongside TP1.)
               }
             } else if (!updated.tp1Hit && !updated.tp1OrderId && updated.tp1) {
               // TP1 was never placed (initial placement failed) — try again now.
@@ -1168,11 +1192,12 @@ async function checkPositions() {
               }
             }
 
-            // ── TP2 fill check (only after TP1 confirmed) ──────────────────────
-            if (updated.tp1Hit && !updated.tp2Hit && updated.tp2OrderId) {
-              const detail = await getOrderDetail(symbol, updated.tp2OrderId);
-              if (detail?.state === 'filled' || detail?.status === 'filled') {
-                const fillPrice = parseFloat(detail.priceAvg || detail.fillPrice || pos.tp2);
+            // ── TP2 fill check ─────────────────────────────────────────────────
+            // Plan orders can all be pending simultaneously, so check TP2 independently.
+            if (!updated.tp2Hit && updated.tp2OrderId) {
+              const status = await getPlanOrderStatus(symbol, updated.tp2OrderId);
+              if (status === 'filled') {
+                const fillPrice = pos.tp2;
                 const pnlPart   = (pos.side === 'long' ? 1 : -1) *
                   (fillPrice - pos.entry) * (pos.qty * 0.35);
                 const partials  = [...(updated.partialCloses || []),
@@ -1182,19 +1207,14 @@ async function checkPositions() {
                 updated = { ...updated, tp2Hit: true, currentSl: pos.tp1, partialCloses: partials };
                 // Trail the exchange SL to TP1 price (locks in profit on remaining 25%)
                 await setPositionSL(symbol, holdSide, pos.tp1);
-
-                // TP2 just cleared — place TP3 immediately.
-                if (!updated.tp3OrderId && updated.tp3) {
-                  const qty25 = floorToStep(pos.qty * 0.25, symbol);
-                  if (qty25 > 0) {
-                    console.log(`  📋 ${symbol} placing TP3 now that TP2 slot freed…`);
-                    const tp3Id = await placeLimitClose(symbol, pos.side, qty25, pos.tp3);
-                    if (tp3Id) {
-                      console.log(`  ✅ ${symbol} TP3 order placed: ${tp3Id}`);
-                      updated.tp3OrderId = tp3Id;
-                    }
-                  }
-                }
+              }
+            } else if (!updated.tp2Hit && !updated.tp2OrderId && updated.tp2) {
+              // TP2 missing — try to place
+              console.log(`  🔄 ${symbol} TP2 missing — attempting placement…`);
+              const qty35 = floorToStep(pos.qty * 0.35, symbol);
+              if (qty35 > 0) {
+                const tp2Id = await placeLimitClose(symbol, pos.side, qty35, pos.tp2);
+                if (tp2Id) { updated.tp2OrderId = tp2Id; console.log(`  ✅ ${symbol} TP2 placed: ${tp2Id}`); }
               }
             }
 
