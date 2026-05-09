@@ -627,15 +627,38 @@ async function fetchAllBitgetPositions() {
   try {
     const result = await bitgetRequest('GET',
       '/api/v2/mix/position/all-position?productType=USDT-FUTURES&marginCoin=USDT', null);
-    if (result.code !== '00000') {
-      console.log(`  ⚠️  all-position: code=${result.code} msg="${result.msg}"`);
-      return null; // null = API error — do NOT assume positions are closed
+    if (result.code === '00000') return result.data || [];
+    if (result.code === '40014') {
+      // Read permission not enabled on this API key. Trade permission (for orders) is a
+      // separate toggle from Read (for positions/balances) in Bitget API Management.
+      // Without Read, the bot cannot detect when Bitget's SL/TP closes a live position.
+      console.log('  ⚠️  all-position returned code 40014 — API key missing "Read" permission');
+      console.log('      → Bitget app → Profile → API Management → Edit key → tick "Read" → Save');
+      console.log('      → Until fixed, SL/TP auto-detection is limited (positions stay open in tracker)');
+      return 'NO_READ_PERMISSION'; // Sentinel — triggers TPSL fallback in checkPositions
     }
-    return result.data || [];
+    console.log(`  ⚠️  all-position: code=${result.code} msg="${result.msg}"`);
+    return null; // null = unexpected error — don't touch live positions this run
   } catch (e) {
     console.log(`  ⚠️  fetchAllBitgetPositions: ${e.message}`);
     return null;
   }
+}
+
+// Partial fallback when Read permission is unavailable: check for any pending
+// limit-close orders (TP1/TP2/TP3) on the symbol via orders-pending endpoint
+// (Trade permission only). Returns true if any such orders exist, null if the
+// call fails, false if the call succeeded but no pending orders found.
+// NOTE: a position can be open with no pending orders (if TP orders were never
+// placed or if only a position-level SL is set), so false is inconclusive.
+async function fetchPendingOrders(symbol) {
+  try {
+    const r = await bitgetRequest('GET',
+      `/api/v2/mix/order/orders-pending?productType=USDT-FUTURES&symbol=${symbol}&marginCoin=USDT`, null);
+    if (r.code !== '00000') return null;
+    const list = r.data?.entrustedList;
+    return Array.isArray(list) && list.length > 0;
+  } catch { return null; }
 }
 
 async function fetchBitgetPositionHistory(symbol) {
@@ -969,6 +992,27 @@ async function checkPositions() {
       // API unreachable — don't touch live positions this run to avoid false closures
       console.log('  ⚠️  Bitget API unavailable — live positions unchanged this run');
       stillOpen.push(...livePos);
+    } else if (bitgetAll === 'NO_READ_PERMISSION') {
+      // "future pos read" permission not enabled on this API key (Bitget code 40014).
+      // Without Read, position status cannot be determined reliably.
+      // Fallback: orders-pending (Trade permission) can confirm a position is open
+      // IF it has pending limit-close TP orders. If not, we stay defensive.
+      const bySymbol = {};
+      for (const pos of livePos) {
+        (bySymbol[pos.symbol] = bySymbol[pos.symbol] || []).push(pos);
+      }
+      for (const [symbol, group] of Object.entries(bySymbol)) {
+        const hasPending = await fetchPendingOrders(symbol);
+        if (hasPending === true) {
+          console.log(`  ⏳ ${symbol} LIVE — pending limit-close order(s) found → position active on Bitget`);
+        } else {
+          // No pending orders ≠ position closed — could just mean TP orders weren't placed.
+          // Keep open defensively. Fix: enable "Read" on the API key.
+          console.log(`  ⚠️  ${symbol} LIVE — cannot verify position status (no "Read" permission)`);
+          console.log('         → Bitget → Profile → API Management → Edit key → enable Read → Save');
+        }
+        stillOpen.push(...group); // Always keep open without Read (never false-close a live trade)
+      }
     } else {
       // Normalise Bitget symbol names (strip _UMCBL suffix if present)
       const bitgetBySymbol = {};
