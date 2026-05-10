@@ -129,8 +129,8 @@ function startRecording() {
   try { fs.unlinkSync(STOP_FILE); } catch {}
 
   // Write the PowerShell recording script to a temp file
-  const wavEscaped  = WAV_FILE.replace(/\\/g, '\\\\');
-  const stopEscaped = STOP_FILE.replace(/\\/g, '\\\\');
+  const wavEscaped  = WAV_FILE.replace(/\\/g, '/');   // forward slashes work in PowerShell
+  const stopEscaped = STOP_FILE.replace(/\\/g, '/');
 
   const ps1 = `
 Add-Type -TypeDefinition @"
@@ -140,12 +140,12 @@ public class MCI {
     public static extern int mciSendString(string cmd, System.Text.StringBuilder ret, int retLen, System.IntPtr hwnd);
 }
 "@
-[MCI]::mciSendString("open new Type waveaudio Alias rec", `$null, 0, [IntPtr]::Zero)
-[MCI]::mciSendString("record rec", `$null, 0, [IntPtr]::Zero)
+[MCI]::mciSendString("open new Type waveaudio Alias rec", $null, 0, [IntPtr]::Zero)
+[MCI]::mciSendString("record rec", $null, 0, [IntPtr]::Zero)
 while (-not (Test-Path "${stopEscaped}")) { Start-Sleep -Milliseconds 100 }
-[MCI]::mciSendString("stop rec", `$null, 0, [IntPtr]::Zero)
-[MCI]::mciSendString("save rec ${wavEscaped}", `$null, 0, [IntPtr]::Zero)
-[MCI]::mciSendString("close rec", `$null, 0, [IntPtr]::Zero)
+[MCI]::mciSendString("stop rec", $null, 0, [IntPtr]::Zero)
+[MCI]::mciSendString("save rec ${wavEscaped}", $null, 0, [IntPtr]::Zero)
+[MCI]::mciSendString("close rec", $null, 0, [IntPtr]::Zero)
 `.trim();
 
   fs.writeFileSync(PS1_FILE, ps1, 'utf-8');
@@ -163,7 +163,8 @@ function stopRecording(proc) {
 }
 
 // ── Whisper Speech-to-Text (local, free, via Python) ─────────────────────────
-const TRANSCRIBE_PY = path.join(path.dirname(new URL(import.meta.url).pathname.slice(1)), 'transcribe.py');
+import { fileURLToPath } from 'url';
+const TRANSCRIBE_PY = path.join(path.dirname(fileURLToPath(import.meta.url)), 'transcribe.py');
 
 function transcribe(wavFile) {
   // First run downloads the Whisper model (~145MB) — takes a minute, one-time only
@@ -172,7 +173,7 @@ function transcribe(wavFile) {
     timeout: 60000,  // 60s — first run needs time to download the model
   });
   if (result.status !== 0) {
-    throw new Error(`Whisper error: ${(result.stderr || '').slice(0, 200)}`);
+    throw new Error(`Whisper error: ${result.stderr || result.error?.message || 'unknown'}`);
   }
   return (result.stdout || '').trim();
 }

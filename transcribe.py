@@ -13,6 +13,17 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 wav_file = sys.argv[1]
-model    = whisper.load_model("base")
-result   = model.transcribe(wav_file, fp16=False)  # fp16=False needed on Windows CPU
+
+import os
+if not os.path.exists(wav_file):
+    print(f"ERROR: WAV file not found: {wav_file}", file=sys.stderr)
+    sys.exit(1)
+
+file_size = os.path.getsize(wav_file)
+if file_size < 100:
+    print(f"ERROR: WAV file is empty or too small ({file_size} bytes) — recording may have failed", file=sys.stderr)
+    sys.exit(1)
+
+model  = whisper.load_model("base")
+result = model.transcribe(wav_file, fp16=False)
 print(result["text"].strip())
