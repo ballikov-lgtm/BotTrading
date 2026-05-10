@@ -278,7 +278,7 @@ function readTrades() {
   // Read all three bots' trade logs and merge into a single chronological list
   const vwapRows     = parseCSV('./trades.csv').map(r => mapTradeRow(r, 'VWAP Scalper'));
   const ironcladRows = parseCSV('./trades-ironclad.csv').map(r => mapTradeRow(r, 'Ironclad'));
-  const sidRows      = parseCSV('./trades-sid.csv').map(r => mapTradeRow(r, 'SID'));
+  const sidRows      = parseCSV('./SID/trades-sid.csv').map(r => mapTradeRow(r, 'SID'));
 
   return [...vwapRows, ...ironcladRows, ...sidRows].sort((a, b) => {
     const ta = `${a.date}T${a.time || '00:00:00'}`;
@@ -319,7 +319,7 @@ function readClosedPositions() {
   const files = [
     './closed-positions-vwap.json',
     './closed-positions-ironclad.json',
-    './closed-positions-sid.json',
+    './SID/closed-positions-sid.json',
   ];
   for (const file of files) {
     try {
@@ -336,8 +336,8 @@ function readClosedPositions() {
 // Read SID account state for dashboard display
 function readSidAccount() {
   try {
-    if (fs.existsSync('./sid-account.json')) {
-      return JSON.parse(fs.readFileSync('./sid-account.json', 'utf8'));
+    if (fs.existsSync('./SID/sid-account.json')) {
+      return JSON.parse(fs.readFileSync('./SID/sid-account.json', 'utf8'));
     }
   } catch {}
   return null;
