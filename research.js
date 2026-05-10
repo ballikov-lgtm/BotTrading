@@ -1126,6 +1126,17 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
     <!-- Filter bar -->
     <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Trade Log</h3>
 
+    <!-- Data freshness notice -->
+    <div style="display:flex;align-items:flex-start;gap:12px;background:#161b22;border:1px solid #d29922;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+      <span style="font-size:18px;flex-shrink:0">⏱️</span>
+      <div style="font-size:13px;color:#c9d1d9;line-height:1.6">
+        <strong style="color:#d29922">Data update schedule:</strong>
+        This trade log refreshes automatically at <strong>9:00 am</strong> and <strong>6:00 pm UK time</strong> (8am / 5pm UTC).
+        Live positions show the <em>current market price</em> until the position closes — at which point the actual exit price and realised P&amp;L replace it within one 15-minute bot cycle.
+        <span style="color:#8b949e">If a trade shows a live price rather than an exit level, it either closed very recently or is still open on the exchange.</span>
+      </div>
+    </div>
+
     <div class="filter-bar">
       <label>Pair</label>
       <select id="filter-pair" onchange="onFilterChange()"><option value="">All Pairs</option></select>
