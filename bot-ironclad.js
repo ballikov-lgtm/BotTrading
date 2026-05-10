@@ -680,6 +680,33 @@ async function getPlanOrderStatus(symbol, orderId) {
   } catch { return 'unknown'; }
 }
 
+// Cancel all pending plan (trigger) TP orders for a symbol.
+// Called whenever a position is detected as closed — prevents stale TP orders
+// from sitting on the exchange and interfering with the next entry on the same symbol.
+async function cancelAllPlanOrders(symbol) {
+  try {
+    const r = await bitgetRequest('GET',
+      `/api/v2/mix/order/orders-plan-pending?productType=USDT-FUTURES&symbol=${symbol}&planType=normal_plan`, null);
+    if (r.code !== '00000') return;
+    const orders = r.data?.entrustedList || [];
+    if (!orders.length) return;
+    console.log(`  🧹 ${symbol} — cancelling ${orders.length} stale plan order(s)…`);
+    for (const o of orders) {
+      const cr = await bitgetRequest('POST', '/api/v2/mix/order/cancel-plan-order', {
+        symbol, productType: 'USDT-FUTURES', marginCoin: 'USDT', orderId: o.orderId,
+      });
+      if (cr.code === '00000') {
+        console.log(`     Cancelled plan order @ trigger $${o.triggerPrice} (${o.size} contracts)`);
+      } else {
+        console.log(`     Cancel failed for ${o.orderId}: ${cr.code} ${cr.msg}`);
+      }
+      await new Promise(res => setTimeout(res, 200));
+    }
+  } catch (e) {
+    console.log(`  ⚠️  cancelAllPlanOrders(${symbol}): ${e.message}`);
+  }
+}
+
 async function getOrderDetail(symbol, orderId) {
   try {
     const r = await bitgetRequest('GET',
@@ -1225,7 +1252,10 @@ async function checkPositions() {
           stillOpen.push(...updatedGroup);
 
         } else {
-          // Gone from Bitget — closed by SL, TP, or manual close
+          // Gone from Bitget — closed by SL, TP, or manual close.
+          // Cancel any stale plan (TP) orders immediately so they don't persist
+          // into the next entry on the same symbol with wrong price targets.
+          await cancelAllPlanOrders(symbol);
           console.log(`  🔍 ${symbol} — no longer open on Bitget, fetching history…`);
           const history = await fetchBitgetPositionHistory(symbol);
 
