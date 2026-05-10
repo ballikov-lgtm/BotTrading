@@ -275,8 +275,10 @@ async function fetchCandles(symbol, timeframe, limit = 100) {
   const res  = await fetch(url);
   const json = await res.json();
   if (!Array.isArray(json.data)) throw new Error(`No candle data for ${symbol} ${timeframe}: ${JSON.stringify(json)}`);
-  // BitGet returns newest first — reverse to chronological
-  return json.data.reverse().map(c => ({
+  // BitGet returns candles ASCENDING (oldest first) — no reverse needed.
+  // Previous .reverse() was wrong and caused swing detection to look at the
+  // oldest swings in history instead of the most recent ones.
+  return json.data.map(c => ({
     time:   parseInt(c[0]),
     open:   parseFloat(c[1]),
     high:   parseFloat(c[2]),
