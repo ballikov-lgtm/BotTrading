@@ -1,0 +1,236 @@
+// ════════════════════════════════════════════════════════════════════════════
+// Ironclad Multi-Timeframe Swing Strategy
+// ════════════════════════════════════════════════════════════════════════════
+// Replicates bot-ironclad.js v2.0 entry logic exactly:
+//
+//  HTF trend  (default: Daily)
+//    — BULL: 2 consecutive higher swing highs + higher swing lows on HTF
+//    — BEAR: 2 consecutive lower swing highs + lower swing lows on HTF
+//
+//  LTF entry  (run on 15m chart)
+//    — LONG : HTF bull + 2nd higher low + swing HIGH between the two lows
+//              + price breaks ABOVE the SL2 candle's high
+//    — SHORT: HTF bear + 2nd lower high + swing LOW between the two highs
+//              + price breaks BELOW the SH2 candle's low
+//
+//  SL : above/below the swing point + 0.5 × ATR buffer
+//  TP : 1.5 × risk (configurable)
+//
+// Usage: open on 15m chart, set HTF to D (default)
+// ════════════════════════════════════════════════════════════════════════════
+//@version=5
+indicator("Ironclad MTF Swing", overlay=true,
+          max_labels_count=500, max_lines_count=500, max_bars_back=500)
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+grpS = "Strategy"
+i_lb      = input.int   (2,    "Swing Lookback (bars each side)", minval=1, maxval=5, group=grpS)
+i_maxBars = input.int   (12,   "Entry Window — bars from last swing",       group=grpS)
+i_htfTF   = input.timeframe("D", "HTF Trend Timeframe",                    group=grpS)
+i_atrBuf  = input.float (0.5,  "SL ATR Buffer",  step=0.1,                 group=grpS)
+i_rr      = input.float (1.5,  "Min R:R for TP", step=0.1,                 group=grpS)
+
+grpD = "Display"
+i_showBG   = input.bool(true,  "Trend background",        group=grpD)
+i_showSwgs = input.bool(true,  "LTF swing markers",       group=grpD)
+i_showSLTP = input.bool(true,  "SL / TP lines on entry",  group=grpD)
+i_showTbl  = input.bool(true,  "Info table",              group=grpD)
+
+// ─── Sufficient historical lookback for indexed series access ─────────────────
+max_bars_back(low,  500)
+max_bars_back(high, 500)
+
+// ─── ATR ─────────────────────────────────────────────────────────────────────
+atr = ta.atr(14)
+
+// ════════════════════════════════════════════════════════════════════════════
+// HTF TREND DETECTION
+// ════════════════════════════════════════════════════════════════════════════
+// ta.pivothigh/low are confirmed `i_lb` bars AFTER the pivot bar, so
+// lookahead=off is safe — we never see future data.
+[htfPH, htfPL] = request.security(syminfo.tickerid, i_htfTF,
+    [ta.pivothigh(high, i_lb, i_lb), ta.pivotlow(low, i_lb, i_lb)],
+    lookahead=barmerge.lookahead_off)
+
+var htfSH = array.new_float(0)   // rolling list of HTF swing highs (oldest→newest)
+var htfSL = array.new_float(0)
+
+if not na(htfPH)
+    array.push(htfSH, htfPH)
+    if array.size(htfSH) > 5
+        array.shift(htfSH)
+
+if not na(htfPL)
+    array.push(htfSL, htfPL)
+    if array.size(htfSL) > 5
+        array.shift(htfSL)
+
+// Returns true if the last two values in arr are rising (or falling)
+f_rising(arr)  =>
+    sz = array.size(arr)
+    sz >= 2 and array.get(arr, sz - 1) > array.get(arr, sz - 2)
+
+f_falling(arr) =>
+    sz = array.size(arr)
+    sz >= 2 and array.get(arr, sz - 1) < array.get(arr, sz - 2)
+
+htfBull = f_rising(htfSH)  and f_rising(htfSL)
+htfBear = f_falling(htfSH) and f_falling(htfSL)
+
+// ════════════════════════════════════════════════════════════════════════════
+// LTF SWING DETECTION
+// ════════════════════════════════════════════════════════════════════════════
+ph = ta.pivothigh(high, i_lb, i_lb)   // pivot high confirmed; occurred i_lb bars ago
+pl = ta.pivotlow (low,  i_lb, i_lb)
+
+// Rolling arrays: price value + absolute bar index of each swing
+var shP = array.new_float(0)
+var shB = array.new_int  (0)
+var slP = array.new_float(0)
+var slB = array.new_int  (0)
+
+if not na(ph)
+    array.push(shP, ph)
+    array.push(shB, bar_index - i_lb)   // bar where pivot actually sits
+    if array.size(shP) > 20
+        array.shift(shP)
+        array.shift(shB)
+
+if not na(pl)
+    array.push(slP, pl)
+    array.push(slB, bar_index - i_lb)
+    if array.size(slP) > 20
+        array.shift(slP)
+        array.shift(slB)
+
+// True if any bar in barArr falls strictly between loBar and hiBar
+f_anyBetween(barArr, loBar, hiBar) =>
+    found = false
+    sz = array.size(barArr)
+    for i = 0 to sz - 1
+        b = array.get(barArr, i)
+        if b > loBar and b < hiBar
+            found := true
+    found
+
+// ════════════════════════════════════════════════════════════════════════════
+// ENTRY LOGIC
+// ════════════════════════════════════════════════════════════════════════════
+shN = array.size(shP)
+slN = array.size(slP)
+
+// ─── Short ───────────────────────────────────────────────────────────────────
+shortEntry = false
+shortSL    = float(na)
+shortTP    = float(na)
+
+if htfBear and shN >= 2
+    sh1P     = array.get(shP, shN - 2)
+    sh2P     = array.get(shP, shN - 1)
+    sh1B     = array.get(shB, shN - 2)
+    sh2B     = array.get(shB, shN - 1)
+    barsAgo  = bar_index - sh2B
+
+    isLH        = sh2P < sh1P                              // lower high ✓
+    isRecent    = barsAgo <= i_maxBars                     // within entry window ✓
+    hasPullback = f_anyBetween(slB, sh1B, sh2B)           // swing low confirmed between ✓
+    sh2Low      = barsAgo >= 0 and barsAgo < 500 ? low [barsAgo] : float(na)
+    isBreakdown = not na(sh2Low) and close < sh2Low        // price broke below SH2 candle ✓
+
+    if isLH and isRecent and hasPullback and isBreakdown
+        riskPts    = math.max(sh2P + atr * i_atrBuf - close, close * 0.003)
+        shortEntry := true
+        shortSL    := close + riskPts
+        shortTP    := close - riskPts * i_rr
+
+// ─── Long ────────────────────────────────────────────────────────────────────
+longEntry = false
+longSL    = float(na)
+longTP    = float(na)
+
+if htfBull and slN >= 2
+    sl1P     = array.get(slP, slN - 2)
+    sl2P     = array.get(slP, slN - 1)
+    sl1B     = array.get(slB, slN - 2)
+    sl2B     = array.get(slB, slN - 1)
+    barsAgo  = bar_index - sl2B
+
+    isHL        = sl2P > sl1P
+    isRecent    = barsAgo <= i_maxBars
+    hasPullback = f_anyBetween(shB, sl1B, sl2B)
+    sl2High     = barsAgo >= 0 and barsAgo < 500 ? high[barsAgo] : float(na)
+    isBreakout  = not na(sl2High) and close > sl2High
+
+    if isHL and isRecent and hasPullback and isBreakout
+        riskPts   = math.max(close - (sl2P - atr * i_atrBuf), close * 0.003)
+        longEntry := true
+        longSL    := close - riskPts
+        longTP    := close + riskPts * i_rr
+
+// ─── Rising-edge dedup: only signal on the first bar conditions turn true ────
+shortPlot = shortEntry and not shortEntry[1]
+longPlot  = longEntry  and not longEntry[1]
+
+// ════════════════════════════════════════════════════════════════════════════
+// VISUALS
+// ════════════════════════════════════════════════════════════════════════════
+
+// Background tint (subtle)
+bgcolor(i_showBG and htfBull ? color.new(color.green, 93) : na, title="Bull bg")
+bgcolor(i_showBG and htfBear ? color.new(color.red,   93) : na, title="Bear bg")
+
+// LTF swing markers (offset to the pivot bar, not the confirmation bar)
+plotshape(i_showSwgs and not na(ph), "Swing High ▽",
+    shape.triangledown, location.abovebar,
+    color.new(color.red,  20), offset=-i_lb, size=size.tiny)
+plotshape(i_showSwgs and not na(pl), "Swing Low △",
+    shape.triangleup,   location.belowbar,
+    color.new(color.teal, 20), offset=-i_lb, size=size.tiny)
+
+// Entry labels
+plotshape(longPlot,  "▲ LONG",  shape.labelup,   location.belowbar,
+    color.new(color.lime, 0), text="▲ L", textcolor=color.black, size=size.normal)
+plotshape(shortPlot, "▼ SHORT", shape.labeldown, location.abovebar,
+    color.new(color.red,  0), text="▼ S", textcolor=color.white, size=size.normal)
+
+// SL / TP dashed lines
+if shortPlot and i_showSLTP
+    line.new(bar_index, shortSL, bar_index + 40, shortSL,
+             color=color.new(color.red,   50), style=line.style_dashed, width=1)
+    line.new(bar_index, shortTP, bar_index + 40, shortTP,
+             color=color.new(color.green, 50), style=line.style_dashed, width=1)
+    label.new(bar_index + 2, shortSL, "SL  " + str.tostring(shortSL, format.mintick),
+              style=label.style_none, textcolor=color.red,   size=size.small)
+    label.new(bar_index + 2, shortTP, "TP  " + str.tostring(shortTP, format.mintick),
+              style=label.style_none, textcolor=color.green, size=size.small)
+
+if longPlot and i_showSLTP
+    line.new(bar_index, longSL, bar_index + 40, longSL,
+             color=color.new(color.red,   50), style=line.style_dashed, width=1)
+    line.new(bar_index, longTP, bar_index + 40, longTP,
+             color=color.new(color.green, 50), style=line.style_dashed, width=1)
+    label.new(bar_index + 2, longSL, "SL  " + str.tostring(longSL, format.mintick),
+              style=label.style_none, textcolor=color.red,   size=size.small)
+    label.new(bar_index + 2, longTP, "TP  " + str.tostring(longTP, format.mintick),
+              style=label.style_none, textcolor=color.green, size=size.small)
+
+// ─── Info table ───────────────────────────────────────────────────────────────
+if i_showTbl
+    var table tbl = table.new(position.top_right, 2, 4,
+        bgcolor      = color.new(color.black, 75),
+        border_color = color.gray, border_width = 1,
+        frame_color  = color.gray, frame_width  = 1)
+
+    trendLbl  = htfBull ? "▲ BULL" : htfBear ? "▼ BEAR" : "NEUTRAL"
+    trendClr  = htfBull ? color.lime : htfBear ? color.red : color.gray
+    sigLbl    = longEntry ? "▲ LONG" : shortEntry ? "▼ SHORT" : "waiting"
+    sigClr    = longEntry ? color.lime : shortEntry ? color.red : color.gray
+
+    table.cell(tbl, 0, 0, i_htfTF + " Trend",          text_color=color.gray,  text_size=size.small)
+    table.cell(tbl, 1, 0, trendLbl,                     text_color=trendClr,    text_size=size.small)
+    table.cell(tbl, 0, 1, "Swing Highs (LTF)",          text_color=color.gray,  text_size=size.small)
+    table.cell(tbl, 1, 1, str.tostring(shN),            text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 2, "Swing Lows (LTF)",           text_color=color.gray,  text_size=size.small)
+    table.cell(tbl, 1, 2, str.tostring(slN),            text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 3, "Signal",                     text_color=color.gray,  text_size=size.small)
+    table.cell(tbl, 1, 3, sigLbl,                       text_color=sigClr,      text_size=size.small)
