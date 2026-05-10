@@ -1362,10 +1362,9 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
         tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
       } else {
         tbody.innerHTML = page.map(t => {
-          // Mode = paper vs real-money (NOT position open/closed status)
           const modeLabel = t.mode === 'paper'
             ? '<span style="color:#d29922">📄 Paper</span>'
-            : '<span style="color:#8b949e">💰 Real</span>';
+            : '<span style="color:#3fb950">💰 Live</span>';
           const botColor  = t.bot === 'Ironclad' ? '#d29922' : '#58a6ff';
 
           // Status = WIN / LOSS / OPEN (this is what tells you if the trade finished)

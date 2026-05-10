@@ -2,6 +2,7 @@ import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import crypto from 'crypto';
+import { execSync } from 'child_process';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -1397,6 +1398,20 @@ async function checkPositions() {
   saveOpenPositions(stillOpen);
   saveClosedPositions(closedPositions);
   console.log(`  ── ${numClosed} closed this run, ${stillOpen.length} still open ──`);
+
+  // ── Immediate dashboard rebuild when any position closes ──────────────────
+  // Don't wait for the twice-daily GitHub Actions run — rebuild right now so
+  // the dashboard shows actual exit prices and P&L within seconds of close.
+  if (numClosed > 0) {
+    console.log(`\n  📊 Rebuilding dashboard immediately (${numClosed} position(s) closed)...`);
+    try {
+      execSync('node research.js', { stdio: 'inherit', timeout: 60000 });
+      console.log(`  ✅ Dashboard rebuilt — closed positions now showing correct exit prices`);
+    } catch (e) {
+      console.log(`  ⚠️  Dashboard rebuild failed: ${e.message}`);
+      console.log(`     Dashboard will update on next scheduled research run (8am/5pm UTC)`);
+    }
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
