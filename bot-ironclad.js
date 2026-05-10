@@ -21,7 +21,7 @@ const CONFIG = {
 
 // ── Bot identity (bumped with every meaningful strategy change) ───────────────
 const BOT_NAME    = 'Ironclad';
-const BOT_VERSION = 'v1.9'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL · v1.8 percentage-based position sizing (compounds with account) + smart re-entry (only cap at 3/day when coin is losing) · v1.9 contract step-size rounding (fixes [22002] on fractional qty) + sequential TP placement (TP2 placed after TP1 fills, TP3 after TP2) + TP1 auto-retry in monitoring loop
+const BOT_VERSION = 'v2.0'; // v1.0 initial swing · v1.1 EMA 21/50/100/200 3-TP system · v1.2 Fibonacci TP levels · v1.3 min stop 0.3% + TP sort fix · v1.4 crypto-only + economic event blackout · v1.5 3h post-loss cooldown per symbol · v1.6 daily drawdown circuit-breaker + live mode + $1000 portfolio · v1.7 real 3-TP split (3 limit closes) + TP fill monitoring + auto-trail SL · v1.8 percentage-based position sizing (compounds with account) + smart re-entry (only cap at 3/day when coin is losing) · v1.9 contract step-size rounding (fixes [22002] on fractional qty) + sequential TP placement (TP2 placed after TP1 fills, TP3 after TP2) + TP1 auto-retry in monitoring loop · v2.0 correct entry rule: requires 2nd lower high (not lower low) for shorts — validates lower high structure, pullback confirmation (swing low between two highs), and recency (max 12 bars)
 
 const RULES_PATH      = './rules-ironclad.json';
 const TRADES_PATH     = './trades-ironclad.csv';
@@ -495,6 +495,29 @@ function detectTrend(candles, lookback = 2, swingCount = 2, atrThreshold = 0.5) 
 }
 
 // ── Entry Signal Detection (LTF 15m) ─────────────────────────────────────────
+//
+// IRONCLAD ENTRY RULES
+// ====================
+// The strategy enters on the 2nd LOWER HIGH (shorts) or 2nd HIGHER LOW (longs),
+// NOT on a lower low / higher high. Three conditions must all pass beyond the
+// basic price-break check:
+//
+//  1. STRUCTURE  — the triggering swing point must confirm trend continuation:
+//                  shorts → current swing high < previous swing high (lower high)
+//                  longs  → current swing low  > previous swing low  (higher low)
+//
+//  2. PULLBACK   — there must be a swing point of the opposite type between the
+//                  two consecutive same-direction swing points. This proves price
+//                  actually made the move (swing low between two highs for shorts,
+//                  swing high between two lows for longs) before pulling back to
+//                  form the entry point. Without this, a tiny mid-fall rebound
+//                  spike registers as a swing high and the bot enters on a lower
+//                  low — chasing price already in free-fall.
+//
+//  3. RECENCY    — the swing point must be within MAX_ENTRY_BARS candles of the
+//                  current bar. An older swing means the entry window has passed
+//                  and entering now would be well into the next lower low / higher
+//                  high — not at the break of the structure level.
 
 function detectEntry(ltfCandles, htfTrend, lookback = 2) {
   const { swingHighs, swingLows } = detectSwings(ltfCandles, lookback);
@@ -502,48 +525,81 @@ function detectEntry(ltfCandles, htfTrend, lookback = 2) {
   const atr = calcATR(ltfCandles);
 
   // Minimum stop distance: 0.3% of price.
-  // Prevents unrealistically tight stops on low-volatility stocks (GOOGL, AAPL)
-  // where 15m ATR can be smaller than a typical bid/ask spread move.
-  const MIN_STOP_PCT = 0.003;
+  const MIN_STOP_PCT   = 0.003;
+  // Maximum age of the triggering swing point (bars).
+  // On 15m candles: 12 bars = 3 hours. Beyond this the entry window has passed.
+  const MAX_ENTRY_BARS = 12;
 
-  // Long entry: HTF bullish + price breaks above recent 15m swing low
-  if (htfTrend === 'bull' && swingLows.length >= 1) {
-    const recentSwingLow = swingLows[swingLows.length - 1];
-    const swingLowHigh   = ltfCandles[recentSwingLow.index].high;
+  // ── Long entry: HTF bullish + 15m 2nd higher low breakout ──────────────────
+  if (htfTrend === 'bull' && swingLows.length >= 2) {
+    const prevSwingLow    = swingLows[swingLows.length - 2];
+    const currentSwingLow = swingLows[swingLows.length - 1];
 
-    if (currentPrice > swingLowHigh) {
-      const rawStop  = recentSwingLow.price - atr * 0.5;
+    const isHigherLow      = currentSwingLow.price > prevSwingLow.price;
+    const barsSinceLow     = ltfCandles.length - 1 - currentSwingLow.index;
+    const isRecent         = barsSinceLow <= MAX_ENTRY_BARS;
+    const swingHighBetween = swingHighs.find(
+      sh => sh.index > prevSwingLow.index && sh.index < currentSwingLow.index
+    );
+    const swingLowHigh      = ltfCandles[currentSwingLow.index].high;
+    const breakoutConfirmed = currentPrice > swingLowHigh;
+
+    if (isHigherLow && isRecent && swingHighBetween && breakoutConfirmed) {
+      const rawStop  = currentSwingLow.price - atr * 0.5;
       const minStop  = currentPrice * (1 - MIN_STOP_PCT);
-      // Use the lower of the two — whichever gives the wider (safer) stop
       const stopLoss = parseFloat(Math.min(rawStop, minStop).toFixed(4));
       return {
         signal:   'long',
         entry:    currentPrice,
         stopLoss,
-        swingRef: recentSwingLow.price,
-        reason:   `HTF bullish + 15m swing low breakout above $${swingLowHigh.toFixed(2)}`,
+        swingRef: currentSwingLow.price,
+        reason:   `HTF bullish + 15m higher low breakout (HL ${prevSwingLow.price.toFixed(4)} → ${currentSwingLow.price.toFixed(4)}) above $${swingLowHigh.toFixed(4)}`,
       };
     }
+
+    // Log rejection reason for diagnostics
+    const reasons = [];
+    if (!isHigherLow)       reasons.push(`not a higher low (${currentSwingLow.price.toFixed(4)} ≤ ${prevSwingLow.price.toFixed(4)})`);
+    if (!isRecent)          reasons.push(`swing low stale (${barsSinceLow} bars ago, max ${MAX_ENTRY_BARS})`);
+    if (!swingHighBetween)  reasons.push(`no swing high between the two lows — pullback not confirmed`);
+    if (!breakoutConfirmed) reasons.push(`price ${currentPrice.toFixed(4)} has not broken above ${swingLowHigh.toFixed(4)}`);
+    if (reasons.length)     console.log(`  ✗ Long entry blocked: ${reasons.join(' | ')}`);
   }
 
-  // Short entry: HTF bearish + price breaks below recent 15m swing high
-  if (htfTrend === 'bear' && swingHighs.length >= 1) {
-    const recentSwingHigh = swingHighs[swingHighs.length - 1];
-    const swingHighLow    = ltfCandles[recentSwingHigh.index].low;
+  // ── Short entry: HTF bearish + 15m 2nd lower high breakdown ────────────────
+  if (htfTrend === 'bear' && swingHighs.length >= 2) {
+    const prevSwingHigh    = swingHighs[swingHighs.length - 2];
+    const currentSwingHigh = swingHighs[swingHighs.length - 1];
 
-    if (currentPrice < swingHighLow) {
-      const rawStop  = recentSwingHigh.price + atr * 0.5;
+    const isLowerHigh       = currentSwingHigh.price < prevSwingHigh.price;
+    const barsSinceHigh     = ltfCandles.length - 1 - currentSwingHigh.index;
+    const isRecent          = barsSinceHigh <= MAX_ENTRY_BARS;
+    const swingLowBetween   = swingLows.find(
+      sl => sl.index > prevSwingHigh.index && sl.index < currentSwingHigh.index
+    );
+    const swingHighLow       = ltfCandles[currentSwingHigh.index].low;
+    const breakdownConfirmed = currentPrice < swingHighLow;
+
+    if (isLowerHigh && isRecent && swingLowBetween && breakdownConfirmed) {
+      const rawStop  = currentSwingHigh.price + atr * 0.5;
       const maxStop  = currentPrice * (1 + MIN_STOP_PCT);
-      // Use the higher of the two — whichever gives the wider (safer) stop
       const stopLoss = parseFloat(Math.max(rawStop, maxStop).toFixed(4));
       return {
         signal:   'short',
         entry:    currentPrice,
         stopLoss,
-        swingRef: recentSwingHigh.price,
-        reason:   `HTF bearish + 15m swing high breakdown below $${swingHighLow.toFixed(2)}`,
+        swingRef: currentSwingHigh.price,
+        reason:   `HTF bearish + 15m lower high breakdown (LH ${prevSwingHigh.price.toFixed(4)} → ${currentSwingHigh.price.toFixed(4)}) below $${swingHighLow.toFixed(4)}`,
       };
     }
+
+    // Log rejection reason for diagnostics
+    const reasons = [];
+    if (!isLowerHigh)        reasons.push(`not a lower high (${currentSwingHigh.price.toFixed(4)} ≥ ${prevSwingHigh.price.toFixed(4)})`);
+    if (!isRecent)           reasons.push(`swing high stale (${barsSinceHigh} bars ago, max ${MAX_ENTRY_BARS})`);
+    if (!swingLowBetween)    reasons.push(`no swing low between the two highs — pullback not confirmed`);
+    if (!breakdownConfirmed) reasons.push(`price ${currentPrice.toFixed(4)} has not broken below ${swingHighLow.toFixed(4)}`);
+    if (reasons.length)      console.log(`  ✗ Short entry blocked: ${reasons.join(' | ')}`);
   }
 
   return null;
