@@ -926,7 +926,22 @@ function loadClosedPositions() {
 }
 
 function saveClosedPositions(positions) {
-  fs.writeFileSync(CLOSED_PATH, JSON.stringify(positions, null, 2));
+  // LOCK PROTECTION: any entry with locked:true was manually verified against
+  // real Bitget export data and must never be overwritten by the bot.
+  // Merge: start from the existing file's locked entries, overlay new data.
+  let locked = {};
+  try {
+    const existing = JSON.parse(fs.readFileSync(CLOSED_PATH, 'utf8'));
+    for (const p of existing) {
+      if (p.locked) locked[p.id] = p;
+    }
+  } catch {}
+  const merged = positions.map(p => locked[p.id] || p);   // prefer locked version
+  // Also preserve any locked entries that aren't in the new list (shouldn't happen, but safety net)
+  for (const id of Object.keys(locked)) {
+    if (!merged.find(p => p.id === id)) merged.push(locked[id]);
+  }
+  fs.writeFileSync(CLOSED_PATH, JSON.stringify(merged, null, 2));
 }
 
 // First-run bootstrap: seeds open-positions-ironclad.json from the CSV so
