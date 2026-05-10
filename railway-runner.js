@@ -56,10 +56,31 @@ async function githubRequest(method, path, body = null) {
 async function pullFile(filename, branch = 'main') {
   try {
     const data = await githubRequest('GET', `/repos/${OWNER}/${REPO}/contents/${filename}?ref=${branch}`);
-    if (data.content) {
-      fs.writeFileSync(filename, Buffer.from(data.content, 'base64').toString('utf8'));
-      console.log(`  ↓ ${filename} (${branch})`);
+    if (!data.content) return;
+
+    const remoteContent = Buffer.from(data.content, 'base64').toString('utf8');
+
+    // For closed-positions JSON files: MERGE remote + local so we never lose
+    // close data that was written locally but not yet pushed (e.g. after a push conflict).
+    // Remote entries come first; local-only entries (pending push) are preserved.
+    if (filename.startsWith('closed-positions') && filename.endsWith('.json') && fs.existsSync(filename)) {
+      try {
+        const localPositions  = JSON.parse(fs.readFileSync(filename, 'utf8'));
+        const remotePositions = JSON.parse(remoteContent);
+        const merged          = new Map();
+        for (const p of remotePositions) merged.set(p.id, p);
+        for (const p of localPositions)  merged.set(p.id, p);  // local overrides if id matches
+        const mergedArr = [...merged.values()];
+        if (mergedArr.length > remotePositions.length) {
+          fs.writeFileSync(filename, JSON.stringify(mergedArr, null, 2));
+          console.log(`  ↓ ${filename} (${branch}) — merged ${remotePositions.length} remote + ${mergedArr.length - remotePositions.length} local-only = ${mergedArr.length} total`);
+          return;
+        }
+      } catch { /* merge failed — fall through to plain overwrite */ }
     }
+
+    fs.writeFileSync(filename, remoteContent);
+    console.log(`  ↓ ${filename} (${branch})`);
   } catch (e) {
     // File may not exist yet on first run — that's fine
     console.log(`  ↓ ${filename} — not found on ${branch}, skipping`);

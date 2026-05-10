@@ -551,6 +551,9 @@ function buildTradeData(trades, safetyLog, livePrices = {}, closedPositions = ne
     // JSON array embedded in HTML for client-side filtering + pagination
     tradesJson: tradesWithPnl.map(t => {
       const { stratName, stratVersion } = parseStrategy(t.notes);
+      const status = t.realized
+        ? (t.outcome === 'WIN' ? 'WIN' : 'LOSS')
+        : 'OPEN';
       return {
         date:        t.date,
         time:        t.time,
@@ -568,6 +571,7 @@ function buildTradeData(trades, safetyLog, livePrices = {}, closedPositions = ne
         realized:    t.realized,
         exitLevel:   t.exitLevel,
         outcome:     t.outcome,
+        status,
         mode:        t.mode,
         strategy:    t.notes        || '',
         stratName,
@@ -1160,12 +1164,12 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
           <th>Open Date</th><th>Open Time</th><th>Symbol</th><th>Side</th>
           <th>Entry</th><th>Stop Loss</th><th>Exit / Live</th><th>Qty</th>
           <th>Close Date</th><th>Close Time</th>
-          <th>P&amp;L</th><th>Cumulative</th><th>Mode</th>
+          <th>P&amp;L</th><th>Cumulative</th><th>Status</th><th>Mode</th>
           <th>Bot</th><th>Strategy</th><th>Version</th>
         </tr>
       </thead>
       <tbody id="history-tbody">
-        <tr><td colspan="16" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
+        <tr><td colspan="17" style="text-align:center;color:#8b949e;padding:20px">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -1355,13 +1359,24 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
       const tbody = document.getElementById('history-tbody');
 
       if (page.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:#8b949e;padding:20px">No trades match the selected filters</td></tr>';
       } else {
         tbody.innerHTML = page.map(t => {
+          // Mode = paper vs real-money (NOT position open/closed status)
           const modeLabel = t.mode === 'paper'
             ? '<span style="color:#d29922">📄 Paper</span>'
-            : '<span style="color:#3fb950">💰 Live</span>';
+            : '<span style="color:#8b949e">💰 Real</span>';
           const botColor  = t.bot === 'Ironclad' ? '#d29922' : '#58a6ff';
+
+          // Status = WIN / LOSS / OPEN (this is what tells you if the trade finished)
+          let statusCell;
+          if (t.status === 'WIN') {
+            statusCell = '<span style="color:#3fb950;font-weight:700">✅ WIN</span>';
+          } else if (t.status === 'LOSS') {
+            statusCell = '<span style="color:#f85149;font-weight:700">❌ LOSS</span>';
+          } else {
+            statusCell = '<span style="color:#58a6ff;font-weight:600">⏳ Open</span>';
+          }
 
           // Exit / Live price cell — for closed trades show exit level badge
           let priceCell;
@@ -1398,6 +1413,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
             '<td>' + closeTimeCell + '</td>' +
             '<td>' + fmtPnl(t.pnl, t.realized, t.exitLevel) + '</td>' +
             '<td>' + fmtPnl(t.cumPnl) + '</td>' +
+            '<td>' + statusCell + '</td>' +
             '<td>' + modeLabel + '</td>' +
             '<td style="font-size:13px;font-weight:500;color:' + botColor + '">' + (t.bot || '—') + '</td>' +
             '<td style="font-size:13px;color:#c9d1d9">' + (t.stratName || '—') + '</td>' +
