@@ -1,0 +1,142 @@
+//@version=6
+// =============================================================================
+// SID RSI Signals v1.0
+// =============================================================================
+// Companion indicator to sid-strategy.pine v1.2. Plots the daily RSI(14) on
+// its own pane with:
+//   - Built-in horizontal lines at the oversold (30) and overbought (70) levels
+//   - 🔻 RED ARROW DOWN at OVERBOUGHT signal days (RSI > 70)
+//   - 🔺 GREEN ARROW UP at OVERSOLD signal days (RSI < 30)
+//   - ▼ Fuchsia ARROW DOWN at the SHORT entry confirmation day
+//   - ▲ Lime ARROW UP at the LONG entry confirmation day
+//   - 🏷️ "Overbought" / "Oversold" labels at the signal extreme
+//
+// This indicator detects the same signal conditions as the strategy. Drop it
+// onto the same chart as sid-strategy.pine to see the arrows on the RSI pane
+// auto-generated wherever the strategy would fire.
+// =============================================================================
+
+indicator(
+   "SID RSI Signals v1.0",
+   shorttitle = "SID RSI",
+   overlay    = false,
+   format     = format.price,
+   precision  = 1,
+   scale      = scale.right
+   )
+
+// --- Inputs (mirror the strategy) -----------------------------------------
+i_rsiLength     = input.int(14, "RSI length", minval=2, group="Rules")
+i_rsiOversold   = input.int(30, "RSI oversold (long signal)",   minval=10, maxval=45, group="Rules")
+i_rsiOverbought = input.int(70, "RSI overbought (short signal)", minval=55, maxval=90, group="Rules")
+i_rsiExit       = input.int(50, "RSI exit level (midline)", minval=30, maxval=70, group="Rules")
+i_timeoutDays   = input.int(3,  "Sticky-arm timeout (trading days)", minval=1, maxval=10, group="Rules")
+i_showLabels    = input.bool(true, "Show OB/OS text labels", group="Display")
+i_showArrows    = input.bool(true, "Show signal + entry arrows", group="Display")
+
+// --- Daily RSI (works on any chart timeframe) ------------------------------
+dailyRSI     = request.security(syminfo.tickerid, "D", ta.rsi(close, i_rsiLength),       lookahead=barmerge.lookahead_off)
+dailyRSIPrev = request.security(syminfo.tickerid, "D", ta.rsi(close, i_rsiLength)[1],    lookahead=barmerge.lookahead_off)
+
+// MACD direction (used to detect entry-day alignment)
+[macdLine_, _, _] = ta.macd(close, 12, 26, 9)
+dailyMACD     = request.security(syminfo.tickerid, "D", macdLine_,    lookahead=barmerge.lookahead_off)
+dailyMACDPrev = request.security(syminfo.tickerid, "D", macdLine_[1], lookahead=barmerge.lookahead_off)
+
+rsiRising   = dailyRSI > dailyRSIPrev
+rsiFalling  = dailyRSI < dailyRSIPrev
+macdRising  = dailyMACD > dailyMACDPrev
+macdFalling = dailyMACD < dailyMACDPrev
+
+isNewDailyBar = ta.change(time("D")) != 0
+isOversold    = dailyRSI < i_rsiOversold
+isOverbought  = dailyRSI > i_rsiOverbought
+
+// --- Sticky-arm state (mirrors strategy v1.2) ------------------------------
+var string armDir       = na
+var int    daysSinceArm = 0
+
+canArm = na(armDir)
+shouldArmLong  = isNewDailyBar and canArm and isOversold
+shouldArmShort = isNewDailyBar and canArm and isOverbought
+
+if shouldArmLong
+    armDir       := "LONG"
+    daysSinceArm := 0
+if shouldArmShort
+    armDir       := "SHORT"
+    daysSinceArm := 0
+
+if not na(armDir) and isNewDailyBar and not (shouldArmLong or shouldArmShort)
+    daysSinceArm := daysSinceArm + 1
+    if daysSinceArm >= i_timeoutDays
+        armDir       := na
+        daysSinceArm := 0
+
+// --- Entry alignment detection (instructor rule 3) -------------------------
+entryReadyLong  = armDir == "LONG"  and isNewDailyBar and rsiRising  and macdRising
+entryReadyShort = armDir == "SHORT" and isNewDailyBar and rsiFalling and macdFalling
+
+if entryReadyLong or entryReadyShort
+    armDir       := na
+    daysSinceArm := 0
+
+// --- Plot the RSI line + the 30/70/50 reference levels ---------------------
+plot(dailyRSI, "Daily RSI(14)", color=color.new(#7e57c2, 0), linewidth=2)
+
+hline(i_rsiOverbought, "Overbought 70", color=color.new(#f85149, 30), linestyle=hline.style_dashed)
+hline(i_rsiExit,       "Midline 50",    color=color.new(#8b949e, 60), linestyle=hline.style_dotted)
+hline(i_rsiOversold,   "Oversold 30",   color=color.new(#3fb950, 30), linestyle=hline.style_dashed)
+
+// Shade the extreme zones lightly
+bgcolor(isOverbought ? color.new(#f85149, 92) : na, title="Overbought shade")
+bgcolor(isOversold   ? color.new(#3fb950, 92) : na, title="Oversold shade")
+
+// --- Signal arrows on this RSI pane ----------------------------------------
+// 🔻 Red arrow DOWN at the overbought signal day (top of pane)
+plotshape(i_showArrows and shouldArmShort,
+   title    = "Signal Short — Overbought",
+   style    = shape.arrowdown,
+   location = location.absolute,
+   color    = color.new(#f85149, 0),
+   size     = size.normal,
+   text     = "OB",
+   textcolor= color.white)
+
+// 🔺 Green arrow UP at the oversold signal day (bottom of pane)
+plotshape(i_showArrows and shouldArmLong,
+   title    = "Signal Long — Oversold",
+   style    = shape.arrowup,
+   location = location.absolute,
+   color    = color.new(#3fb950, 0),
+   size     = size.normal,
+   text     = "OS",
+   textcolor= color.white)
+
+// ▼ Fuchsia arrow DOWN at the SHORT entry day
+plotshape(i_showArrows and entryReadyShort,
+   title    = "Entry Short — RSI+MACD aligned ↓",
+   style    = shape.arrowdown,
+   location = location.absolute,
+   color    = color.new(#ff7b72, 0),
+   size     = size.large,
+   text     = "ENTRY",
+   textcolor= color.white)
+
+// ▲ Lime arrow UP at the LONG entry day
+plotshape(i_showArrows and entryReadyLong,
+   title    = "Entry Long — RSI+MACD aligned ↑",
+   style    = shape.arrowup,
+   location = location.absolute,
+   color    = color.new(#56d364, 0),
+   size     = size.large,
+   text     = "ENTRY",
+   textcolor= color.white)
+
+// --- "Overbought" / "Oversold" text labels at the extreme RSI value --------
+if i_showLabels and shouldArmShort
+    label.new(bar_index, dailyRSI + 8, "OVERBOUGHT", color=color.new(#f85149, 30),
+              textcolor=color.white, style=label.style_label_down, size=size.small)
+if i_showLabels and shouldArmLong
+    label.new(bar_index, dailyRSI - 8, "OVERSOLD", color=color.new(#3fb950, 30),
+              textcolor=color.white, style=label.style_label_up, size=size.small)

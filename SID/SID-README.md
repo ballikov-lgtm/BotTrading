@@ -2,10 +2,14 @@
 
 A slow and steady swing trading strategy focused exclusively on **US stocks and ETFs**. Designed for consistent gains over a 12-month horizon using two indicators and a strict set of rules to avoid volatility events.
 
-**Current version:** v1.1 — daily-bar signal with 15-min intraday entry confirmation (see [Version History](#version-history)).
+**Current version:** v1.2 — instructor-aligned (sticky RSI signal + RSI/MACD direction-align on a later day). See [Version History](#version-history).
 
 **Bot file:** `bot-sid.js`
-**PineScript:** `pine/sid-strategy.pine` (backtest on TradingView, 15-min chart)
+**PineScripts:**
+- `pine/sid-strategy.pine` — main strategy script (backtest on TradingView, 15-min chart)
+- `pine/sid-rsi-signals.pine` — companion indicator: daily RSI on its own pane with 30/70 lines + signal/entry arrows
+- `pine/sid-macd-signals.pine` — companion indicator: daily MACD on its own pane with signal/entry arrows
+
 **Trade log:** `trades-sid.csv`
 **Position tracker:** `open-positions-sid.json` / `closed-positions-sid.json`
 
@@ -27,41 +31,46 @@ A slow and steady swing trading strategy focused exclusively on **US stocks and 
 
 ---
 
-## Core Logic (v1.1)
+## Core Logic (v1.2 — instructor-aligned)
 
-The strategy works in **two stages**: a daily-bar signal arms the trade, then a 15-minute intraday candle confirms entry. The two-stage design (added in v1.1) is specifically to avoid the common fake-reversal trap where RSI dips into oversold but the move continues lower the next day.
+The strategy follows the SID instructor's method directly. v1.2 fixes a v1.1 bug where the bot incorrectly required RSI to remain in the extreme zone at entry — the instructor's actual rule is that the signal date is **STICKY** and entry happens on a **later day** when RSI direction and MACD direction both point in the trade direction.
 
-### Step 1 — Signal Condition (daily close)
-On the daily candle close:
-- **Long signal:** RSI(14) < 30 **AND** daily MACD line pointing up (rising vs. prior daily close)
-- **Short signal:** RSI(14) > 70 **AND** daily MACD line pointing down (falling vs. prior daily close)
+### Step 1 — Signal Date (daily close)
+On a daily candle close:
+- **Long signal:** RSI(14) crosses below 30 → trade is **ARMED LONG**
+- **Short signal:** RSI(14) crosses above 70 → trade is **ARMED SHORT**
 
-When this fires, the trade is **ARMED**. An alert is sent. No entry is taken yet.
+RSI does **not** need to stay in the extreme zone after this — the arm is sticky.
 
 ### Step 2 — Earnings Check
-Before arming, check whether an earnings announcement falls within **14 calendar days** of today. If yes — **skip the trade entirely, regardless of how good the setup looks**. Earnings cause unpredictable gaps and spikes that invalidate the strategy's risk assumptions.
+Before arming, check whether an earnings announcement falls within **14 calendar days** of the current date. If yes — **skip the trade entirely.** Earnings cause unpredictable gaps that invalidate the strategy's risk assumptions.
 
-### Step 3 — Entry Confirmation (next US session, 15-min bars)
-After ARMED, poll every 15 minutes during the US cash session (09:30–16:00 ET / 14:30–21:00 UTC):
-- **Long entry:** the most recent 15-min candle closes **green** (close > open). Enter at that candle's close.
-- **Short entry:** the most recent 15-min candle closes **red** (close < open). Enter at that candle's close.
+### Step 3 — Entry Day (a LATER daily close)
+On each subsequent daily close, check if the trade can enter:
+- **Long entry:** daily RSI direction is UP **AND** daily MACD line direction is UP — both pointing up on the same daily bar.
+- **Short entry:** daily RSI direction is DOWN **AND** daily MACD line direction is DOWN — both pointing down on the same daily bar.
 
-The intraday candle is the confirmation that the reversal has actually started.
+The MACD does **not** have to cross — it just needs to be pointing in the same direction as RSI. Entry is at that daily close.
 
-### Step 4 — Signal Expiry
-An ARMED signal cancels (no entry) if any of the following happens before confirmation:
-- Daily RSI exits the oversold/overbought zone on a new daily close (RSI ≥ 30 for long, ≤ 70 for short)
-- Daily MACD line flips direction on a new daily close
+### Step 4 — Optional 15-min Intraday Confirmation (v1.1 bot tweak, can be disabled)
+After the daily Step 3 fires, the bot can wait for a confirming 15-min candle during the US session:
+- **Long entry confirm:** a 15-min candle closes **green** (close > open).
+- **Short entry confirm:** a 15-min candle closes **red** (close < open).
+
+This is a minor confirmation tweak the bot adds — it filters false alignments. Toggle off in the script inputs to revert to the pure instructor method.
+
+### Step 5 — Signal Expiry
+An ARMED signal cancels if:
+- **3 trading days** pass without entry alignment (hard timeout), OR
 - An earnings date enters the 14-day blackout window
-- **3 trading days** pass without entry confirmation (hard timeout)
 
-### Step 5 — Stop Loss
+### Step 6 — Stop Loss
 Placed using the daily-bar extremes during the signal-to-entry window:
 - **Long:** Lowest daily low between signal date and entry date, **rounded DOWN** to the nearest whole dollar
 - **Short:** Highest daily high between signal date and entry date, **rounded UP** to the nearest whole dollar
 
-### Step 6 — Take Profit
-Exit when **daily RSI reaches 50**. Set an alert. There are no partial closes — the full position exits at this level.
+### Step 7 — Take Profit
+Exit when **daily RSI reaches 50**. Single full exit — no partials.
 
 ---
 
@@ -233,6 +242,7 @@ BitGet offers a small number of US stock CFDs (AAPL, TSLA, MSFT, NVDA, GOOGL, ME
 |---------|------|--------|
 | v1.0 | Apr 2026 | Initial implementation — RSI(14) + MACD(12,26,9), daily chart, US stocks/ETFs |
 | v1.1 | 10 May 2026 | Two-stage entry: daily signal arms the trade; entry now requires a 15-min intraday candle closing in trade direction during the next US session. Added 3-day hard timeout on armed signals. Goal: avoid fake reversals where RSI dips into oversold but the move continues lower the next day. |
+| v1.2 | 11 May 2026 | **Instructor-aligned fix.** v1.1 incorrectly required RSI to still be in the extreme zone on the entry day; the instructor's actual rule treats the signal date as STICKY and the entry day is a later day where RSI direction + MACD direction both align with the trade. v1.2 fixes this: arm on RSI hitting extreme alone, then enter when RSI+MACD direction-align (within the 3-day timeout). Discovered via Project D analysis comparing 10 instructor-marked trades vs the bot. Caught the AAPL, AMD, GM trades that v1.1 had missed. The 15-min intraday confirmation from v1.1 is preserved as an optional input (default ON). |
 
 ---
 

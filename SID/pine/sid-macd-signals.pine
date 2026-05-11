@@ -1,0 +1,121 @@
+//@version=6
+// =============================================================================
+// SID MACD Signals v1.0
+// =============================================================================
+// Companion indicator to sid-strategy.pine v1.2. Plots the daily MACD(12,26,9)
+// on its own pane with:
+//   - MACD line + signal line + histogram
+//   - Zero-line reference
+//   - 🔻 RED ARROW DOWN at SHORT entry days (MACD pointing down + RSI aligned)
+//   - 🔺 GREEN ARROW UP at LONG entry days (MACD pointing up + RSI aligned)
+//   - 🟡 Small dot at the signal-arm day (RSI extreme — earliest possible setup)
+//
+// Detects the same conditions as the strategy. Drop onto the same chart as
+// sid-strategy.pine and sid-rsi-signals.pine for full visual confirmation.
+// =============================================================================
+
+indicator(
+   "SID MACD Signals v1.0",
+   shorttitle = "SID MACD",
+   overlay    = false,
+   format     = format.price,
+   precision  = 4
+   )
+
+// --- Inputs (mirror the strategy) -----------------------------------------
+i_fastLength    = input.int(12, "MACD fast length",  minval=2, group="MACD")
+i_slowLength    = input.int(26, "MACD slow length",  minval=2, group="MACD")
+i_signalLength  = input.int(9,  "MACD signal length", minval=2, group="MACD")
+i_rsiOversold   = input.int(30, "RSI oversold (long signal)",   minval=10, maxval=45, group="Rules")
+i_rsiOverbought = input.int(70, "RSI overbought (short signal)", minval=55, maxval=90, group="Rules")
+i_timeoutDays   = input.int(3,  "Sticky-arm timeout (trading days)", minval=1, maxval=10, group="Rules")
+i_showHist      = input.bool(true, "Show histogram", group="Display")
+i_showArrows    = input.bool(true, "Show entry arrows", group="Display")
+i_showArmDot    = input.bool(true, "Show signal-arm dot", group="Display")
+
+// --- Daily values (works on any chart timeframe) --------------------------
+[macdLine_, macdSig_, macdHist_] = ta.macd(close, i_fastLength, i_slowLength, i_signalLength)
+dailyMACD       = request.security(syminfo.tickerid, "D", macdLine_,    lookahead=barmerge.lookahead_off)
+dailyMACDPrev   = request.security(syminfo.tickerid, "D", macdLine_[1], lookahead=barmerge.lookahead_off)
+dailySignal     = request.security(syminfo.tickerid, "D", macdSig_,     lookahead=barmerge.lookahead_off)
+dailyHist       = request.security(syminfo.tickerid, "D", macdHist_,    lookahead=barmerge.lookahead_off)
+
+dailyRSI        = request.security(syminfo.tickerid, "D", ta.rsi(close, 14),    lookahead=barmerge.lookahead_off)
+dailyRSIPrev    = request.security(syminfo.tickerid, "D", ta.rsi(close, 14)[1], lookahead=barmerge.lookahead_off)
+
+rsiRising   = dailyRSI  > dailyRSIPrev
+rsiFalling  = dailyRSI  < dailyRSIPrev
+macdRising  = dailyMACD > dailyMACDPrev
+macdFalling = dailyMACD < dailyMACDPrev
+
+isNewDailyBar = ta.change(time("D")) != 0
+isOversold    = dailyRSI < i_rsiOversold
+isOverbought  = dailyRSI > i_rsiOverbought
+
+// --- Sticky-arm state ------------------------------------------------------
+var string armDir       = na
+var int    daysSinceArm = 0
+
+canArm = na(armDir)
+shouldArmLong  = isNewDailyBar and canArm and isOversold
+shouldArmShort = isNewDailyBar and canArm and isOverbought
+
+if shouldArmLong
+    armDir       := "LONG"
+    daysSinceArm := 0
+if shouldArmShort
+    armDir       := "SHORT"
+    daysSinceArm := 0
+
+if not na(armDir) and isNewDailyBar and not (shouldArmLong or shouldArmShort)
+    daysSinceArm := daysSinceArm + 1
+    if daysSinceArm >= i_timeoutDays
+        armDir       := na
+        daysSinceArm := 0
+
+// --- Entry alignment detection --------------------------------------------
+entryReadyLong  = armDir == "LONG"  and isNewDailyBar and rsiRising  and macdRising
+entryReadyShort = armDir == "SHORT" and isNewDailyBar and rsiFalling and macdFalling
+
+if entryReadyLong or entryReadyShort
+    armDir       := na
+    daysSinceArm := 0
+
+// --- Plot MACD line, signal, histogram ------------------------------------
+histColor = dailyHist >= 0 ? (dailyHist > dailyHist[1] ? color.new(#26a69a, 0) : color.new(#26a69a, 40))
+                          : (dailyHist < dailyHist[1] ? color.new(#ef5350, 0) : color.new(#ef5350, 40))
+plot(i_showHist ? dailyHist : na, "Histogram", color=histColor, style=plot.style_columns)
+
+plot(dailyMACD,   "MACD",   color=color.new(#2962ff, 0), linewidth=2)
+plot(dailySignal, "Signal", color=color.new(#ff6d00, 0), linewidth=1)
+
+hline(0, "Zero", color=color.new(#8b949e, 40), linestyle=hline.style_dotted)
+
+// --- Arrows -----------------------------------------------------------------
+// Small yellow dot at the signal-arm day (RSI extreme) — earliest setup point
+plotshape(i_showArmDot and (shouldArmLong or shouldArmShort),
+   title    = "Signal armed (RSI extreme)",
+   style    = shape.circle,
+   location = location.absolute,
+   color    = color.new(color.yellow, 30),
+   size     = size.tiny)
+
+// 🔻 RED arrow DOWN at SHORT entry day (MACD pointing down + RSI aligned)
+plotshape(i_showArrows and entryReadyShort,
+   title    = "Entry Short — MACD ↓ aligned",
+   style    = shape.arrowdown,
+   location = location.absolute,
+   color    = color.new(#f85149, 0),
+   size     = size.large,
+   text     = "↓ ENTRY",
+   textcolor= color.white)
+
+// 🔺 GREEN arrow UP at LONG entry day (MACD pointing up + RSI aligned)
+plotshape(i_showArrows and entryReadyLong,
+   title    = "Entry Long — MACD ↑ aligned",
+   style    = shape.arrowup,
+   location = location.absolute,
+   color    = color.new(#3fb950, 0),
+   size     = size.large,
+   text     = "↑ ENTRY",
+   textcolor= color.white)
