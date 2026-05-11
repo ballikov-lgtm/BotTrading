@@ -599,7 +599,7 @@ function buildSidHeatmapHtml(scan) {
   `;
 
   const svg = `
-    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;margin:0 auto;background:#0d1117;border:1px solid #30363d;border-radius:8px">
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:70%;height:auto;display:block;margin:0 auto;background:#0d1117;border:1px solid #30363d;border-radius:8px">
       ${bgZones}
       ${grid}
       ${refLines}
