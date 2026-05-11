@@ -19,5 +19,26 @@
     "realizedPnl": -2.86,
     "outcome": "LOSS",
     "accountAfter": 4997.14
+  },
+  {
+    "id": "SID-PAPER-1778266682724",
+    "symbol": "BAC",
+    "side": "short",
+    "entry": 51.314998626708984,
+    "stopLoss": 56,
+    "shares": 5,
+    "totalUsd": 256.57,
+    "riskUsd": 23.43,
+    "signalDate": "2026-04-15",
+    "openDate": "2026-05-08",
+    "openTime": "18:58:02",
+    "strategy": "SID v1.0",
+    "exitLevel": "rsi50",
+    "exitPrice": 50.54999923706055,
+    "exitRsi": 40.83,
+    "closeDate": "2026-05-11",
+    "realizedPnl": 3.82,
+    "outcome": "WIN",
+    "accountAfter": 5000.96
   }
 ]
