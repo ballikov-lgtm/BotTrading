@@ -1,0 +1,527 @@
+{
+  "generated": "2026-05-11T21:02:41.926769",
+  "strategy_version": "1.2",
+  "data_source": "backtest-report_rsi75_lo_rsi3_weekly.json",
+  "rules": {
+    "auto_trade": {
+      "min_trades": 3,
+      "min_net_pnl": 50.0,
+      "min_profit_factor": 1.5,
+      "min_win_rate": 40.0
+    },
+    "monitor": {
+      "min_trades": 2,
+      "min_profit_factor": 0.8,
+      "min_win_rate": 25.0,
+      "max_net_loss": 75.0
+    }
+  },
+  "summary": {
+    "AUTO_TRADE": 2,
+    "MONITOR": 2,
+    "EXCLUDED": 1,
+    "INSUFFICIENT_DATA": 45
+  },
+  "tickers": [
+    {
+      "symbol": "BA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 4.69,
+      "net_pnl": 726.6,
+      "trade_count": 3,
+      "reason": "WR=67% PF=4.69 P&L=$+727 over 3 trades \u2014 consistent"
+    },
+    {
+      "symbol": "COST",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 496.64,
+      "trade_count": 2,
+      "reason": "WR=100% PF=999.00 P&L=$+497 over 2 trades \u2014 borderline, needs sentiment check"
+    },
+    {
+      "symbol": "BAC",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 310.44,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLI",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 296.14,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "TQQQ",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 265.44,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "QQQ",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 260.19,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "AAPL",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 248.2,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "DIA",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 239.55,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "VZ",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 238.14,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "SPY",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 231.03,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLV",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 168.3,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLF",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 153.72,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLC",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 150.45,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLK",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 108.64,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "DIS",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 1.52,
+      "net_pnl": 104.29,
+      "trade_count": 2,
+      "reason": "WR=50% PF=1.52 P&L=$+104 over 2 trades \u2014 borderline, needs sentiment check"
+    },
+    {
+      "symbol": "MSFT",
+      "tier": "AUTO_TRADE",
+      "direction": "long-only",
+      "win_rate": 66.7,
+      "profit_factor": 1.51,
+      "net_pnl": 101.21,
+      "trade_count": 3,
+      "reason": "WR=67% PF=1.51 P&L=$+101 over 3 trades \u2014 consistent"
+    },
+    {
+      "symbol": "MA",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 999.0,
+      "net_pnl": 81.48,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "AMD",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "AMZN",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "CAT",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "DKS",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "ETSY",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "FCX",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "FDX",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "GM",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "GOLD",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "GOOG",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "GS",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "IBM",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "INTC",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "IWM",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "JPM",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "MCD",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "META",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "PYPL",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "QYLD",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "SLV",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "SQQQ",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "short-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "TGT",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "short-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "TNA",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "TSLA",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "TZA",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "short-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "WMT",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLB",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLE",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "long-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLP",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLRE",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLU",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": 0.0,
+      "trade_count": 0,
+      "reason": "only 0 trade(s) in 12 months"
+    },
+    {
+      "symbol": "HD",
+      "tier": "INSUFFICIENT_DATA",
+      "direction": "short-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": -199.5,
+      "trade_count": 1,
+      "reason": "only 1 trade(s) in 12 months"
+    },
+    {
+      "symbol": "XLY",
+      "tier": "EXCLUDED",
+      "direction": "short-only",
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "net_pnl": -396.84,
+      "trade_count": 2,
+      "reason": "WR=0% PF=0.00 P&L=$-397 over 2 trades \u2014 net negative without edge"
+    }
+  ]
+}
