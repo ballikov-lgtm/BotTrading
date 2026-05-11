@@ -1,0 +1,274 @@
+//@version=6
+// =============================================================================
+// SID Strategy v1.1
+// =============================================================================
+// Two-stage swing entry for US stocks and ETFs.
+//
+// STAGE 1 - SIGNAL (daily close):
+//   Long  : daily RSI(14) < 30  AND daily MACD line pointing up
+//   Short : daily RSI(14) > 70  AND daily MACD line pointing down
+//   Plus  : no scheduled earnings within 14 calendar days
+//   On signal, the trade is ARMED. Alert fires. No entry yet.
+//
+// STAGE 2 - ENTRY (next US session, 15-min bars):
+//   Poll every 15 min during the US cash session.
+//   Enter when the most recent 15-min candle closes in the trade direction
+//   (green for long, red for short). Entry is at that 15-min close.
+//
+// EXPIRY (armed signal cancels if any of):
+//   - Daily RSI exits oversold/overbought zone on a new daily close
+//   - Daily MACD flips direction on a new daily close
+//   - Earnings date enters the 14-day window
+//   - 3 trading days pass without entry confirmation
+//
+// EXIT:  Daily RSI reaches 50. Single full exit, no partials.
+//
+// STOP:  Lowest low (long) / highest high (short) between signal day and entry day,
+//        rounded DOWN to whole dollar (long) / UP to whole dollar (short).
+//
+// USAGE: Apply to a 15-minute chart on any US stock or ETF. The Strategy
+//        Tester will show backtest results.
+//
+// VERSION HISTORY:
+//   v1.0 - initial implementation (daily-bar entry on RSI+MACD alignment)
+//   v1.1 - added 15-min intraday entry confirmation + 3-day hard timeout
+// =============================================================================
+
+strategy(
+   "SID Strategy v1.1",
+   shorttitle           = "SID v1.1",
+   overlay              = true,
+   initial_capital      = 5000,
+   default_qty_type     = strategy.fixed,
+   default_qty_value    = 0,
+   pyramiding           = 0,
+   process_orders_on_close = true,
+   calc_on_every_tick   = false,
+   commission_type      = strategy.commission.percent,
+   commission_value     = 0.0,
+   slippage             = 0
+   )
+
+// ─── Inputs ──────────────────────────────────────────────────────────────────
+g_strat = "Strategy"
+i_accountSize   = input.float(10000.0, "Account size ($)", minval=100, group=g_strat)
+i_riskPct       = input.float(0.5,    "Risk per trade (%)", minval=0.1, maxval=5.0, step=0.1, group=g_strat,
+   tooltip="0.5% while paper trading. Move to 1-2% when live and consistently profitable.")
+i_rsiOversold   = input.int(30,       "RSI oversold (long signal)",   minval=10, maxval=45, group=g_strat)
+i_rsiOverbought = input.int(70,       "RSI overbought (short signal)", minval=55, maxval=90, group=g_strat)
+i_rsiExit       = input.int(50,       "RSI exit level", minval=30, maxval=70, group=g_strat)
+i_timeoutDays   = input.int(3,        "Hard timeout (trading days)", minval=1, maxval=10, group=g_strat)
+
+g_filt = "Filters"
+i_allowLongs    = input.bool(true,  "Allow long trades",  group=g_filt)
+i_allowShorts   = input.bool(true,  "Allow short trades", group=g_filt)
+i_useEarnings   = input.bool(true,  "Apply 14-day earnings blackout", group=g_filt)
+i_earningsDays  = input.int(14,     "Earnings blackout days",  minval=1, maxval=30, group=g_filt)
+
+g_disp = "Display"
+i_showTable   = input.bool(true,  "Show info table",                group=g_disp)
+i_showSignals = input.bool(true,  "Show signal + entry markers",    group=g_disp)
+i_showStops   = input.bool(true,  "Show stop line while in trade",  group=g_disp)
+
+// ─── Daily-timeframe values (work on any chart timeframe) ────────────────────
+// Note: lookahead_off is essential to avoid look-ahead bias in backtest.
+[macdLine_, macdSig_, _] = ta.macd(close, 12, 26, 9)
+
+dailyRSI       = request.security(syminfo.tickerid, "D", ta.rsi(close, 14),       lookahead=barmerge.lookahead_off)
+dailyRSIPrev   = request.security(syminfo.tickerid, "D", ta.rsi(close, 14)[1],    lookahead=barmerge.lookahead_off)
+dailyMACDLine  = request.security(syminfo.tickerid, "D", macdLine_,               lookahead=barmerge.lookahead_off)
+dailyMACDPrev  = request.security(syminfo.tickerid, "D", macdLine_[1],            lookahead=barmerge.lookahead_off)
+dailyLow       = request.security(syminfo.tickerid, "D", low,                     lookahead=barmerge.lookahead_off)
+dailyHigh      = request.security(syminfo.tickerid, "D", high,                    lookahead=barmerge.lookahead_off)
+dailyClose     = request.security(syminfo.tickerid, "D", close,                   lookahead=barmerge.lookahead_off)
+
+macdRising  = dailyMACDLine > dailyMACDPrev
+macdFalling = dailyMACDLine < dailyMACDPrev
+
+// ─── Earnings filter ─────────────────────────────────────────────────────────
+// Pine's request.earnings() returns EPS values, not future earnings dates.
+// True earnings-date awareness happens in the Node scanner (Alpaca/yfinance).
+// On-chart, we surface TradingView's built-in next-earnings timestamp.
+nextEarningsTime = request.security(syminfo.tickerid, "D", earnings.future_time, ignore_invalid_symbol=true, lookahead=barmerge.lookahead_off)
+hasEarnings      = not na(nextEarningsTime)
+daysToEarnings   = hasEarnings ? math.floor((nextEarningsTime - time) / (1000.0 * 60.0 * 60.0 * 24.0)) : 9999
+earningsBlackout = i_useEarnings and hasEarnings and daysToEarnings <= i_earningsDays
+
+// ─── Signal detection (fires once per new daily bar) ─────────────────────────
+isNewDailyBar = ta.change(time("D")) != 0
+
+dailySetupLong  = i_allowLongs  and dailyRSI < i_rsiOversold   and macdRising
+dailySetupShort = i_allowShorts and dailyRSI > i_rsiOverbought and macdFalling
+
+// ─── ARM state machine ──────────────────────────────────────────────────────
+var string armDir       = na     // "LONG" / "SHORT" / na
+var float  armSignalLow = na     // running lowest low since arm
+var float  armSignalHigh = na    // running highest high since arm
+var int    armBarsCount = 0      // daily bars elapsed since arm
+var int    armStartTime = na
+
+canArm = na(armDir) and strategy.position_size == 0 and not earningsBlackout
+
+// New-arm triggers only fire on new daily bar
+shouldArmLong  = isNewDailyBar and dailySetupLong  and canArm
+shouldArmShort = isNewDailyBar and dailySetupShort and canArm
+
+if shouldArmLong
+    armDir        := "LONG"
+    armSignalLow  := dailyLow
+    armSignalHigh := dailyHigh
+    armBarsCount  := 0
+    armStartTime  := time
+
+if shouldArmShort
+    armDir        := "SHORT"
+    armSignalLow  := dailyLow
+    armSignalHigh := dailyHigh
+    armBarsCount  := 0
+    armStartTime  := time
+
+// While armed, track the extremes of the signal-to-entry window
+if not na(armDir) and isNewDailyBar
+    armBarsCount  := armBarsCount + 1
+    armSignalLow  := math.min(armSignalLow,  dailyLow)
+    armSignalHigh := math.max(armSignalHigh, dailyHigh)
+
+// ─── Invalidation rules ─────────────────────────────────────────────────────
+invalidLong  = armDir == "LONG"  and isNewDailyBar and (dailyRSI >= i_rsiOversold   or not macdRising  or earningsBlackout or armBarsCount >= i_timeoutDays)
+invalidShort = armDir == "SHORT" and isNewDailyBar and (dailyRSI <= i_rsiOverbought or not macdFalling or earningsBlackout or armBarsCount >= i_timeoutDays)
+
+if invalidLong or invalidShort
+    armDir        := na
+    armSignalLow  := na
+    armSignalHigh := na
+    armBarsCount  := 0
+    armStartTime  := na
+
+// ─── Intraday entry confirmation (15-min candles during US session) ─────────
+// US cash session: 09:30-16:00 New York time
+inUSSession = not na(time(timeframe.period, "0930-1600", "America/New_York"))
+
+// 15-min candle direction
+candleGreen = close > open
+candleRed   = close < open
+
+readyToEnterLong  = armDir == "LONG"  and inUSSession and candleGreen
+readyToEnterShort = armDir == "SHORT" and inUSSession and candleRed
+
+// ─── Position sizing ────────────────────────────────────────────────────────
+riskAmount = i_accountSize * (i_riskPct / 100.0)
+
+stopLong  = na(armSignalLow)  ? na : math.floor(armSignalLow)
+stopShort = na(armSignalHigh) ? na : math.ceil(armSignalHigh)
+
+riskPerShareLong  = readyToEnterLong  and not na(stopLong)  ? close - stopLong  : na
+riskPerShareShort = readyToEnterShort and not na(stopShort) ? stopShort - close : na
+
+sharesLong  = not na(riskPerShareLong)  and riskPerShareLong  > 0 ? math.floor(riskAmount / riskPerShareLong)  : 0
+sharesShort = not na(riskPerShareShort) and riskPerShareShort > 0 ? math.floor(riskAmount / riskPerShareShort) : 0
+
+// ─── Execute entries ────────────────────────────────────────────────────────
+if readyToEnterLong and sharesLong > 0
+    strategy.entry("Long", strategy.long, qty=sharesLong)
+    strategy.exit("Stop L", from_entry="Long", stop=stopLong)
+    armDir        := na
+    armSignalLow  := na
+    armSignalHigh := na
+    armBarsCount  := 0
+    armStartTime  := na
+
+if readyToEnterShort and sharesShort > 0
+    strategy.entry("Short", strategy.short, qty=sharesShort)
+    strategy.exit("Stop S", from_entry="Short", stop=stopShort)
+    armDir        := na
+    armSignalLow  := na
+    armSignalHigh := na
+    armBarsCount  := 0
+    armStartTime  := na
+
+// ─── Exit on daily RSI = 50 ─────────────────────────────────────────────────
+if strategy.position_size > 0 and dailyRSI >= i_rsiExit
+    strategy.close("Long", comment="RSI 50 exit")
+
+if strategy.position_size < 0 and dailyRSI <= i_rsiExit
+    strategy.close("Short", comment="RSI 50 exit")
+
+// ─── On-chart markers ───────────────────────────────────────────────────────
+plotshape(i_showSignals and shouldArmLong,  title="Long signal armed",
+   style=shape.triangleup,   location=location.belowbar, color=color.new(color.green,  0), size=size.tiny)
+plotshape(i_showSignals and shouldArmShort, title="Short signal armed",
+   style=shape.triangledown, location=location.abovebar, color=color.new(color.red,    0), size=size.tiny)
+plotshape(i_showSignals and readyToEnterLong  and sharesLong  > 0, title="Long entry",
+   style=shape.arrowup,      location=location.belowbar, color=color.new(color.lime,    0), size=size.small)
+plotshape(i_showSignals and readyToEnterShort and sharesShort > 0, title="Short entry",
+   style=shape.arrowdown,    location=location.abovebar, color=color.new(color.fuchsia, 0), size=size.small)
+
+// Stop line while in trade
+inLong  = strategy.position_size > 0
+inShort = strategy.position_size < 0
+plot(i_showStops and inLong  ? strategy.position_avg_price : na, "Long entry price",  color=color.new(color.green, 50), style=plot.style_circles, linewidth=1)
+plot(i_showStops and inShort ? strategy.position_avg_price : na, "Short entry price", color=color.new(color.red,   50), style=plot.style_circles, linewidth=1)
+
+// ─── Info table ─────────────────────────────────────────────────────────────
+if i_showTable and barstate.islast
+    var table info = table.new(position.top_right, 2, 10, bgcolor=color.new(color.black, 70), border_width=1, border_color=color.new(color.gray, 50))
+
+    state    = strategy.position_size != 0 ? (inLong ? "IN TRADE (LONG)" : "IN TRADE (SHORT)") : (na(armDir) ? "IDLE" : "ARMED " + armDir)
+    rsiColor = dailyRSI < i_rsiOversold ? color.lime : dailyRSI > i_rsiOverbought ? color.red : color.white
+    macdTxt  = macdRising ? "rising" : macdFalling ? "falling" : "flat"
+    macdCol  = macdRising ? color.lime : macdFalling ? color.red : color.gray
+    earnTxt  = not hasEarnings ? "none" : (daysToEarnings <= i_earningsDays ? "BLACKOUT " + str.tostring(daysToEarnings) + "d" : str.tostring(daysToEarnings) + "d")
+    earnCol  = earningsBlackout ? color.red : color.white
+    stopTxt  = armDir == "LONG" ? "$" + str.tostring(stopLong, "#.##") : armDir == "SHORT" ? "$" + str.tostring(stopShort, "#.##") : "—"
+    sharesTxt = armDir == "LONG" ? str.tostring(sharesLong > 0 ? sharesLong : math.floor(riskAmount / math.max(close - stopLong, 0.01))) : armDir == "SHORT" ? str.tostring(sharesShort > 0 ? sharesShort : math.floor(riskAmount / math.max(stopShort - close, 0.01))) : "—"
+
+    table.cell(info, 0, 0, "SID Strategy v1.1", text_color=color.white, bgcolor=color.new(color.blue, 40))
+    table.cell(info, 1, 0, syminfo.ticker,       text_color=color.white, bgcolor=color.new(color.blue, 40))
+
+    table.cell(info, 0, 1, "State",              text_color=color.gray)
+    table.cell(info, 1, 1, state,                text_color=color.yellow)
+
+    table.cell(info, 0, 2, "Daily RSI(14)",      text_color=color.gray)
+    table.cell(info, 1, 2, str.tostring(dailyRSI, "#.#"), text_color=rsiColor)
+
+    table.cell(info, 0, 3, "MACD direction",     text_color=color.gray)
+    table.cell(info, 1, 3, macdTxt,              text_color=macdCol)
+
+    table.cell(info, 0, 4, "Days armed",         text_color=color.gray)
+    table.cell(info, 1, 4, na(armDir) ? "—" : str.tostring(armBarsCount) + " / " + str.tostring(i_timeoutDays), text_color=color.white)
+
+    table.cell(info, 0, 5, "Earnings",           text_color=color.gray)
+    table.cell(info, 1, 5, earnTxt,              text_color=earnCol)
+
+    table.cell(info, 0, 6, "Stop level",         text_color=color.gray)
+    table.cell(info, 1, 6, stopTxt,              text_color=color.white)
+
+    table.cell(info, 0, 7, "Shares (est.)",      text_color=color.gray)
+    table.cell(info, 1, 7, sharesTxt,            text_color=color.white)
+
+    table.cell(info, 0, 8, "Risk per trade",     text_color=color.gray)
+    table.cell(info, 1, 8, "$" + str.tostring(riskAmount, "#.##") + "  (" + str.tostring(i_riskPct) + "%)", text_color=color.white)
+
+    table.cell(info, 0, 9, "Account",            text_color=color.gray)
+    table.cell(info, 1, 9, "$" + str.tostring(i_accountSize, "#.##"), text_color=color.white)
+
+// ─── Alerts (webhook-ready JSON payloads for Telegram bridge) ───────────────
+alertcondition(shouldArmLong,
+   title="SID v1.1 - Long signal ARMED",
+   message='{"version":"1.1","strategy":"SID","symbol":"{{ticker}}","state":"ARMED","direction":"LONG","close":{{close}},"time":"{{time}}"}')
+
+alertcondition(shouldArmShort,
+   title="SID v1.1 - Short signal ARMED",
+   message='{"version":"1.1","strategy":"SID","symbol":"{{ticker}}","state":"ARMED","direction":"SHORT","close":{{close}},"time":"{{time}}"}')
+
+alertcondition(readyToEnterLong and sharesLong > 0,
+   title="SID v1.1 - Long entry CONFIRMED",
+   message='{"version":"1.1","strategy":"SID","symbol":"{{ticker}}","state":"ENTRY","direction":"LONG","close":{{close}},"time":"{{time}}"}')
+
+alertcondition(readyToEnterShort and sharesShort > 0,
+   title="SID v1.1 - Short entry CONFIRMED",
+   message='{"version":"1.1","strategy":"SID","symbol":"{{ticker}}","state":"ENTRY","direction":"SHORT","close":{{close}},"time":"{{time}}"}')
+
+alertcondition((strategy.position_size > 0 and dailyRSI >= i_rsiExit) or (strategy.position_size < 0 and dailyRSI <= i_rsiExit),
+   title="SID v1.1 - RSI 50 EXIT",
+   message='{"version":"1.1","strategy":"SID","symbol":"{{ticker}}","state":"EXIT","reason":"RSI50","close":{{close}},"time":"{{time}}"}')
