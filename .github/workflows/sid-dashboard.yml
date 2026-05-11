@@ -1,0 +1,73 @@
+name: SID Dashboard
+
+# Independent pipeline for the SID (Swing Intraday Day-trading) strategy.
+# Refreshes SID/scanner-sid.json from Yahoo via yfinance, then rebuilds the
+# self-contained cyberpunk dashboard at docs/sid/index.html.
+#
+# This intentionally lives apart from the Ironclad research workflow:
+# the SID dashboard is private (additive-only rule on shared Ironclad UI),
+# evolves on its own cadence, and a Yahoo outage here must NOT block the
+# Ironclad publish.
+
+on:
+  schedule:
+    # US market context — three refreshes per UK day
+    - cron: '0 13 * * 1-5'  # 14:00 UK / 09:00 ET — pre-open
+    - cron: '30 17 * * 1-5' # 18:30 UK / 13:30 ET — midday
+    - cron: '15 21 * * 1-5' # 22:15 UK / 17:15 ET — post-close
+  workflow_dispatch:        # Manual rebuild
+
+permissions:
+  contents: write           # Push the regenerated dashboard
+
+concurrency:
+  group: sid-dashboard
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_BIN: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install yfinance + pandas
+        run: pip install --quiet yfinance pandas
+
+      - name: Pull live SID trade logs from logs branch
+        run: |
+          git fetch origin logs
+          git checkout origin/logs -- SID/closed-positions-sid.json || echo "No closed-positions-sid.json on logs branch yet — skipping"
+          git checkout origin/logs -- SID/open-positions-sid.json   || echo "No open-positions-sid.json on logs branch yet — skipping"
+          git checkout origin/logs -- SID/sid-account.json          || echo "No sid-account.json on logs branch yet — skipping"
+
+      - name: Scan watchlist (SID/scanner-sid.json)
+        # continue-on-error: a Yahoo outage shouldn't block the dashboard.
+        # Without fresh scanner data the dashboard still renders historical
+        # signals from the last successful run.
+        working-directory: SID
+        continue-on-error: true
+        run: node scan-sid.js
+
+      - name: Build dashboard (docs/sid/index.html)
+        run: node SID/sid-dashboard.js
+
+      - name: Publish to GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/sid/index.html
+          git add SID/scanner-sid.json || true
+          git diff --staged --quiet || git commit -m "SID dashboard update $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash origin main
+          git push
