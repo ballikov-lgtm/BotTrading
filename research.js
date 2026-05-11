@@ -343,315 +343,6 @@ function readSidAccount() {
   return null;
 }
 
-// Read SID scanner output (watchlist signals + tradability scores)
-function readSidScanner() {
-  try {
-    if (fs.existsSync('./SID/scanner-sid.json')) {
-      return JSON.parse(fs.readFileSync('./SID/scanner-sid.json', 'utf8'));
-    }
-  } catch {}
-  return null;
-}
-
-// Render the SID Scanner tab body (returns HTML string).
-// Kept outside generateHTML to keep the main template manageable.
-function buildSidScannerHtml(scan) {
-  if (!scan || !Array.isArray(scan.tickers) || scan.tickers.length === 0) {
-    return `
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:24px;text-align:center;color:#8b949e">
-        <p style="margin:0 0 8px;color:#e6edf3;font-size:14px">No scanner data yet</p>
-        <p style="margin:0;font-size:13px">Run <code style="background:#0d1117;padding:2px 6px;border-radius:4px;color:#d29922">cd SID &amp;&amp; node scan-sid.js</code> to generate <code>SID/scanner-sid.json</code>.</p>
-      </div>`;
-  }
-
-  const scanDate = scan.scanDate ? new Date(scan.scanDate) : null;
-  const scanDateStr = scanDate
-    ? scanDate.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC'
-    : 'unknown';
-
-  // Status summary counts
-  const counts = {};
-  for (const t of scan.tickers) counts[t.status || 'UNKNOWN'] = (counts[t.status || 'UNKNOWN'] || 0) + 1;
-  const errCount = scan.tickers.filter(t => t.error).length;
-
-  // Status colour mapping (matches scanner CLI palette)
-  const statusColor = {
-    SIGNAL_LONG: '#3fb950', SIGNAL_SHORT: '#f85149',
-    OVERSOLD_WAIT_MACD: '#56d364', OVERBOUGHT_WAIT_MACD: '#ff7b72',
-    IN_TRADE: '#58a6ff',
-    APPROACHING_LONG: '#d29922', APPROACHING_SHORT: '#d29922',
-    EARNINGS_BLACKOUT: '#8b949e',
-    IDLE: '#6e7681',
-  };
-  const statusLabel = {
-    SIGNAL_LONG: '🟢 Signal long',  SIGNAL_SHORT: '🔴 Signal short',
-    OVERSOLD_WAIT_MACD: '🟢 Oversold (waiting MACD)',
-    OVERBOUGHT_WAIT_MACD: '🔴 Overbought (waiting MACD)',
-    IN_TRADE: '🔵 In trade',
-    APPROACHING_LONG: '🟡 Approaching long',
-    APPROACHING_SHORT: '🟡 Approaching short',
-    EARNINGS_BLACKOUT: '⚠️ Earnings blackout',
-    IDLE: '· Idle',
-  };
-
-  const scoreColor = s => s >= 80 ? '#3fb950' : s >= 60 ? '#d29922' : '#8b949e';
-  const macdGlyph  = d => d === 'rising' ? '<span style="color:#3fb950">↑ rising</span>'
-                       : d === 'falling' ? '<span style="color:#f85149">↓ falling</span>'
-                       : '<span style="color:#8b949e">— flat</span>';
-  const trendGlyph = t => t === 'up' ? '<span style="color:#3fb950">▲ up</span>'
-                       : t === 'down' ? '<span style="color:#f85149">▼ down</span>'
-                       : '<span style="color:#8b949e">~ choppy</span>';
-
-  const rows = scan.tickers.map(t => {
-    if (t.error) {
-      return `<tr><td>${t.symbol}</td><td colspan="9" style="color:#f85149">error: ${t.error}</td></tr>`;
-    }
-    const colour = statusColor[t.status] || '#8b949e';
-    const label  = statusLabel[t.status] || t.status;
-    const transTag = t.transitionedFrom
-      ? `<span style="color:#58a6ff;font-size:11px;margin-left:6px">← ${t.transitionedFrom}</span>`
-      : '';
-    const earningsTag = t.earningsBlackout
-      ? `<span style="color:#f85149">⚠ ${t.daysToEarnings}d</span>`
-      : (t.daysToEarnings != null ? `${t.daysToEarnings}d` : '—');
-    return `
-      <tr>
-        <td style="font-weight:600">${t.symbol}</td>
-        <td style="color:${colour}">${label}${transTag}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums">${t.rsi != null ? t.rsi.toFixed(1) : '—'}</td>
-        <td>${macdGlyph(t.macdDirection)}</td>
-        <td>${trendGlyph(t.weeklyTrend)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums">${t.weeklyAdx != null ? t.weeklyAdx.toFixed(1) : '—'}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums">${t.choppinessIdx != null ? t.choppinessIdx.toFixed(1) : '—'}</td>
-        <td style="text-align:right;color:${scoreColor(t.score || 0)};font-weight:600;font-variant-numeric:tabular-nums">${t.score ?? '—'}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums">${t.lastClose != null ? '$' + t.lastClose.toFixed(2) : '—'}</td>
-        <td style="text-align:right">${earningsTag}</td>
-      </tr>`;
-  }).join('');
-
-  // Summary stat tiles (only show non-zero categories)
-  const statTile = (n, label, color) =>
-    `<div class="stat"><div class="num" style="color:${color}">${n}</div><div class="label">${label}</div></div>`;
-  const statTiles = [
-    counts.SIGNAL_LONG          && statTile(counts.SIGNAL_LONG,          'Signal Long',        '#3fb950'),
-    counts.SIGNAL_SHORT         && statTile(counts.SIGNAL_SHORT,         'Signal Short',       '#f85149'),
-    counts.OVERSOLD_WAIT_MACD   && statTile(counts.OVERSOLD_WAIT_MACD,   'Oversold (MACD wait)','#56d364'),
-    counts.OVERBOUGHT_WAIT_MACD && statTile(counts.OVERBOUGHT_WAIT_MACD, 'Overbought (MACD wait)','#ff7b72'),
-    counts.IN_TRADE             && statTile(counts.IN_TRADE,             'In Trade',           '#58a6ff'),
-    (counts.APPROACHING_LONG || counts.APPROACHING_SHORT) &&
-      statTile((counts.APPROACHING_LONG || 0) + (counts.APPROACHING_SHORT || 0), 'Approaching', '#d29922'),
-    counts.IDLE                 && statTile(counts.IDLE,                 'Idle',               '#6e7681'),
-    errCount                    && statTile(errCount,                    'Errors',             '#f85149'),
-  ].filter(Boolean).join('');
-
-  return `
-    <div class="summary" style="margin-bottom:16px">
-      <strong>SID Watchlist Scanner v${scan.scannerVersion || '1.0'} · Strategy v${scan.strategyVersion || '1.1'}</strong>
-      &nbsp;·&nbsp; <span style="color:#8b949e">Last scan: ${scanDateStr}</span>
-      &nbsp;·&nbsp; <span style="color:#8b949e">${scan.tickersScanned} tickers · ${(scan.elapsedMs/1000).toFixed(1)}s</span>
-    </div>
-
-    <div class="stats" style="margin-bottom:24px">${statTiles}</div>
-
-    <h3 style="margin:0 0 12px;font-size:14px;color:#8b949e;font-weight:500">Watchlist (sorted: signals first, then by tradability score)</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Status</th>
-          <th style="text-align:right">RSI(14)</th>
-          <th>MACD</th>
-          <th>Weekly Trend</th>
-          <th style="text-align:right">Wk ADX</th>
-          <th style="text-align:right">Chop Idx</th>
-          <th style="text-align:right">Score</th>
-          <th style="text-align:right">Last Close</th>
-          <th style="text-align:right">Earnings</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-
-    <div style="margin-top:24px;padding:16px;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-size:12px;line-height:1.7">
-      <strong style="color:#e6edf3">How to read this</strong><br>
-      <strong>Status</strong>: SIGNAL = ready to ARM on TradingView · WAIT_MACD = RSI extreme but MACD not aligned · APPROACHING = RSI within 5pts of trigger · IDLE = no edge today.<br>
-      <strong>Score (0-100)</strong>: SID's fit for this stock. Weekly trend clarity (20), Weekly ADX in 15-35 band (20), Daily Choppiness &lt; 55 (15), Historical RSI extremes &lt;20/&gt;80 (25), Mean-reversion activity (20).<br>
-      <strong>Caveat</strong>: v1 scoring does NOT detect fake-out / double-top patterns yet (v2 work). High-score &amp; choppy stocks like FCX may still appear at the top — review manually.
-    </div>`;
-}
-
-// Render the SID Heatmap tab (RSI x Tradability Score scatter, inspired by CoinGlass RSI heatmap).
-// Pure SVG — no chart library required. Returns HTML string.
-function buildSidHeatmapHtml(scan) {
-  if (!scan || !Array.isArray(scan.tickers) || scan.tickers.length === 0) {
-    return `
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:24px;text-align:center;color:#8b949e">
-        <p style="margin:0 0 8px;color:#e6edf3;font-size:14px">No scanner data yet</p>
-        <p style="margin:0;font-size:13px">Run <code style="background:#0d1117;padding:2px 6px;border-radius:4px;color:#d29922">cd SID &amp;&amp; node scan-sid.js</code> first.</p>
-      </div>`;
-  }
-
-  const valid = scan.tickers.filter(t => !t.error && t.rsi != null && t.score != null);
-
-  // Canvas / mapping
-  const W = 1100, H = 620;
-  const padL = 70, padR = 40, padT = 50, padB = 60;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-  const xOf = rsi => padL + (Math.max(0, Math.min(100, rsi)) / 100) * innerW;
-  const yOf = score => padT + (1 - Math.max(0, Math.min(100, score)) / 100) * innerH;
-
-  const statusColor = {
-    SIGNAL_LONG: '#3fb950', SIGNAL_SHORT: '#f85149',
-    OVERSOLD_WAIT_MACD: '#56d364', OVERBOUGHT_WAIT_MACD: '#ff7b72',
-    IN_TRADE: '#58a6ff',
-    APPROACHING_LONG: '#d29922', APPROACHING_SHORT: '#d29922',
-    EARNINGS_BLACKOUT: '#8b949e', IDLE: '#6e7681',
-  };
-
-  // Background tint for oversold/overbought zones
-  const bgZones = `
-    <rect x="${xOf(0)}"  y="${padT}" width="${xOf(30) - xOf(0)}"  height="${innerH}" fill="#3fb950" opacity="0.06"/>
-    <rect x="${xOf(70)}" y="${padT}" width="${xOf(100) - xOf(70)}" height="${innerH}" fill="#f85149" opacity="0.06"/>
-  `;
-
-  // X-axis ticks at 0, 20, 30, 50, 70, 80, 100
-  const xTickVals = [0, 20, 30, 50, 70, 80, 100];
-  const xTicks = xTickVals.map(v => `
-    <line x1="${xOf(v)}" y1="${padT + innerH}" x2="${xOf(v)}" y2="${padT + innerH + 5}" stroke="#8b949e"/>
-    <text x="${xOf(v)}" y="${padT + innerH + 22}" text-anchor="middle" fill="#8b949e" font-size="11">${v}</text>
-  `).join('');
-
-  // Y-axis ticks
-  const yTickVals = [0, 20, 40, 60, 80, 100];
-  const yTicks = yTickVals.map(v => `
-    <line x1="${padL - 5}" y1="${yOf(v)}" x2="${padL}" y2="${yOf(v)}" stroke="#8b949e"/>
-    <text x="${padL - 10}" y="${yOf(v) + 4}" text-anchor="end" fill="#8b949e" font-size="11">${v}</text>
-  `).join('');
-
-  // Reference lines at RSI 30, 70 (signal thresholds) and Score 60, 80 (tradability bands)
-  const refLines = `
-    <line x1="${xOf(30)}" y1="${padT}" x2="${xOf(30)}" y2="${padT + innerH}" stroke="#3fb950" stroke-dasharray="4,4" opacity="0.5"/>
-    <line x1="${xOf(70)}" y1="${padT}" x2="${xOf(70)}" y2="${padT + innerH}" stroke="#f85149" stroke-dasharray="4,4" opacity="0.5"/>
-    <line x1="${padL}" y1="${yOf(60)}" x2="${padL + innerW}" y2="${yOf(60)}" stroke="#8b949e" stroke-dasharray="3,3" opacity="0.2"/>
-    <line x1="${padL}" y1="${yOf(80)}" x2="${padL + innerW}" y2="${yOf(80)}" stroke="#d29922" stroke-dasharray="3,3" opacity="0.3"/>
-  `;
-
-  // Light grid (subtle)
-  const grid = xTickVals.map(v => `<line x1="${xOf(v)}" y1="${padT}" x2="${xOf(v)}" y2="${padT + innerH}" stroke="#21262d" opacity="0.5"/>`).join('') +
-               yTickVals.map(v => `<line x1="${padL}" y1="${yOf(v)}" x2="${padL + innerW}" y2="${yOf(v)}" stroke="#21262d" opacity="0.5"/>`).join('');
-
-  // Dots — simple jitter on Y when scores collide so labels remain readable
-  // (group by integer score, fan out vertically by index in group)
-  const byScore = {};
-  for (const t of valid) {
-    const k = Math.round(t.score);
-    if (!byScore[k]) byScore[k] = [];
-    byScore[k].push(t);
-  }
-  const placement = new Map();
-  for (const [scoreKey, group] of Object.entries(byScore)) {
-    // Sort group by RSI so left-to-right ordering is predictable
-    group.sort((a, b) => a.rsi - b.rsi);
-    group.forEach((t, idx) => {
-      // Vertical jitter: spread up to ±6 score points across group
-      const offset = group.length > 1 ? ((idx - (group.length - 1) / 2) * 2) : 0;
-      placement.set(t.symbol, { x: t.rsi, y: t.score + offset });
-    });
-  }
-
-  const dots = valid.map(t => {
-    const p = placement.get(t.symbol);
-    const x = xOf(p.x), y = yOf(p.y);
-    const color = statusColor[t.status] || '#6e7681';
-    const r = t.status?.startsWith('SIGNAL') ? 22 : 18;
-    const tooltip = [
-      t.symbol,
-      `Status: ${t.status}`,
-      `RSI: ${t.rsi.toFixed(1)}`,
-      `Score: ${t.score}`,
-      `Weekly: ${t.weeklyTrend}`,
-      `MACD: ${t.macdDirection}`,
-      `Wk ADX: ${(t.weeklyAdx ?? 0).toFixed(1)}`,
-      `Chop: ${(t.choppinessIdx ?? 0).toFixed(1)}`,
-      `Last: $${t.lastClose?.toFixed(2)}`,
-    ].join('\n');
-    return `
-      <g>
-        <circle cx="${x}" cy="${y}" r="${r}" fill="${color}" fill-opacity="0.75" stroke="#0d1117" stroke-width="1.5">
-          <title>${tooltip}</title>
-        </circle>
-        <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="${t.symbol.length > 4 ? 8 : 10}" font-weight="600" pointer-events="none">${t.symbol}</text>
-      </g>`;
-  }).join('');
-
-  // Zone labels
-  const zoneLabels = `
-    <text x="${xOf(15)}" y="${padT + 22}" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="600" opacity="0.8">⬅ OVERSOLD · long signals</text>
-    <text x="${xOf(85)}" y="${padT + 22}" text-anchor="middle" fill="#f85149" font-size="12" font-weight="600" opacity="0.8">OVERBOUGHT · short signals ➡</text>
-    <text x="${xOf(50)}" y="${padT + 22}" text-anchor="middle" fill="#8b949e" font-size="11" opacity="0.6">neutral</text>
-  `;
-
-  // Axis labels
-  const axisLabels = `
-    <text x="${padL + innerW / 2}" y="${H - 15}" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600">Daily RSI (14)</text>
-    <text x="20" y="${padT + innerH / 2}" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" transform="rotate(-90 20 ${padT + innerH / 2})">SID Tradability Score</text>
-  `;
-
-  const svg = `
-    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;margin:0 auto;background:#0d1117;border:1px solid #30363d;border-radius:8px">
-      ${bgZones}
-      ${grid}
-      ${refLines}
-      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="#8b949e" stroke-width="1.2"/>
-      <line x1="${padL}" y1="${padT + innerH}" x2="${padL + innerW}" y2="${padT + innerH}" stroke="#8b949e" stroke-width="1.2"/>
-      ${xTicks}
-      ${yTicks}
-      ${zoneLabels}
-      ${axisLabels}
-      ${dots}
-    </svg>`;
-
-  // Legend
-  const legendItems = [
-    { c: '#3fb950', l: 'Signal Long (ready to ARM)' },
-    { c: '#f85149', l: 'Signal Short (ready to ARM)' },
-    { c: '#56d364', l: 'Oversold — waiting MACD' },
-    { c: '#ff7b72', l: 'Overbought — waiting MACD' },
-    { c: '#d29922', l: 'Approaching' },
-    { c: '#58a6ff', l: 'In Trade' },
-    { c: '#6e7681', l: 'Idle' },
-  ];
-  const legendHtml = `
-    <div style="display:flex;flex-wrap:wrap;gap:18px;justify-content:center;margin-top:14px;padding:14px;background:#161b22;border:1px solid #30363d;border-radius:8px;font-size:12px;color:#c9d1d9">
-      ${legendItems.map(l => `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:12px;height:12px;background:${l.c};border-radius:50%;border:1px solid #0d1117"></span>${l.l}</div>`).join('')}
-    </div>`;
-
-  const scanDate = scan.scanDate ? new Date(scan.scanDate) : null;
-  const scanDateStr = scanDate
-    ? scanDate.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC'
-    : 'unknown';
-
-  return `
-    <div class="summary" style="margin-bottom:16px">
-      <strong>SID Heatmap</strong> &nbsp;·&nbsp;
-      <span style="color:#8b949e">RSI (x) vs Tradability Score (y) &nbsp;·&nbsp; ${valid.length} tickers &nbsp;·&nbsp; ${scanDateStr}</span><br>
-      <span style="color:#8b949e;font-size:12px">Hover any dot for details. Larger circles = active signals.</span>
-    </div>
-
-    ${svg}
-
-    ${legendHtml}
-
-    <div style="margin-top:18px;padding:16px;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#8b949e;font-size:12px;line-height:1.7">
-      <strong style="color:#e6edf3">How to read it</strong><br>
-      <strong>Top-left</strong> (high score · RSI &lt; 30): the gold zone for long entries — SID-friendly stocks that are oversold.<br>
-      <strong>Top-right</strong> (high score · RSI &gt; 70): the gold zone for short entries.<br>
-      <strong>Bottom half</strong>: low SID-fit (choppy / weak trend) — review manually before trading.<br>
-      Vertical dashed lines mark RSI 30 / 70. Background tint highlights the extreme zones. Horizontal lines at score 60 (caution) and 80 (high quality).
-    </div>`;
-}
-
 function readOpenPositions() {
   try {
     if (!fs.existsSync('./open-positions-ironclad.json')) return [];
@@ -997,9 +688,7 @@ function categoryBadge(cat) {
   return map[cat] || '📊';
 }
 
-function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositions = [], sidScanner = null) {
-  const sidScannerHtml = buildSidScannerHtml(sidScanner);
-  const sidHeatmapHtml = buildSidHeatmapHtml(sidScanner);
+function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositions = []) {
   const td = tradeData.today;
   const at = tradeData.allTime;
 
@@ -1345,8 +1034,6 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="research">📊 Market Research</button>
     <button class="tab-btn"        data-tab="history">📈 Trade History</button>
-    <button class="tab-btn"        data-tab="sid-scanner">🎯 SID Scanner</button>
-    <button class="tab-btn"        data-tab="sid-heatmap">🗺️ SID Heatmap</button>
     <button class="tab-btn"        data-tab="setup">⚙️ Setup Guide</button>
   </nav>
 
@@ -1502,21 +1189,7 @@ function generateHTML(date, summary, signals, bitgetPairs, tradeData, openPositi
   </div><!-- /tab-history -->
 
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <!-- TAB 3 — SID Scanner (additive; data from SID/scanner-sid.json)         -->
-  <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <div id="tab-sid-scanner" class="tab-pane">
-    ${sidScannerHtml}
-  </div><!-- /tab-sid-scanner -->
-
-  <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <!-- TAB 4 — SID Heatmap (RSI x Tradability Score scatter, à la CoinGlass)  -->
-  <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <div id="tab-sid-heatmap" class="tab-pane">
-    ${sidHeatmapHtml}
-  </div><!-- /tab-sid-heatmap -->
-
-  <!-- ═══════════════════════════════════════════════════════════════════════ -->
-  <!-- TAB 4 — Setup Guide                                                     -->
+  <!-- TAB 3 — Setup Guide                                                     -->
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <div id="tab-setup" class="tab-pane">
 
@@ -1904,7 +1577,6 @@ async function run() {
   const safetyLog       = readSafetyLog();
   const closedPositions = readClosedPositions();
   const sidAccount      = readSidAccount();
-  const sidScanner      = readSidScanner();
   const openPositions   = readOpenPositions();
   console.log(`Closed positions loaded: ${closedPositions.size} realized P&L record(s)`);
   console.log(`Open positions loaded: ${openPositions.length} position(s)`);
@@ -1944,7 +1616,7 @@ async function run() {
 
   // Generate and save HTML dashboard
   if (!fs.existsSync('./docs')) fs.mkdirSync('./docs');
-  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeData, openPositions, sidScanner);
+  const html = generateHTML(date, research.summary, signals, bitgetPairs, tradeData, openPositions);
   fs.writeFileSync('./docs/index.html', html);
   console.log(`\nDashboard saved to docs/index.html`);
 }
