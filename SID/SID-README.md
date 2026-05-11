@@ -2,8 +2,11 @@
 
 A slow and steady swing trading strategy focused exclusively on **US stocks and ETFs**. Designed for consistent gains over a 12-month horizon using two indicators and a strict set of rules to avoid volatility events.
 
-**Bot file:** `bot-sid.js`  
-**Trade log:** `trades-sid.csv`  
+**Current version:** v1.1 — daily-bar signal with 15-min intraday entry confirmation (see [Version History](#version-history)).
+
+**Bot file:** `bot-sid.js`
+**PineScript:** `pine/sid-strategy.pine` (backtest on TradingView, 15-min chart)
+**Trade log:** `trades-sid.csv`
 **Position tracker:** `open-positions-sid.json` / `closed-positions-sid.json`
 
 ---
@@ -24,51 +27,80 @@ A slow and steady swing trading strategy focused exclusively on **US stocks and 
 
 ---
 
-## Core Logic
+## Core Logic (v1.1)
 
-### Step 1 — Signal Condition
-- **Long:** RSI drops below 30 (oversold). This is the **signal date**.
-- **Short:** RSI rises above 70 (overbought). This is the **signal date**.
+The strategy works in **two stages**: a daily-bar signal arms the trade, then a 15-minute intraday candle confirms entry. The two-stage design (added in v1.1) is specifically to avoid the common fake-reversal trap where RSI dips into oversold but the move continues lower the next day.
+
+### Step 1 — Signal Condition (daily close)
+On the daily candle close:
+- **Long signal:** RSI(14) < 30 **AND** daily MACD line pointing up (rising vs. prior daily close)
+- **Short signal:** RSI(14) > 70 **AND** daily MACD line pointing down (falling vs. prior daily close)
+
+When this fires, the trade is **ARMED**. An alert is sent. No entry is taken yet.
 
 ### Step 2 — Earnings Check
-Before entering, check whether an earnings announcement falls within **14 calendar days** of today. If yes — **skip the trade entirely, regardless of how good the setup looks**. Earnings cause unpredictable gaps and spikes that invalidate the strategy's risk assumptions.
+Before arming, check whether an earnings announcement falls within **14 calendar days** of today. If yes — **skip the trade entirely, regardless of how good the setup looks**. Earnings cause unpredictable gaps and spikes that invalidate the strategy's risk assumptions.
 
-### Step 3 — Entry Trigger
-Wait for RSI and MACD to align **at the same time** on the same day:
-- **Long entry:** RSI pointing up AND MACD pointing up (or crossing up). Entry is on that candle's close.
-- **Short entry:** RSI pointing down AND MACD pointing down (or crossing down). Entry is on that candle's close.
+### Step 3 — Entry Confirmation (next US session, 15-min bars)
+After ARMED, poll every 15 minutes during the US cash session (09:30–16:00 ET / 14:30–21:00 UTC):
+- **Long entry:** the most recent 15-min candle closes **green** (close > open). Enter at that candle's close.
+- **Short entry:** the most recent 15-min candle closes **red** (close < open). Enter at that candle's close.
 
-The MACD does **not** have to cross — it can simply be pointing in the same direction as RSI. Both are valid entry signals.
+The intraday candle is the confirmation that the reversal has actually started.
 
-### Step 4 — Stop Loss
-Placed between the signal date and the entry date:
-- **Long:** Lowest low between signal date and entry date, **rounded DOWN** to the nearest whole dollar
-- **Short:** Highest high between signal date and entry date, **rounded UP** to the nearest whole dollar
+### Step 4 — Signal Expiry
+An ARMED signal cancels (no entry) if any of the following happens before confirmation:
+- Daily RSI exits the oversold/overbought zone on a new daily close (RSI ≥ 30 for long, ≤ 70 for short)
+- Daily MACD line flips direction on a new daily close
+- An earnings date enters the 14-day blackout window
+- **3 trading days** pass without entry confirmation (hard timeout)
 
-### Step 5 — Take Profit
-Exit when **RSI reaches 50**. Set an alert. There are no partial closes — the full position exits at this level.
+### Step 5 — Stop Loss
+Placed using the daily-bar extremes during the signal-to-entry window:
+- **Long:** Lowest daily low between signal date and entry date, **rounded DOWN** to the nearest whole dollar
+- **Short:** Highest daily high between signal date and entry date, **rounded UP** to the nearest whole dollar
+
+### Step 6 — Take Profit
+Exit when **daily RSI reaches 50**. Set an alert. There are no partial closes — the full position exits at this level.
 
 ---
 
-## Entry Checklist (Long)
+## Entry Checklist (Long) — v1.1
 
-- [ ] RSI(14) default settings
-- [ ] MACD(12, 26, 9) default settings — histogram hidden
-- [ ] RSI < 30 signal detected → note the signal date
+**Stage 1 — Signal (daily close, ~21:00 UTC)**
+- [ ] RSI(14) default settings, MACD(12, 26, 9) default settings — histogram hidden
+- [ ] Daily RSI < 30 detected
+- [ ] Daily MACD line pointing up
 - [ ] No earnings date within 14 calendar days
-- [ ] RSI and MACD both pointing up at the same time → entry date
-- [ ] Stop loss = lowest low (signal date → entry date) rounded down to whole dollar
-- [ ] Take profit alert set at RSI 50
+- [ ] Signal armed → alert sent
 
-## Entry Checklist (Short)
+**Stage 2 — Entry (next US session, every 15 min)**
+- [ ] Daily RSI still < 30 on most recent daily close
+- [ ] Daily MACD still pointing up
+- [ ] Within 3 trading days of signal
+- [ ] Most recent 15-min candle closed green (close > open) → enter at that close
 
-- [ ] RSI(14) default settings
-- [ ] MACD(12, 26, 9) default settings — histogram hidden
-- [ ] RSI > 70 signal detected → note the signal date
+**Stage 3 — Management**
+- [ ] Stop loss = lowest daily low (signal date → entry date) rounded DOWN to whole dollar
+- [ ] Take profit alert set at daily RSI 50
+
+## Entry Checklist (Short) — v1.1
+
+**Stage 1 — Signal (daily close)**
+- [ ] Daily RSI > 70 detected
+- [ ] Daily MACD line pointing down
 - [ ] No earnings date within 14 calendar days
-- [ ] RSI and MACD both pointing down at the same time → entry date
-- [ ] Stop loss = highest high (signal date → entry date) rounded up to whole dollar
-- [ ] Take profit alert set at RSI 50
+- [ ] Signal armed → alert sent
+
+**Stage 2 — Entry (next US session, every 15 min)**
+- [ ] Daily RSI still > 70 on most recent daily close
+- [ ] Daily MACD still pointing down
+- [ ] Within 3 trading days of signal
+- [ ] Most recent 15-min candle closed red (close < open) → enter at that close
+
+**Stage 3 — Management**
+- [ ] Stop loss = highest daily high (signal date → entry date) rounded UP to whole dollar
+- [ ] Take profit alert set at daily RSI 50
 
 ---
 
@@ -200,6 +232,7 @@ BitGet offers a small number of US stock CFDs (AAPL, TSLA, MSFT, NVDA, GOOGL, ME
 | Version | Date | Change |
 |---------|------|--------|
 | v1.0 | Apr 2026 | Initial implementation — RSI(14) + MACD(12,26,9), daily chart, US stocks/ETFs |
+| v1.1 | 10 May 2026 | Two-stage entry: daily signal arms the trade; entry now requires a 15-min intraday candle closing in trade direction during the next US session. Added 3-day hard timeout on armed signals. Goal: avoid fake reversals where RSI dips into oversold but the move continues lower the next day. |
 
 ---
 
