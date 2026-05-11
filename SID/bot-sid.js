@@ -2,6 +2,8 @@ import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
 
+import { createExecutor, resolveTradingMode } from './alpaca-executor.js';
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
@@ -11,7 +13,8 @@ const CONFIG = {
   maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 3,      // Never hold more than 3 at once
   maxPerDay:        parseInt(process.env.SID_MAX_PER_DAY)        || 1,      // Max new entries per run
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
-  paperTrading:     process.env.SID_PAPER !== 'false',
+  paperTrading:     process.env.SID_PAPER !== 'false',                       // legacy flag — still honoured for trade-log labelling
+  tradingMode:      resolveTradingMode(),                                    // 'dry_run' | 'paper' | 'live' — controls Alpaca execution
 };
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
@@ -363,7 +366,7 @@ function calcPositionSize(entry, stopLoss) {
 // Walks through daily candles since the position was opened to find the first
 // day where RSI crossed 50. Uses that day's close as the exit price.
 
-async function checkPositions() {
+async function checkPositions(executor = null) {
   const openPositions   = loadOpenPositions();
   const closedPositions = loadClosedPositions();
 
@@ -437,6 +440,22 @@ async function checkPositions() {
     const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
     const icon    = outcome === 'WIN' ? '✅' : '❌';
 
+    // ── Send exit order to Alpaca if running paper/live ──────────────────────
+    // For RSI 50 exits we submit a market close (Alpaca's stop order handles SL
+    // fills server-side, which the next syncPositions run will reconcile).
+    // If the Alpaca close fails, leave the position open locally and try again
+    // next run — do NOT realise P&L on a phantom exit.
+    if (executor && exitLevel === 'rsi50') {
+      try {
+        await executor.closePosition(pos, `RSI 50 reached (${exitCandle.rsi?.toFixed(1)})`);
+      } catch (err) {
+        console.log(`    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
+        writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
+        stillOpen.push(pos);
+        continue;
+      }
+    }
+
     // Update compounding account balance
     const updatedAccount = updateAccount(realizedPnl);
     const growthPct      = ((updatedAccount.accountUsd - updatedAccount.startingUsd) / updatedAccount.startingUsd * 100).toFixed(2);
@@ -478,9 +497,58 @@ async function run() {
   console.log(`\n══ SID Bot run ${new Date().toISOString()} ══`);
   console.log(`Account : $${account.accountUsd.toFixed(2)}  (started $${account.startingUsd}  ${growthSign}${growthPct}%  ${account.tradeCount} closed trades)`);
   console.log(`Sizing  : ${(CONFIG.riskPct * 100).toFixed(1)}% risk/trade  Max position: ${(CONFIG.maxPositionPct * 100).toFixed(0)}% = $${(CONFIG.accountUsd * CONFIG.maxPositionPct).toFixed(2)}`);
-  console.log(`Max open: ${CONFIG.maxOpenPositions}  Earnings window: ${CONFIG.earningsWindow} days  Paper: ${CONFIG.paperTrading}`);
+  console.log(`Max open: ${CONFIG.maxOpenPositions}  Earnings window: ${CONFIG.earningsWindow} days  Mode: ${CONFIG.tradingMode.toUpperCase()}`);
   console.log(`Symbols : ${WATCHLIST.length} stocks/ETFs`);
   console.log(`─`.repeat(60));
+
+  // ── Alpaca executor — created only when SID_TRADING_MODE != dry_run ──────
+  // Returns null in dry_run mode. Returns a paper/live executor otherwise.
+  // From here on, "executor" is the single touchpoint for any order action.
+  const executor = createExecutor();
+
+  if (executor) {
+    const preflight = await executor.preflight();
+    if (!preflight.ok) {
+      console.error(`\n🚫 Alpaca preflight failed (${preflight.reason}): ${preflight.detail}`);
+      console.error('   Aborting run to avoid placing orders in an unknown state.');
+      writeLog({ kind: 'preflight_fail', reason: preflight.reason, detail: preflight.detail });
+      return;
+    }
+
+    // Trust Alpaca's account equity over the local compounding ledger when
+    // we're actually trading through them. This means the bot sizes against
+    // the real broker balance including fills, dividends, and FX.
+    if (preflight.equity > 0) {
+      CONFIG.accountUsd = preflight.equity;
+      console.log(`[Alpaca] Equity     : $${preflight.equity.toFixed(2)}  (used for position sizing this run)`);
+      console.log(`[Alpaca] Buying pwr : $${preflight.buyingPower.toFixed(2)}`);
+      console.log(`[Alpaca] Market open: ${preflight.marketOpen ? 'YES' : 'NO'}  next open: ${preflight.nextOpen}`);
+    }
+
+    if (!preflight.marketOpen) {
+      console.log(`\n⏸  Market is closed — will read positions but place no orders this run.`);
+    }
+
+    // Sync local open positions against Alpaca's authoritative view.
+    // Any positions Alpaca no longer has (because a stop filled overnight, say)
+    // get pulled out of open-positions-sid.json. The local position monitor
+    // (checkPositions) still runs for RSI 50 evaluation on what remains.
+    try {
+      const localOpen = loadOpenPositions();
+      const { stillOpen, closedExternally } = await executor.syncPositions(localOpen);
+      if (closedExternally.length) {
+        console.log(`[Alpaca] Reconciliation: ${closedExternally.length} position(s) closed externally (stop fills?)`);
+        for (const pos of closedExternally) {
+          console.log(`           - ${pos.symbol} ${pos.side} ${pos.shares}sh @ $${pos.entry}`);
+          writeLog({ kind: 'external_close', symbol: pos.symbol, position: pos });
+        }
+        saveOpenPositions(stillOpen);
+      }
+    } catch (err) {
+      console.error(`[Alpaca] Position sync failed: ${err.message} — continuing with local data`);
+      writeLog({ kind: 'sync_fail', error: err.message });
+    }
+  }
 
   // ── Weekend guard (stocks/ETFs only — markets are closed Sat/Sun) ─────────
   // Any signal fired on a weekend is driven by Friday's stale close price.
@@ -495,7 +563,7 @@ async function run() {
   }
 
   // Step 0: Check open positions for RSI-50 exits
-  await checkPositions();
+  await checkPositions(executor);
 
   // Step 1: Check if we're already at the position limit
   const openPositions = loadOpenPositions();
@@ -572,8 +640,7 @@ async function run() {
       continue;
     }
 
-    // All checks passed — log the paper trade
-    const orderId = `SID-PAPER-${Date.now()}`;
+    // All checks passed — prepare the trade record
     const now     = new Date();
 
     console.log(`✓ ${signal.signal.toUpperCase()}`);
@@ -588,10 +655,40 @@ async function run() {
       console.log(`    Earnings : Next → ${earningsDates[0]} (${Math.round((new Date(earningsDates[0]) - now) / 86400000)} days away) ✅ clear`);
     }
 
+    // ── Submit to Alpaca (paper or live) ─────────────────────────────────────
+    // In dry_run mode (executor=null) we just record the trade locally as before.
+    // In paper/live mode we place a real order and use Alpaca's order ID as the
+    // canonical identifier — this lets us reconcile later.
+    let orderId   = `SID-DRYRUN-${Date.now()}`;
+    let exchange  = 'Yahoo/DryRun';
+    let modeLabel = 'dry_run';
+
+    if (executor) {
+      try {
+        const result = await executor.openEntry({ signal, sizing, symbol });
+        orderId   = result.entryOrderId;
+        exchange  = `Alpaca/${CONFIG.tradingMode}`;
+        modeLabel = CONFIG.tradingMode;
+        console.log(`    Order ID : ${orderId} (stop ${result.stopOrderId})`);
+      } catch (err) {
+        console.log(`    🚫 Alpaca entry FAILED: ${err.message}`);
+        writeLog({
+          kind:   'order_fail',
+          symbol,
+          signal: signal.signal,
+          error:  err.message,
+          status: err.status,
+          body:   err.body,
+        });
+        // Don't record this trade locally — the signal didn't actually open
+        continue;
+      }
+    }
+
     const row = [
       now.toISOString().slice(0, 10),
       now.toISOString().slice(11, 19),
-      'Yahoo/Paper',
+      exchange,
       symbol,
       signal.signal,
       sizing.shares,
@@ -602,7 +699,7 @@ async function run() {
       sizing.riskPct,
       signal.signalDate,
       orderId,
-      'paper',
+      modeLabel,
       `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
 
@@ -620,6 +717,7 @@ async function run() {
       signalDate: signal.signalDate,
       openDate:   now.toISOString().slice(0, 10),
       openTime:   now.toISOString().slice(11, 19),
+      mode:       modeLabel,
       strategy:   `${BOT_NAME} ${BOT_VERSION}`,
     });
 

@@ -27,6 +27,7 @@ jobs:
       - name: Run SID bot
         working-directory: SID
         env:
+          # ── SID strategy config ──────────────────────────────────────────
           SID_ACCOUNT_USD:     ${{ secrets.SID_ACCOUNT_USD }}
           SID_RISK_PCT:        ${{ secrets.SID_RISK_PCT }}
           SID_MAX_POS_PCT:     ${{ secrets.SID_MAX_POS_PCT }}
@@ -34,6 +35,21 @@ jobs:
           SID_MAX_PER_DAY:     ${{ secrets.SID_MAX_PER_DAY }}
           SID_EARNINGS_WINDOW: ${{ secrets.SID_EARNINGS_WINDOW }}
           SID_PAPER:           ${{ secrets.SID_PAPER }}
+
+          # ── Alpaca execution (see SID-ALPACA-SETUP.md for setup) ─────────
+          # SID_TRADING_MODE controls what happens with each signal:
+          #   dry_run (default if secret unset) — no Alpaca calls, log only
+          #   paper                              — Alpaca paper account
+          #   live                               — Alpaca live account
+          #                                        (also requires SID_LIVE_CONFIRMED
+          #                                         = YES_I_REALLY_MEAN_IT)
+          # If ALPACA_KEY_ID / ALPACA_SECRET_KEY are unset, the executor
+          # automatically falls back to dry_run regardless of mode.
+          SID_TRADING_MODE:    ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED:  ${{ secrets.SID_LIVE_CONFIRMED }}
+          ALPACA_KEY_ID:       ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
         run: node bot-sid.js
 
       - name: Save trade logs
