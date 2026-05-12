@@ -416,5 +416,43 @@
     "closeDate": "2026-05-11",
     "closeTime": "14:30:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1778502714153",
+    "symbol": "ETHUSDT",
+    "side": "short",
+    "entry": 2336.7,
+    "stopLoss": 2359.8636,
+    "takeProfit": 2301.9546,
+    "qty": 0.00214,
+    "totalUsd": 5,
+    "openDate": "2026-05-11",
+    "openTime": "12:31:54",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.223,
+    "exitLevel": "tp1",
+    "exitPrice": 2301.9546,
+    "closeDate": "2026-05-12",
+    "closeTime": "01:30:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1778573361296",
+    "symbol": "XRPUSDT",
+    "side": "long",
+    "entry": 1.46,
+    "stopLoss": 1.439,
+    "takeProfit": 1.5022,
+    "qty": 3.414601,
+    "totalUsd": 5,
+    "openDate": "2026-05-12",
+    "openTime": "08:09:21",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.2158,
+    "exitLevel": "sl",
+    "exitPrice": 1.439,
+    "closeDate": "2026-05-12",
+    "closeTime": "13:45:00",
+    "outcome": "LOSS"
   }
 ]
