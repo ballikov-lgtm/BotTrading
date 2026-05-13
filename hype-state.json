@@ -9,6 +9,8 @@
   "tp2OrderId": null,
   "tp3OrderId": null,
   "log": [
+    "2026-05-13T13:02Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22047\",\"msg\":\"The order price exceeds the maximum price limit: 45.169\",\"requestTime\":1778677376881,\"data\":null}",
+    "2026-05-13T13:02Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-05-13T12:48Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22047\",\"msg\":\"The order price exceeds the maximum price limit: 44.989\",\"requestTime\":1778676501582,\"data\":null}",
     "2026-05-13T12:48Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-05-13T12:33Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22047\",\"msg\":\"The order price exceeds the maximum price limit: 44.867\",\"requestTime\":1778675594363,\"data\":null}",
@@ -156,8 +158,6 @@
     "2026-05-12T19:52Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1778615520303,\"data\":null}",
     "2026-05-12T19:52Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-05-12T19:36Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1778614618956,\"data\":null}",
-    "2026-05-12T19:36Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-05-12T19:21Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1778613719212,\"data\":null}",
-    "2026-05-12T19:21Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
+    "2026-05-12T19:36Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
   ]
 }
