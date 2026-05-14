@@ -19,7 +19,15 @@ const CONFIG = {
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v1.0'; // v1.0 initial — RSI(14) + MACD(12,26,9), daily chart, US stocks/ETFs only
+const BOT_VERSION = 'v1.5'; // v1.5: pre-only earnings blackout (allow day-after) + locked v1.4 filters
+// Version history:
+//   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
+//   v1.1 15-min intraday entry confirmation
+//   v1.2 instructor-aligned: sticky RSI signal, MACD direction-align entry
+//   v1.3 RSI overbought 70->75, RSI(3) rebound-zone confirm
+//   v1.4 weekly 50/200 SMA trend filter
+//   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings,
+//        trade allowed day after). v1.4 locked at git tag sid-v1.4-baseline.
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
@@ -185,11 +193,18 @@ async function fetchEarningsDates(symbol) {
 }
 
 function isWithinEarningsWindow(earningsDates, windowDays) {
+  // v1.5 rule clarification — block trade ONLY if earnings is within the
+  // next `windowDays` calendar days (i.e., we're inside the pre-earnings
+  // window). Past earnings dates no longer block — trading the day after
+  // earnings is permitted and is in fact often a high-confidence entry
+  // because the announcement risk has just been removed.
   const today = new Date();
   for (const dateStr of earningsDates) {
     const earningsDate = new Date(dateStr);
-    const daysAway = Math.abs((earningsDate - today) / (1000 * 60 * 60 * 24));
-    if (daysAway <= windowDays) return { blocked: true, date: dateStr, daysAway: Math.round(daysAway) };
+    const daysFromNow = (earningsDate - today) / (1000 * 60 * 60 * 24);
+    if (daysFromNow >= 0 && daysFromNow <= windowDays) {
+      return { blocked: true, date: dateStr, daysAway: Math.round(daysFromNow) };
+    }
   }
   return { blocked: false };
 }
