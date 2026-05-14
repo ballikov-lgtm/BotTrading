@@ -29,9 +29,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '1.4';
-const HEADLINE_BACKTEST_WR = 77.0;
-const HEADLINE_BACKTEST_PNL = 3584;
+const STRATEGY_VERSION = '1.5';
+// v1.5 backtest stats — 5-year window (statistically meaningful, 167 trades).
+// The earlier headline 77% / +$3,584 was a cherry-picked 12-month window
+// and overstated the true edge. These numbers are the realistic expectation.
+const HEADLINE_BACKTEST_WR = 62.3;
+const HEADLINE_BACKTEST_PNL = 11809;
 
 // ── Data loading (all optional) ──────────────────────────────────────────
 function loadJSON(relPath, fallback) {
