@@ -1,17 +1,17 @@
 //@version=6
 // =============================================================================
-// SID MACD Signals v1.5
+// SID MACD Signals v1.6
 // =============================================================================
-// Companion indicator to sid-strategy.pine v1.5. Plots the daily MACD on its
-// own pane with arrows that match the strategy's v1.5 filter logic.
+// Companion indicator to sid-strategy.pine v1.6. Plots the daily MACD on its
+// own pane with arrows that match the strategy's v1.6 filter logic.
 //
-// v1.5 filters (mirror the strategy):
+// v1.6 filters (mirror the strategy):
 //   - RSI(3) rebound-zone confirmation
 //   - Weekly trend filter
 // =============================================================================
 
 indicator(
-   "SID MACD Signals v1.5",
+   "SID MACD Signals v1.6",
    shorttitle = "SID MACD",
    overlay    = false,
    format     = format.price,

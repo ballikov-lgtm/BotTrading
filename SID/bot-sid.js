@@ -19,38 +19,73 @@ const CONFIG = {
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v1.5'; // v1.5: pre-only earnings blackout (allow day-after) + locked v1.4 filters
+const BOT_VERSION = 'v1.6'; // v1.6: PPI filter + REFINED 47 watchlist (5-year backtest curation)
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
 //   v1.2 instructor-aligned: sticky RSI signal, MACD direction-align entry
 //   v1.3 RSI overbought 70->75, RSI(3) rebound-zone confirm
-//   v1.4 weekly 50/200 SMA trend filter
-//   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings,
-//        trade allowed day after). v1.4 locked at git tag sid-v1.4-baseline.
+//   v1.4 weekly 50/200 SMA trend filter (locked at tag sid-v1.4-baseline)
+//   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings)
+//   v1.6 PPI blackout (14 days pre-PPI release) + REFINED 47 watchlist.
+//        Backtest: 74.8% WR, PF 3.20, +$12,574 over 5y. v1.5 locked at tag
+//        sid-v1.5-baseline. Note: FOMC/CPI blackouts were tested and REJECTED
+//        (they actively hurt WR — see backtest-v1.7-validation-report.md).
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
 const CLOSED_PATH     = './closed-positions-sid.json';
 const ACCOUNT_PATH    = './sid-account.json';
 const SAFETY_LOG_PATH = './sid-log.json';
+const WATCHLIST_PATH  = './watchlist-sid.json';
+const EVENT_DATES_PATH= './event-dates.json';
 
-// ── Advisory Watchlist ────────────────────────────────────────────────────────
-// This list is NOT fixed. Remove stocks that repeatedly underperform.
-// Add new stocks when market research or sentiment signals a swing opportunity.
-// See SID-README.md for the full watchlist management policy.
-const WATCHLIST = [
-  // ETFs — broad market and sector
-  'DIA', 'IWM', 'QQQ', 'SPY',
-  'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY',
-  'SLV', 'GOLD', 'SQQQ', 'TNA', 'TQQQ', 'TZA', 'QYLD',
-  // Individual stocks
-  'AAPL', 'AMD', 'AMZN', 'BA', 'BAC', 'CAT',
-  'COST', 'DIS', 'DKS', 'ETSY', 'FCX', 'FDX',
-  'GM', 'GOOG', 'GS', 'HD', 'IBM', 'INTC',
-  'JPM', 'MA', 'META', 'MCD', 'MSFT', 'PYPL',
-  'TGT', 'TSLA', 'VZ', 'WMT',
+// ── Watchlist (loaded from watchlist-sid.json — currently REFINED 47) ─────────
+// The watchlist file is the canonical trade list. Edit watchlist-sid.json's
+// top-level `tickers` array to change what the bot trades; the bot picks it up
+// automatically on the next run. Falls back to a hardcoded list if the file is
+// missing / malformed (so the bot is robust to deploy issues).
+const HARDCODED_FALLBACK_WATCHLIST = [
+  'DIA','IWM','QQQ','SPY','AAPL','AMD','AMZN','BA','CAT','COST',
+  'DIS','GOOG','GS','HD','IBM','INTC','JPM','META','MCD','PYPL',
+  'TGT','TSLA','WMT','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY',
 ];
+function loadWatchlist() {
+  try {
+    const j = JSON.parse(fs.readFileSync(WATCHLIST_PATH, 'utf8'));
+    if (Array.isArray(j.tickers) && j.tickers.length > 0) {
+      console.log(`Watchlist : loaded ${j.tickers.length} tickers from ${WATCHLIST_PATH} (version ${j.version || '?'})`);
+      return j.tickers;
+    }
+  } catch (err) {
+    console.warn(`⚠  Could not load ${WATCHLIST_PATH}: ${err.message} — using hardcoded fallback`);
+  }
+  return HARDCODED_FALLBACK_WATCHLIST;
+}
+const WATCHLIST = loadWatchlist();
+
+// ── Macro event dates (PPI only — FOMC/CPI tested and REJECTED in backtest) ──
+// PPI dates are loaded from event-dates.json. The 14-day PRE-PPI blackout
+// blocks ARMING during the run-up to a PPI release; trading is permitted
+// the day after each release.
+//
+// FOMC and CPI windows were tested in the v1.7 validation backtest and found
+// to be HARMFUL (drops WR from 60% -> 49% on 5-year favourites sample). They
+// are intentionally NOT consumed by the bot even though the dates are in the
+// event-dates.json file (preserved for future research).
+function loadPPIDates() {
+  try {
+    const j = JSON.parse(fs.readFileSync(EVENT_DATES_PATH, 'utf8'));
+    if (Array.isArray(j.ppi)) {
+      console.log(`Macro     : loaded ${j.ppi.length} PPI dates from ${EVENT_DATES_PATH}`);
+      return j.ppi;
+    }
+  } catch (err) {
+    console.warn(`⚠  Could not load PPI dates from ${EVENT_DATES_PATH}: ${err.message} — PPI filter disabled`);
+  }
+  return [];
+}
+const PPI_DATES = loadPPIDates();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -202,6 +237,22 @@ function isWithinEarningsWindow(earningsDates, windowDays) {
   for (const dateStr of earningsDates) {
     const earningsDate = new Date(dateStr);
     const daysFromNow = (earningsDate - today) / (1000 * 60 * 60 * 24);
+    if (daysFromNow >= 0 && daysFromNow <= windowDays) {
+      return { blocked: true, date: dateStr, daysAway: Math.round(daysFromNow) };
+    }
+  }
+  return { blocked: false };
+}
+
+function isWithinPPIWindow(windowDays) {
+  // v1.6 macro filter — block trading 14 days BEFORE a PPI release.
+  // Same logic as earnings: pre-only (allow day after).
+  // Backtest evidence (v1.7 validation): PPI lift on REFINED 47 watchlist
+  // takes WR from 66.9% to 74.8% with PF jumping 2.11 -> 3.20.
+  const today = new Date();
+  for (const dateStr of PPI_DATES) {
+    const eventDate = new Date(dateStr);
+    const daysFromNow = (eventDate - today) / (1000 * 60 * 60 * 24);
     if (daysFromNow >= 0 && daysFromNow <= windowDays) {
       return { blocked: true, date: dateStr, daysAway: Math.round(daysFromNow) };
     }
@@ -644,6 +695,16 @@ async function run() {
     if (earningsCheck.blocked) {
       console.log(`🚫 Earnings blackout — ${earningsCheck.date} is ${earningsCheck.daysAway} days away (${CONFIG.earningsWindow}-day rule)`);
       writeLog({ symbol, signal: signal.signal, reason: `Earnings blackout: ${earningsCheck.date}` });
+      continue;
+    }
+
+    // v1.6 PPI blackout — 14 days before next PPI release. Applies to ALL
+    // tickers (macro event, not per-ticker). FOMC/CPI deliberately NOT
+    // applied (backtest showed they hurt — see header comments).
+    const ppiCheck = isWithinPPIWindow(CONFIG.earningsWindow);
+    if (ppiCheck.blocked) {
+      console.log(`🚫 PPI blackout — ${ppiCheck.date} is ${ppiCheck.daysAway} days away (${CONFIG.earningsWindow}-day rule)`);
+      writeLog({ symbol, signal: signal.signal, reason: `PPI blackout: ${ppiCheck.date}` });
       continue;
     }
 
