@@ -174,26 +174,69 @@ the same process:
 ├─────────────────────────────────────────────┤
 │  Loop A — Market Monitor (every 60s)       │
 │    Poll VIX + SPY                          │
-│    Apply tier rules:                       │
+│    Apply tier rules (LONGS ONLY for auto): │
 │      VIX 30-35: log only                   │
 │      VIX 35-40: Telegram warning           │
-│      VIX > 40:  auto-close + Telegram       │
-│      SPY -3% in 30min: auto-close + alert  │
+│      VIX > 40:  auto-close LONGS + alert   │
+│      SPY -3% in 30min: auto-close LONGS    │
+│      (SHORTS LEFT ALONE — they're winning) │
 │                                             │
 │  Loop B — Telegram Listener (long-polling) │
 │    Accept commands from authorised user:   │
 │      /status                               │
 │      /positions                            │
 │      /close <SYMBOL>                       │
-│      /close_all                            │
-│      /pause       (manual VIX gate)        │
+│      /close_longs   (defensive close all   │
+│                      longs, keep shorts)   │
+│      /close_shorts  (rare — manual override) │
+│      /close_all     (nuclear — both sides) │
+│      /pause         (manual VIX gate)      │
 │      /resume                               │
-│      /vix         (current VIX)            │
+│      /vix           (current VIX value)    │
 │      /help                                 │
 │                                             │
 │  Shared: Alpaca client + state file        │
 └─────────────────────────────────────────────┘
 ```
+
+### Why auto-close LONGS only (critical design choice)
+
+Panic regimes are **bearish by definition** — VIX spikes because options
+traders are pricing in big DOWNSIDE moves. Implications per position
+side:
+
+| Position | During panic | Action |
+|---|---|---|
+| **Long** | Price moving AGAINST us | Close — preserve capital |
+| **Short** | Price moving WITH us | **HOLD — let it earn** |
+
+Auto-closing a profitable short during a panic crash would cash out
+exactly at the moment it's supposed to deliver. Two scenarios where
+this matters:
+
+1. **Trend short caught right.** SID shorts on overbought reversals.
+   If we shorted at top of bounce and crash hits → we're up big →
+   closing prematurely sacrifices the strategy's whole point.
+
+2. **Tail-risk hedge.** SID's short trades naturally hedge the long
+   book. During panic, the short book is the only thing earning
+   while longs are stopping out. Closing both = double-damage.
+
+The `/close_all` command stays available as a NUCLEAR option for the
+trader's discretion (e.g. "I want flat exposure for the weekend
+ahead of an election") but it's manual + requires confirmation.
+
+### Why the v1.7 daily VIX gate is fine staying side-agnostic
+
+The daily gate blocks NEW ARMING. SID short signals fire when:
+  - Daily RSI > 75 (overbought)
+  - Weekly 50-SMA < 200-SMA (weekly downtrend)
+  - RSI(3) > 75 (rebound-zone confirm)
+
+During VIX-spike panic, the universe is OVERSOLD not overbought, so
+short signals are mechanically rare anyway. Blocking them costs
+almost nothing in practice. Keeping the gate simple (side-agnostic)
+keeps the code simple.
 
 ### Toggle config (env vars on Railway)
 
