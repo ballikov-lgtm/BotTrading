@@ -29,12 +29,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '1.6';
-// v1.6 backtest stats — 5-year window on REFINED 47 watchlist (119 trades).
-// PPI filter + curated watchlist combined push WR into the community 65-85%
-// target band for the first time. PF 3.20 = strong risk/reward profile.
-const HEADLINE_BACKTEST_WR = 74.8;
-const HEADLINE_BACKTEST_PNL = 12574;
+const STRATEGY_VERSION = '1.7';
+// v1.7 backtest stats — 5-year window on expanded 80-ticker universe.
+// 425 trades after VIX >= 30 gate. 58.6% WR is lower than v1.6's 74.8%
+// because we widened the universe to 80 tickers (from 47); the gain is
+// statistical robustness — 3.5x more trades to validate the rules.
+const HEADLINE_BACKTEST_WR = 58.6;
+const HEADLINE_BACKTEST_PNL = 17616;
 
 // ── Data loading (all optional) ──────────────────────────────────────────
 function loadJSON(relPath, fallback) {

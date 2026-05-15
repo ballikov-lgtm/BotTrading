@@ -20,7 +20,7 @@ const CONFIG = {
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v1.6'; // v1.6: PPI filter + REFINED 47 watchlist (5-year backtest curation)
+const BOT_VERSION = 'v1.7'; // v1.7: VIX >= 30 gate + 32-ticker tier1 expansion
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
@@ -28,10 +28,13 @@ const BOT_VERSION = 'v1.6'; // v1.6: PPI filter + REFINED 47 watchlist (5-year b
 //   v1.3 RSI overbought 70->75, RSI(3) rebound-zone confirm
 //   v1.4 weekly 50/200 SMA trend filter (locked at tag sid-v1.4-baseline)
 //   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings)
-//   v1.6 PPI blackout (14 days pre-PPI release) + REFINED 47 watchlist.
-//        Backtest: 74.8% WR, PF 3.20, +$12,574 over 5y. v1.5 locked at tag
-//        sid-v1.5-baseline. Note: FOMC/CPI blackouts were tested and REJECTED
-//        (they actively hurt WR — see backtest-v1.7-validation-report.md).
+//   v1.6 PPI blackout + REFINED 47 watchlist (locked at tag sid-v1.6-baseline)
+//   v1.7 VIX >= 30 gate (skip new entries on high-fear days) + tier1
+//        ticker expansion (80 active tickers up from 47). Inspired by user
+//        observation of Sept 2022 FOMC + UK pension crisis loss cluster.
+//        VIX is the market's implied-volatility / fear gauge — when >= 30
+//        the gate fires and the bot blocks new arms for the day. Backtest
+//        on 5y data showed +3pp WR improvement with this gate.
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
@@ -87,6 +90,48 @@ function loadPPIDates() {
   return [];
 }
 const PPI_DATES = loadPPIDates();
+
+// ── v1.7 VIX gate ────────────────────────────────────────────────────────────
+// Block new entries on high-fear days (VIX >= 30). VIX is the market's
+// implied-volatility / fear index — when it spikes, indices are pricing in
+// big moves. Historically, oversold bounces during VIX>=30 regimes are
+// disproportionately false bounces (e.g. Sept 2022 FOMC + UK crisis cluster
+// in our backtest). The gate doesn't close existing positions — it only
+// blocks new ARMing for the day.
+//
+// Per-run check: bot wakes once a day, checks yesterday's VIX close. If
+// >= 30, no new entries today. Tomorrow morning: re-check fresh.
+const VIX_GATE_THRESHOLD = 30.0;
+
+async function fetchVixYesterdayClose() {
+  // Fetches VIX history and returns most-recent close + ISO date.
+  // Returns { vix: number, date: string } or null on failure.
+  try {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^VIX?interval=1d&range=10d';
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) throw new Error('no chart data');
+    const ts = result.timestamp || [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    // Find most recent non-null close
+    for (let i = ts.length - 1; i >= 0; i--) {
+      if (closes[i] != null && !isNaN(closes[i])) {
+        return {
+          vix: parseFloat(closes[i].toFixed(2)),
+          date: new Date(ts[i] * 1000).toISOString().slice(0, 10),
+        };
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn(`⚠  VIX fetch failed: ${err.message} — VIX gate skipped (trade normally)`);
+    return null;
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -656,6 +701,29 @@ async function run() {
     console.log(`\n⚠️  Daily entry limit reached (${CONFIG.maxPerDay}) — no new entries today`);
     console.log(`\n══ SID run complete ══`);
     return;
+  }
+
+  // Step 2.5: VIX gate (v1.7) — skip new entries on high-fear days
+  // The gate blocks new ARMing only. Open positions keep running (with their
+  // stops). If VIX data fetch fails, we trade normally (fail-open).
+  const vixSnap = await fetchVixYesterdayClose();
+  if (vixSnap) {
+    if (vixSnap.vix >= VIX_GATE_THRESHOLD) {
+      console.log(`\n🔴 VIX gate ACTIVE — VIX closed at ${vixSnap.vix} on ${vixSnap.date} (threshold ${VIX_GATE_THRESHOLD})`);
+      console.log(`   Skipping new entries today. Existing positions continue.`);
+      writeLog({ kind: 'vix_gate_active', vix: vixSnap.vix, date: vixSnap.date });
+      // Send Telegram alert (best-effort)
+      tg.sendMessage(
+        `🔴 <b>SID VIX gate ACTIVE</b>\n\n`
+        + `VIX closed at <b>${vixSnap.vix}</b> on ${vixSnap.date} (threshold ${VIX_GATE_THRESHOLD}).\n\n`
+        + `No new entries today. Open positions continue normally.\n\n`
+        + `<i>Gate auto-clears when VIX drops below ${VIX_GATE_THRESHOLD}.</i>`
+      ).catch(() => {});
+      console.log(`\n══ SID run complete (VIX gate) ══`);
+      return;
+    } else {
+      console.log(`\n✓ VIX gate clear — VIX at ${vixSnap.vix} (< ${VIX_GATE_THRESHOLD})`);
+    }
   }
 
   // Track symbols already open (don't double-enter)

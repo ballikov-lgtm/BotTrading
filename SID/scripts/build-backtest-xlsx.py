@@ -72,23 +72,33 @@ ws = wb.active
 ws.title = 'All Trades'
 
 # Title row
-TITLE = 'SID Strategy Back Testing — v1.5 / v1.6 baseline rules, 5-year window'
-ws.merge_cells('A1:S1')
+TITLE = 'SID Strategy Back Testing — v1.7 with VIX >= 30 gate, 5-year window'
+ws.merge_cells('A1:U1')
 ws['A1'] = TITLE
 ws['A1'].font = Font(name=ARIAL, size=16, bold=True, color=THEME['title_fg'])
 ws['A1'].fill = PatternFill('solid', fgColor=THEME['title_bg'])
 ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
 ws.row_dimensions[1].height = 32
 
-# Subtitle row with strategy + parameter summary
+# Subtitle row with strategy + parameter summary (v1.7 shows both raw + VIX-gated)
 total_pnl = sum(float(t['pnl']) for t in trades)
 wins = sum(1 for t in trades if float(t['pnl']) > 0)
 losses = len(trades) - wins
 wr = wins / len(trades) * 100 if trades else 0
-subtitle = (f'{len(trades)} trades  |  Win rate: {wr:.1f}% ({wins}W / {losses}L)  |  '
-            f'Net P&L: ${total_pnl:+,.2f}  |  $200 risk/trade  |  '
-            f'71 ticker universe (favourites + all)  |  Generated {datetime.now().strftime("%Y-%m-%d")}')
-ws.merge_cells('A2:S2')
+
+# v1.7 VIX-gate filtered stats
+passed = [t for t in trades if t.get('vix_gate') == 'pass']
+p_wr = sum(1 for t in passed if float(t['pnl']) > 0) / len(passed) * 100 if passed else 0
+p_pnl = sum(float(t['pnl']) for t in passed)
+
+subtitle = (
+    f'{len(trades)} backtested  |  {len(passed)} after VIX>=30 production gate  |  '
+    f'Win rate: {wr:.1f}% raw / {p_wr:.1f}% filtered  |  '
+    f'Net P&L: ${total_pnl:+,.0f} raw / ${p_pnl:+,.0f} filtered  |  '
+    f'$200 risk/trade  |  {len(set(t["ticker"] for t in trades))} ticker universe  |  '
+    f'Generated {datetime.now().strftime("%Y-%m-%d")}'
+)
+ws.merge_cells('A2:U2')
 ws['A2'] = subtitle
 ws['A2'].font = Font(name=ARIAL, size=11, color='2D3748', italic=True)
 ws['A2'].fill = PatternFill('solid', fgColor='F7FAFC')
@@ -116,6 +126,8 @@ COLS = [
     ('Bars Held',        'bars_held',      'int',     10),
     ('RSI @ Signal',     'rsi_at_signal',  'rsi',     12),
     ('RSI @ Entry',      'rsi_at_entry',   'rsi',     12),
+    ('VIX @ Entry',      'vix_at_entry',   'vix',     11),
+    ('VIX Gate (v1.7)',  'vix_gate',       'gate',    14),
     ('Outcome',          None,             'outcome', 11),  # computed
 ]
 
@@ -154,6 +166,14 @@ for i, t in enumerate(trades):
         elif kind == 'rsi':
             c.value = float(t[key])
             c.number_format = '0.0'
+        elif kind == 'vix':
+            try:
+                c.value = float(t[key]) if t[key] else None
+                c.number_format = '0.0'
+            except Exception:
+                c.value = t[key]
+        elif kind == 'gate':
+            c.value = (t[key] or '').upper()
         elif kind == 'date':
             c.value = t[key]
             c.number_format = '@'
@@ -184,6 +204,16 @@ for i, t in enumerate(trades):
                 c.fill = PatternFill('solid', fgColor=THEME['win_bg'])
                 c.font = Font(name=ARIAL, size=10, bold=True, color=THEME['win_fg'])
             else:
+                c.fill = PatternFill('solid', fgColor=THEME['loss_bg'])
+                c.font = Font(name=ARIAL, size=10, bold=True, color=THEME['loss_fg'])
+
+        # VIX Gate cell colour (PASS = green, BLOCK = red)
+        if kind == 'gate':
+            gate_val = (t[key] or '').lower()
+            if gate_val == 'pass':
+                c.fill = PatternFill('solid', fgColor=THEME['win_bg'])
+                c.font = Font(name=ARIAL, size=10, bold=True, color=THEME['win_fg'])
+            elif gate_val == 'block':
                 c.fill = PatternFill('solid', fgColor=THEME['loss_bg'])
                 c.font = Font(name=ARIAL, size=10, bold=True, color=THEME['loss_fg'])
 
@@ -238,8 +268,10 @@ add_subtotal(15, 1, '0.00%;[Red]-0.00%')          # P&L %: average
 add_subtotal(16, 1, '0.0')               # Bars held: average
 add_subtotal(17, 1, '0.0')               # RSI at signal: average
 add_subtotal(18, 1, '0.0')               # RSI at entry: average
+add_subtotal(19, 1, '0.0')               # VIX at entry: average
+add_subtotal(20, 3, label='')            # VIX gate: blank (text)
 # Outcome: blank
-add_subtotal(19, 3, label='')
+add_subtotal(21, 3, label='')
 
 ws.row_dimensions[SUBTOTAL_ROW].height = 26
 
@@ -247,7 +279,7 @@ ws.row_dimensions[SUBTOTAL_ROW].height = 26
 ws.freeze_panes = 'C4'
 
 # Add AutoFilter on the header row
-ws.auto_filter.ref = f"A{HEADER_ROW}:S{DATA_END}"
+ws.auto_filter.ref = f"A{HEADER_ROW}:U{DATA_END}"
 
 # ============================================================================
 # Sheet 2: Per-Ticker Summary
@@ -379,6 +411,8 @@ rules = [
     ('Daily RSI(3) confirmation', 'Must also be in extreme zone', 'Filters out stale RSI(14) lag'),
     ('Weekly trend filter', '50-SMA > 200-SMA for long, < for short', 'Strong filter — only trade with weekly trend'),
     ('Earnings blackout', '14 days BEFORE earnings (pre-only)', 'Trading day after earnings is allowed'),
+    ('PPI macro blackout (v1.6)', '14 days before US PPI release', 'Pre-only — trading day after PPI is allowed'),
+    ('VIX regime gate (v1.7)', 'Skip new entries if VIX close >= 30', 'Open positions continue — gate only blocks new arms'),
     ('Stage 2 — Trigger (entry)', '', ''),
     ('Daily RSI direction', 'Pointing same way as trade', 'Long = RSI rising; Short = RSI falling'),
     ('Daily MACD direction', 'Pointing same way as trade', 'Long = MACD rising; Short = MACD falling'),
