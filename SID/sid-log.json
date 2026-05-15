@@ -1,5 +1,57 @@
 [
   {
+    "timestamp": "2026-05-15T20:05:22.326Z",
+    "symbol": "AVGO",
+    "signal": "short",
+    "entry": 425.19000244140625,
+    "stopLoss": 443,
+    "shares": 1,
+    "totalUsd": 425.19,
+    "riskUsd": 17.81,
+    "rsiAtSignal": 70.9,
+    "rsiAtEntry": 58.64,
+    "signalDate": "2026-04-10",
+    "earningsDates": [],
+    "orderId": "SID-DRYRUN-1778875522324",
+    "reason": "RSI overbought (70.9) on 2026-04-10 → RSI(58.6) & MACD both pointing down"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:21.815Z",
+    "symbol": "AMD",
+    "signal": "short",
+    "reason": "Position size < 1 share"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:21.328Z",
+    "symbol": "AMAT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:20.902Z",
+    "symbol": "ADBE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:20.458Z",
+    "symbol": "ABT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:20.001Z",
+    "symbol": "ABBV",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-05-15T20:05:19.559Z",
+    "symbol": "AAPL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
     "timestamp": "2026-05-13T20:23:39.438Z",
     "symbol": "XLRE",
     "signal": "short",
