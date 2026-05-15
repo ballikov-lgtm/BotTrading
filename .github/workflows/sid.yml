@@ -50,6 +50,15 @@ jobs:
           ALPACA_KEY_ID:       ${{ secrets.ALPACA_KEY_ID }}
           ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+
+          # ── Telegram alerts (see SID-TELEGRAM-SETUP.md) ──────────────────
+          # All three are optional. If BOT_TOKEN or CHAT_ID is missing, the
+          # bot silently skips alerts and trades normally.
+          # Set TELEGRAM_ALERTS_ENABLED=false to disable temporarily without
+          # removing the secrets.
+          TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:         ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ALERTS_ENABLED:  ${{ secrets.TELEGRAM_ALERTS_ENABLED }}
         run: node bot-sid.js
 
       - name: Save trade logs

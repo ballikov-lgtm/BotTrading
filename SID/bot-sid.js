@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 
 import { createExecutor, resolveTradingMode } from './alpaca-executor.js';
+import * as tg from './telegram-alerts.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -540,6 +541,17 @@ async function checkPositions(executor = null) {
       outcome,
       accountAfter:    updatedAccount.accountUsd,
     });
+
+    // Telegram exit alert (best-effort)
+    tg.alertExitFired({
+      symbol:       pos.symbol,
+      side:         pos.side,
+      exitPrice,
+      exitReason:   exitLevel,
+      realizedPnl,
+      accountAfter: updatedAccount.accountUsd,
+      mode:         pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
   }
 
   const numClosed = openPositions.length - stillOpen.length;
@@ -797,6 +809,18 @@ async function run() {
       strategy:   `${BOT_NAME} ${BOT_VERSION}`,
     });
 
+    // Fire Telegram alert (best-effort, never blocks trading)
+    tg.alertEntryFired({
+      symbol,
+      side:        signal.signal,
+      entryPrice:  signal.entry,
+      stopLoss:    signal.stopLoss,
+      shares:      sizing.shares,
+      riskUsd:     sizing.riskUsd,
+      orderId,
+      mode:        modeLabel,
+    }).catch(() => {}); // swallow — best effort
+
     writeLog({
       symbol,
       signal:       signal.signal,
@@ -822,6 +846,17 @@ async function run() {
   }
 
   console.log(`\n══ SID run complete — ${newEntriesThisRun} new trade(s) ══`);
+
+  // Final Telegram run-summary (best-effort)
+  const finalAccount = loadAccount();
+  const finalOpen = loadOpenPositions();
+  await tg.alertBotStatus({
+    openCount:   finalOpen.length,
+    newEntries:  newEntriesThisRun,
+    closedToday: 0, // checkPositions already sent per-exit alerts
+    accountUsd:  finalAccount.accountUsd,
+    mode:        CONFIG.tradingMode,
+  }).catch(() => {});
 }
 
 run().catch(err => {
