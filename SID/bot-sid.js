@@ -2,6 +2,9 @@ import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
 
+import { createExecutor, resolveTradingMode } from './alpaca-executor.js';
+import * as tg from './telegram-alerts.js';
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
@@ -11,35 +14,79 @@ const CONFIG = {
   maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 3,      // Never hold more than 3 at once
   maxPerDay:        parseInt(process.env.SID_MAX_PER_DAY)        || 1,      // Max new entries per run
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
-  paperTrading:     process.env.SID_PAPER !== 'false',
+  paperTrading:     process.env.SID_PAPER !== 'false',                       // legacy flag — still honoured for trade-log labelling
+  tradingMode:      resolveTradingMode(),                                    // 'dry_run' | 'paper' | 'live' — controls Alpaca execution
 };
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v1.0'; // v1.0 initial — RSI(14) + MACD(12,26,9), daily chart, US stocks/ETFs only
+const BOT_VERSION = 'v1.6'; // v1.6: PPI filter + REFINED 47 watchlist (5-year backtest curation)
+// Version history:
+//   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
+//   v1.1 15-min intraday entry confirmation
+//   v1.2 instructor-aligned: sticky RSI signal, MACD direction-align entry
+//   v1.3 RSI overbought 70->75, RSI(3) rebound-zone confirm
+//   v1.4 weekly 50/200 SMA trend filter (locked at tag sid-v1.4-baseline)
+//   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings)
+//   v1.6 PPI blackout (14 days pre-PPI release) + REFINED 47 watchlist.
+//        Backtest: 74.8% WR, PF 3.20, +$12,574 over 5y. v1.5 locked at tag
+//        sid-v1.5-baseline. Note: FOMC/CPI blackouts were tested and REJECTED
+//        (they actively hurt WR — see backtest-v1.7-validation-report.md).
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
 const CLOSED_PATH     = './closed-positions-sid.json';
 const ACCOUNT_PATH    = './sid-account.json';
 const SAFETY_LOG_PATH = './sid-log.json';
+const WATCHLIST_PATH  = './watchlist-sid.json';
+const EVENT_DATES_PATH= './event-dates.json';
 
-// ── Advisory Watchlist ────────────────────────────────────────────────────────
-// This list is NOT fixed. Remove stocks that repeatedly underperform.
-// Add new stocks when market research or sentiment signals a swing opportunity.
-// See SID-README.md for the full watchlist management policy.
-const WATCHLIST = [
-  // ETFs — broad market and sector
-  'DIA', 'IWM', 'QQQ', 'SPY',
-  'XLB', 'XLC', 'XLE', 'XLF', 'XLI', 'XLK', 'XLP', 'XLRE', 'XLU', 'XLV', 'XLY',
-  'SLV', 'GOLD', 'SQQQ', 'TNA', 'TQQQ', 'TZA', 'QYLD',
-  // Individual stocks
-  'AAPL', 'AMD', 'AMZN', 'BA', 'BAC', 'CAT',
-  'COST', 'DIS', 'DKS', 'ETSY', 'FCX', 'FDX',
-  'GM', 'GOOG', 'GS', 'HD', 'IBM', 'INTC',
-  'JPM', 'MA', 'META', 'MCD', 'MSFT', 'PYPL',
-  'TGT', 'TSLA', 'VZ', 'WMT',
+// ── Watchlist (loaded from watchlist-sid.json — currently REFINED 47) ─────────
+// The watchlist file is the canonical trade list. Edit watchlist-sid.json's
+// top-level `tickers` array to change what the bot trades; the bot picks it up
+// automatically on the next run. Falls back to a hardcoded list if the file is
+// missing / malformed (so the bot is robust to deploy issues).
+const HARDCODED_FALLBACK_WATCHLIST = [
+  'DIA','IWM','QQQ','SPY','AAPL','AMD','AMZN','BA','CAT','COST',
+  'DIS','GOOG','GS','HD','IBM','INTC','JPM','META','MCD','PYPL',
+  'TGT','TSLA','WMT','XLC','XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY',
 ];
+function loadWatchlist() {
+  try {
+    const j = JSON.parse(fs.readFileSync(WATCHLIST_PATH, 'utf8'));
+    if (Array.isArray(j.tickers) && j.tickers.length > 0) {
+      console.log(`Watchlist : loaded ${j.tickers.length} tickers from ${WATCHLIST_PATH} (version ${j.version || '?'})`);
+      return j.tickers;
+    }
+  } catch (err) {
+    console.warn(`⚠  Could not load ${WATCHLIST_PATH}: ${err.message} — using hardcoded fallback`);
+  }
+  return HARDCODED_FALLBACK_WATCHLIST;
+}
+const WATCHLIST = loadWatchlist();
+
+// ── Macro event dates (PPI only — FOMC/CPI tested and REJECTED in backtest) ──
+// PPI dates are loaded from event-dates.json. The 14-day PRE-PPI blackout
+// blocks ARMING during the run-up to a PPI release; trading is permitted
+// the day after each release.
+//
+// FOMC and CPI windows were tested in the v1.7 validation backtest and found
+// to be HARMFUL (drops WR from 60% -> 49% on 5-year favourites sample). They
+// are intentionally NOT consumed by the bot even though the dates are in the
+// event-dates.json file (preserved for future research).
+function loadPPIDates() {
+  try {
+    const j = JSON.parse(fs.readFileSync(EVENT_DATES_PATH, 'utf8'));
+    if (Array.isArray(j.ppi)) {
+      console.log(`Macro     : loaded ${j.ppi.length} PPI dates from ${EVENT_DATES_PATH}`);
+      return j.ppi;
+    }
+  } catch (err) {
+    console.warn(`⚠  Could not load PPI dates from ${EVENT_DATES_PATH}: ${err.message} — PPI filter disabled`);
+  }
+  return [];
+}
+const PPI_DATES = loadPPIDates();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -182,11 +229,34 @@ async function fetchEarningsDates(symbol) {
 }
 
 function isWithinEarningsWindow(earningsDates, windowDays) {
+  // v1.5 rule clarification — block trade ONLY if earnings is within the
+  // next `windowDays` calendar days (i.e., we're inside the pre-earnings
+  // window). Past earnings dates no longer block — trading the day after
+  // earnings is permitted and is in fact often a high-confidence entry
+  // because the announcement risk has just been removed.
   const today = new Date();
   for (const dateStr of earningsDates) {
     const earningsDate = new Date(dateStr);
-    const daysAway = Math.abs((earningsDate - today) / (1000 * 60 * 60 * 24));
-    if (daysAway <= windowDays) return { blocked: true, date: dateStr, daysAway: Math.round(daysAway) };
+    const daysFromNow = (earningsDate - today) / (1000 * 60 * 60 * 24);
+    if (daysFromNow >= 0 && daysFromNow <= windowDays) {
+      return { blocked: true, date: dateStr, daysAway: Math.round(daysFromNow) };
+    }
+  }
+  return { blocked: false };
+}
+
+function isWithinPPIWindow(windowDays) {
+  // v1.6 macro filter — block trading 14 days BEFORE a PPI release.
+  // Same logic as earnings: pre-only (allow day after).
+  // Backtest evidence (v1.7 validation): PPI lift on REFINED 47 watchlist
+  // takes WR from 66.9% to 74.8% with PF jumping 2.11 -> 3.20.
+  const today = new Date();
+  for (const dateStr of PPI_DATES) {
+    const eventDate = new Date(dateStr);
+    const daysFromNow = (eventDate - today) / (1000 * 60 * 60 * 24);
+    if (daysFromNow >= 0 && daysFromNow <= windowDays) {
+      return { blocked: true, date: dateStr, daysAway: Math.round(daysFromNow) };
+    }
   }
   return { blocked: false };
 }
@@ -363,7 +433,7 @@ function calcPositionSize(entry, stopLoss) {
 // Walks through daily candles since the position was opened to find the first
 // day where RSI crossed 50. Uses that day's close as the exit price.
 
-async function checkPositions() {
+async function checkPositions(executor = null) {
   const openPositions   = loadOpenPositions();
   const closedPositions = loadClosedPositions();
 
@@ -437,6 +507,22 @@ async function checkPositions() {
     const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
     const icon    = outcome === 'WIN' ? '✅' : '❌';
 
+    // ── Send exit order to Alpaca if running paper/live ──────────────────────
+    // For RSI 50 exits we submit a market close (Alpaca's stop order handles SL
+    // fills server-side, which the next syncPositions run will reconcile).
+    // If the Alpaca close fails, leave the position open locally and try again
+    // next run — do NOT realise P&L on a phantom exit.
+    if (executor && exitLevel === 'rsi50') {
+      try {
+        await executor.closePosition(pos, `RSI 50 reached (${exitCandle.rsi?.toFixed(1)})`);
+      } catch (err) {
+        console.log(`    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
+        writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
+        stillOpen.push(pos);
+        continue;
+      }
+    }
+
     // Update compounding account balance
     const updatedAccount = updateAccount(realizedPnl);
     const growthPct      = ((updatedAccount.accountUsd - updatedAccount.startingUsd) / updatedAccount.startingUsd * 100).toFixed(2);
@@ -455,6 +541,17 @@ async function checkPositions() {
       outcome,
       accountAfter:    updatedAccount.accountUsd,
     });
+
+    // Telegram exit alert (best-effort)
+    tg.alertExitFired({
+      symbol:       pos.symbol,
+      side:         pos.side,
+      exitPrice,
+      exitReason:   exitLevel,
+      realizedPnl,
+      accountAfter: updatedAccount.accountUsd,
+      mode:         pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
   }
 
   const numClosed = openPositions.length - stillOpen.length;
@@ -478,9 +575,58 @@ async function run() {
   console.log(`\n══ SID Bot run ${new Date().toISOString()} ══`);
   console.log(`Account : $${account.accountUsd.toFixed(2)}  (started $${account.startingUsd}  ${growthSign}${growthPct}%  ${account.tradeCount} closed trades)`);
   console.log(`Sizing  : ${(CONFIG.riskPct * 100).toFixed(1)}% risk/trade  Max position: ${(CONFIG.maxPositionPct * 100).toFixed(0)}% = $${(CONFIG.accountUsd * CONFIG.maxPositionPct).toFixed(2)}`);
-  console.log(`Max open: ${CONFIG.maxOpenPositions}  Earnings window: ${CONFIG.earningsWindow} days  Paper: ${CONFIG.paperTrading}`);
+  console.log(`Max open: ${CONFIG.maxOpenPositions}  Earnings window: ${CONFIG.earningsWindow} days  Mode: ${CONFIG.tradingMode.toUpperCase()}`);
   console.log(`Symbols : ${WATCHLIST.length} stocks/ETFs`);
   console.log(`─`.repeat(60));
+
+  // ── Alpaca executor — created only when SID_TRADING_MODE != dry_run ──────
+  // Returns null in dry_run mode. Returns a paper/live executor otherwise.
+  // From here on, "executor" is the single touchpoint for any order action.
+  const executor = createExecutor();
+
+  if (executor) {
+    const preflight = await executor.preflight();
+    if (!preflight.ok) {
+      console.error(`\n🚫 Alpaca preflight failed (${preflight.reason}): ${preflight.detail}`);
+      console.error('   Aborting run to avoid placing orders in an unknown state.');
+      writeLog({ kind: 'preflight_fail', reason: preflight.reason, detail: preflight.detail });
+      return;
+    }
+
+    // Trust Alpaca's account equity over the local compounding ledger when
+    // we're actually trading through them. This means the bot sizes against
+    // the real broker balance including fills, dividends, and FX.
+    if (preflight.equity > 0) {
+      CONFIG.accountUsd = preflight.equity;
+      console.log(`[Alpaca] Equity     : $${preflight.equity.toFixed(2)}  (used for position sizing this run)`);
+      console.log(`[Alpaca] Buying pwr : $${preflight.buyingPower.toFixed(2)}`);
+      console.log(`[Alpaca] Market open: ${preflight.marketOpen ? 'YES' : 'NO'}  next open: ${preflight.nextOpen}`);
+    }
+
+    if (!preflight.marketOpen) {
+      console.log(`\n⏸  Market is closed — will read positions but place no orders this run.`);
+    }
+
+    // Sync local open positions against Alpaca's authoritative view.
+    // Any positions Alpaca no longer has (because a stop filled overnight, say)
+    // get pulled out of open-positions-sid.json. The local position monitor
+    // (checkPositions) still runs for RSI 50 evaluation on what remains.
+    try {
+      const localOpen = loadOpenPositions();
+      const { stillOpen, closedExternally } = await executor.syncPositions(localOpen);
+      if (closedExternally.length) {
+        console.log(`[Alpaca] Reconciliation: ${closedExternally.length} position(s) closed externally (stop fills?)`);
+        for (const pos of closedExternally) {
+          console.log(`           - ${pos.symbol} ${pos.side} ${pos.shares}sh @ $${pos.entry}`);
+          writeLog({ kind: 'external_close', symbol: pos.symbol, position: pos });
+        }
+        saveOpenPositions(stillOpen);
+      }
+    } catch (err) {
+      console.error(`[Alpaca] Position sync failed: ${err.message} — continuing with local data`);
+      writeLog({ kind: 'sync_fail', error: err.message });
+    }
+  }
 
   // ── Weekend guard (stocks/ETFs only — markets are closed Sat/Sun) ─────────
   // Any signal fired on a weekend is driven by Friday's stale close price.
@@ -495,7 +641,7 @@ async function run() {
   }
 
   // Step 0: Check open positions for RSI-50 exits
-  await checkPositions();
+  await checkPositions(executor);
 
   // Step 1: Check if we're already at the position limit
   const openPositions = loadOpenPositions();
@@ -564,6 +710,16 @@ async function run() {
       continue;
     }
 
+    // v1.6 PPI blackout — 14 days before next PPI release. Applies to ALL
+    // tickers (macro event, not per-ticker). FOMC/CPI deliberately NOT
+    // applied (backtest showed they hurt — see header comments).
+    const ppiCheck = isWithinPPIWindow(CONFIG.earningsWindow);
+    if (ppiCheck.blocked) {
+      console.log(`🚫 PPI blackout — ${ppiCheck.date} is ${ppiCheck.daysAway} days away (${CONFIG.earningsWindow}-day rule)`);
+      writeLog({ symbol, signal: signal.signal, reason: `PPI blackout: ${ppiCheck.date}` });
+      continue;
+    }
+
     // Calculate position size
     const sizing = calcPositionSize(signal.entry, signal.stopLoss);
     if (!sizing) {
@@ -572,8 +728,7 @@ async function run() {
       continue;
     }
 
-    // All checks passed — log the paper trade
-    const orderId = `SID-PAPER-${Date.now()}`;
+    // All checks passed — prepare the trade record
     const now     = new Date();
 
     console.log(`✓ ${signal.signal.toUpperCase()}`);
@@ -588,10 +743,40 @@ async function run() {
       console.log(`    Earnings : Next → ${earningsDates[0]} (${Math.round((new Date(earningsDates[0]) - now) / 86400000)} days away) ✅ clear`);
     }
 
+    // ── Submit to Alpaca (paper or live) ─────────────────────────────────────
+    // In dry_run mode (executor=null) we just record the trade locally as before.
+    // In paper/live mode we place a real order and use Alpaca's order ID as the
+    // canonical identifier — this lets us reconcile later.
+    let orderId   = `SID-DRYRUN-${Date.now()}`;
+    let exchange  = 'Yahoo/DryRun';
+    let modeLabel = 'dry_run';
+
+    if (executor) {
+      try {
+        const result = await executor.openEntry({ signal, sizing, symbol });
+        orderId   = result.entryOrderId;
+        exchange  = `Alpaca/${CONFIG.tradingMode}`;
+        modeLabel = CONFIG.tradingMode;
+        console.log(`    Order ID : ${orderId} (stop ${result.stopOrderId})`);
+      } catch (err) {
+        console.log(`    🚫 Alpaca entry FAILED: ${err.message}`);
+        writeLog({
+          kind:   'order_fail',
+          symbol,
+          signal: signal.signal,
+          error:  err.message,
+          status: err.status,
+          body:   err.body,
+        });
+        // Don't record this trade locally — the signal didn't actually open
+        continue;
+      }
+    }
+
     const row = [
       now.toISOString().slice(0, 10),
       now.toISOString().slice(11, 19),
-      'Yahoo/Paper',
+      exchange,
       symbol,
       signal.signal,
       sizing.shares,
@@ -602,7 +787,7 @@ async function run() {
       sizing.riskPct,
       signal.signalDate,
       orderId,
-      'paper',
+      modeLabel,
       `${BOT_NAME} ${BOT_VERSION}`,
     ].join(',');
 
@@ -620,8 +805,21 @@ async function run() {
       signalDate: signal.signalDate,
       openDate:   now.toISOString().slice(0, 10),
       openTime:   now.toISOString().slice(11, 19),
+      mode:       modeLabel,
       strategy:   `${BOT_NAME} ${BOT_VERSION}`,
     });
+
+    // Fire Telegram alert (best-effort, never blocks trading)
+    tg.alertEntryFired({
+      symbol,
+      side:        signal.signal,
+      entryPrice:  signal.entry,
+      stopLoss:    signal.stopLoss,
+      shares:      sizing.shares,
+      riskUsd:     sizing.riskUsd,
+      orderId,
+      mode:        modeLabel,
+    }).catch(() => {}); // swallow — best effort
 
     writeLog({
       symbol,
@@ -648,6 +846,17 @@ async function run() {
   }
 
   console.log(`\n══ SID run complete — ${newEntriesThisRun} new trade(s) ══`);
+
+  // Final Telegram run-summary (best-effort)
+  const finalAccount = loadAccount();
+  const finalOpen = loadOpenPositions();
+  await tg.alertBotStatus({
+    openCount:   finalOpen.length,
+    newEntries:  newEntriesThisRun,
+    closedToday: 0, // checkPositions already sent per-exit alerts
+    accountUsd:  finalAccount.accountUsd,
+    mode:        CONFIG.tradingMode,
+  }).catch(() => {});
 }
 
 run().catch(err => {

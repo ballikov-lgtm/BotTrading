@@ -1,13 +1,42 @@
 {
-  "version": "1.0",
-  "lastUpdated": "2026-05-11",
-  "description": "SID strategy starter watchlist — 50 US stocks and ETFs across major sectors. Edit freely: scanner reads this file at runtime.",
+  "version": "3.0",
+  "lastUpdated": "2026-05-15",
+  "source": "research/SID Trading Watchlist.txt (community-curated) + 5-year backtest curation 2026-05-15",
+  "description": "SID strategy watchlist. tickers = REFINED 47 = the curated trading universe. FAVOURITES = 61 community-tracked tickers (reference). ALL = 10 monitor-only. dropped = 14 underperformers removed after 5-year backtest evidence (12 net losers + 2 marginals). v1.6 ships with REFINED 47 as the canonical trade list.",
   "tickers": [
-    "DIA", "IWM", "QQQ", "SPY",
-    "AAPL", "AMD", "AMZN", "BA", "BAC", "CAT",
-    "COST", "DIS", "DKS", "ETSY", "FCX", "FDX", "GM", "GOLD", "GOOG", "GS",
-    "HD", "IBM", "INTC", "JPM", "MA", "META", "MCD", "MSFT", "PYPL", "QYLD",
-    "SLV", "SQQQ", "TGT", "TNA", "TQQQ", "TSLA", "TZA", "VZ", "WMT",
-    "XLB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"
-  ]
+    "AAPL", "AMD", "AMZN", "B", "BA", "CAT", "COST", "DIA", "DIS", "F",
+    "GDX", "GOOG", "GS", "HD", "IBM", "INTC", "IWM", "JPM", "KHC", "MCD",
+    "META", "NUGT", "PYPL", "QQQ", "RIOT", "SLV", "SPY", "SQQQ", "TGT",
+    "TNA", "TQQQ", "TSLA", "TZA", "V", "WFC", "WMT", "XHB", "XLC", "XLE",
+    "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"
+  ],
+  "sections": {
+    "refined_47_active": [
+      "AAPL", "AMD", "AMZN", "B", "BA", "CAT", "COST", "DIA", "DIS", "F",
+      "GDX", "GOOG", "GS", "HD", "IBM", "INTC", "IWM", "JPM", "KHC", "MCD",
+      "META", "NUGT", "PYPL", "QQQ", "RIOT", "SLV", "SPY", "SQQQ", "TGT",
+      "TNA", "TQQQ", "TSLA", "TZA", "V", "WFC", "WMT", "XHB", "XLC", "XLE",
+      "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV", "XLY"
+    ],
+    "favourites_reference_61": [
+      "AAL", "AAPL", "AMD", "AMZN", "B", "BA", "CAT", "COIN", "COST", "CSCO",
+      "DIA", "DIS", "EXPE", "F", "GDX", "GOOG", "GS", "HD", "HUM", "HUT",
+      "IBM", "INTC", "IWM", "JPM", "KHC", "KO", "LUV", "LVS", "MCD", "META",
+      "NEM", "NUGT", "PG", "PYPL", "QQQ", "RIOT", "ROKU", "SLB", "SLV", "SMH",
+      "SPY", "SQQQ", "TGT", "TNA", "TQQQ", "TSLA", "TZA", "V", "WFC", "WMT",
+      "XHB", "XLC", "XLE", "XLF", "XLI", "XLK", "XLP", "XLRE", "XLU", "XLV",
+      "XLY"
+    ],
+    "all_monitor_only": [
+      "BAC", "DKS", "ETSY", "FCX", "GM", "MA", "MSFT", "QYLD", "VZ", "XLB"
+    ],
+    "dropped_5yr_backtest_evidence": {
+      "comment": "Removed from active list per 5-year backtest 2026-05-15. 12 net P&L losers + 2 marginals. See backtest-v1.7-validation-report.md.",
+      "tickers": ["AAL", "COIN", "CSCO", "EXPE", "HUM", "HUT", "KO", "LUV", "LVS", "NEM", "PG", "ROKU", "SLB", "SMH"]
+    },
+    "unsupported_external": {
+      "comment": "Not available via yfinance.",
+      "tickers": ["XAUUSD", "XAUUSDT.P"]
+    }
+  }
 }

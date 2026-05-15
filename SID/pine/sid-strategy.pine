@@ -1,10 +1,11 @@
 //@version=6
 // =============================================================================
-// SID Strategy v1.4  — Instructor-aligned + RSI(3) + Weekly Trend filters
+// SID Strategy v1.6  — Instructor-aligned + RSI(3) + Weekly Trend + Earnings
 // =============================================================================
 // CORE RULES (instructor's method, untouched):
 //   1. Signal:  RSI(14) crosses below 30 (LONG) or above 75 (SHORT). Arm STICKY.
-//   2. Earnings: 14-day blackout.
+//   2. Earnings: 14-day PRE-earnings blackout. Trading allowed the day after.
+//                Earnings is forward-looking only (Pine `earnings.future_time`).
 //   3. Entry:   On a LATER day (signal day + 1 to 3 trading days), when daily
 //               RSI direction AND daily MACD direction both point in trade
 //               direction. Entry is on that daily close.
@@ -18,6 +19,7 @@
 //     zone on the signal day (filters stale RSI(14) lag)  (v1.3)
 //   - Weekly trend filter: longs only when weekly 50-SMA > 200-SMA; shorts
 //     only when weekly 50-SMA < 200-SMA  (v1.4)
+//   - Pre-earnings blackout enforced at entry-time (v1.6)
 //
 // VERSION HISTORY:
 //   v1.0 — initial: simultaneous RSI+MACD daily-bar arm/entry
@@ -29,6 +31,18 @@
 //   v1.4 — Weekly trend filter added. 12-month backtest on watchlist with
 //          all filters active: 77% win rate, +$3,584 net on $10k account
 //          at 2% risk per trade. ~36% annualized.
+//   v1.5 — Pre-earnings blackout clarified: blocks 14 days BEFORE earnings
+//          only (trading allowed the day after). 5-year backtest: WR 62.3%
+//          vs v1.4 baseline 60.9%, PF 1.98 vs 1.85. v1.4 locked at git tag
+//          `sid-v1.4-baseline`.
+//   v1.6 — PPI blackout (14 days before US PPI release) + REFINED 47
+//          watchlist curation (removed 14 net-losing community tickers).
+//          FOMC/CPI blackouts TESTED and REJECTED — they hurt WR (see
+//          backtest-v1.7-validation-report.md). 5-year backtest on REFINED
+//          47: WR 74.8%, PF 3.20, +$12,574 over 5y. v1.5 locked at git tag
+//          `sid-v1.5-baseline`. Note: PPI dates are enforced by the BOT
+//          (event-dates.json); Pine strategy is for visualisation only —
+//          PPI filter is not implemented in Pine to keep the source clean.
 //
 // PROJECT POLICY: Per saved memory `feedback_instructor_strategy_priority.md`,
 // the instructor's core rules (RSI 30 long signal, MACD alignment at entry,
@@ -39,8 +53,8 @@
 // =============================================================================
 
 strategy(
-   "SID Strategy v1.4",
-   shorttitle           = "SID v1.4",
+   "SID Strategy v1.6",
+   shorttitle           = "SID v1.6",
    overlay              = true,
    initial_capital      = 10000,
    default_qty_type     = strategy.fixed,

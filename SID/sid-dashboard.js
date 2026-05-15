@@ -29,9 +29,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '1.4';
-const HEADLINE_BACKTEST_WR = 77.0;
-const HEADLINE_BACKTEST_PNL = 3584;
+const STRATEGY_VERSION = '1.6';
+// v1.6 backtest stats — 5-year window on REFINED 47 watchlist (119 trades).
+// PPI filter + curated watchlist combined push WR into the community 65-85%
+// target band for the first time. PF 3.20 = strong risk/reward profile.
+const HEADLINE_BACKTEST_WR = 74.8;
+const HEADLINE_BACKTEST_PNL = 12574;
 
 // ── Data loading (all optional) ──────────────────────────────────────────
 function loadJSON(relPath, fallback) {

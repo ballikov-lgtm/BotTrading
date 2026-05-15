@@ -1,12 +1,12 @@
 //@version=6
 // =============================================================================
-// SID RSI Signals v1.4
+// SID RSI Signals v1.6
 // =============================================================================
-// Companion indicator to sid-strategy.pine v1.4. Plots the daily RSI(14) on
+// Companion indicator to sid-strategy.pine v1.6. Plots the daily RSI(14) on
 // its own pane with built-in 30 / 50 / 75 lines and arrows that fire at the
 // same signal/entry events as the strategy.
 //
-// v1.4 filters (mirror the strategy):
+// v1.6 filters (mirror the strategy):
 //   - RSI(3) rebound-zone confirmation: 3-day RSI must also be in extreme
 //   - Weekly trend filter: longs only in weekly uptrend (50w SMA > 200w SMA)
 //
@@ -14,7 +14,7 @@
 // =============================================================================
 
 indicator(
-   "SID RSI Signals v1.4",
+   "SID RSI Signals v1.6",
    shorttitle = "SID RSI",
    overlay    = false,
    format     = format.price,
