@@ -1,0 +1,173 @@
+# SID Strategy Audit — Video Transcripts vs Our Implementation
+
+Source material: `C:\Claude Standalone\resources\Video Transcripts\SID Strategy\transcripts\`
+4 sections, multiple episodes each.
+
+Purpose: Identify gaps between the instructor's stated rules (from video
+transcripts) and what we've built (`bot-sid.js`, Pine, current ship versions).
+Resolution: Either patch our implementation, or document why we deliberately
+deviated.
+
+---
+
+## Transcript inventory
+
+Will be updated as new transcripts land. Mark each `audited` once reviewed.
+
+| File | Status | Topic | Key findings |
+|---|---|---|---|
+| `S1_EP1_Watchlist.txt` | ⬜ pending audit | What/why of watchlist construction | TBD |
+| `S1_P2_Market_Indices.txt` | ⬜ pending audit | DIA/SPY/QQQ/IWM definitions | TBD |
+| _(more arriving)_ | ⬜ pending | | |
+
+---
+
+## Section-by-section audit (populated as we go)
+
+### Section 1 — Setup (watchlist, indices, sector ETFs)
+
+What we expect this section covers: how to build a watchlist, why those
+specific tickers, sector coverage, how to add ad-hoc trades.
+
+**Gaps found:** (TBD as transcripts process)
+
+**Our implementation:**
+- Watchlist: 80 tickers (REFINED 47 + 32 tier1 expansion)
+- Stored in `SID/watchlist-sid.json`
+- Auto-loaded by bot at runtime
+
+### Section 2 — (likely Strategy / Entry Rules)
+
+What we expect: RSI thresholds, MACD setup, weekly confirmation, signal-to-entry rules.
+
+**Gaps found:** TBD
+
+**Our implementation (v1.7):**
+- Stage 1 ARM: Daily RSI(14) < 30 (long) or > 75 (short) + RSI(3) confirmation + weekly 50w > 200w
+- Stage 2 TRIGGER: Daily RSI direction + Daily MACD direction
+- 3-day sticky arm window
+- VIX ≥ 30 daily gate (v1.7 addition)
+- Earnings 14-day pre-blackout, PPI 14-day pre-blackout
+
+### Section 3 — (likely Risk Management / Position Sizing)
+
+What we expect: Account sizing, % risk per trade, stops, position caps,
+diversification rules.
+
+**Gaps found:** TBD
+
+**Our implementation:**
+- Account: $10K assumed (user planning $20K after 3 months paper)
+- Risk: 2% per trade ($200 fixed)
+- Position cap: 10% of account (live bot only; backtest does not cap)
+- Max 3 concurrent positions
+- Stop: lowest low (long) / highest high (short) between signal & entry, rounded DOWN/UP to whole dollar
+- Exit: daily RSI(14) reaches 50, full exit, no partials
+
+### Section 4 — (likely Advanced / Trade Management / Psychology)
+
+What we expect: When to skip trades, news avoidance, drawdown rules,
+trade journaling, mindset.
+
+**Gaps found:** TBD
+
+**Our implementation:**
+- No discretionary skip logic (bot fires mechanical)
+- VIX gate at 30 (v1.7) covers high-fear regimes
+- Earnings + PPI macro blackouts
+- Open trade limit (3) caps exposure
+- No trade journal / sentiment overlay
+
+---
+
+## Specific gaps to look for (hypotheses from current data analysis)
+
+These are the spots where our 57.8% backtest WR most likely differs from the
+community-claimed 77% WR. Listen for explicit instructor guidance on each.
+
+### 🔴 HIGH-PROBABILITY GAPS
+
+#### 1. Trigger candle/timing
+- **Current**: We enter on daily close when `today_RSI > yesterday_RSI AND today_MACD > yesterday_MACD`.
+- **Possibly different in video**: Enter on next-bar open? Wait for a green candle that closes ABOVE prior high? Wait for MACD line to cross signal line (not just be rising)?
+
+#### 2. Weekly confirmation interpretation
+- **Current**: `50w > 200w` (lagging position check). Almost never blocks trades.
+- **Possibly different**: 50w SLOPE pointing in trade direction (much stricter — would block GM Oct 2022 + many similar). Or weekly RSI rising. Or weekly price > 50w SMA.
+
+#### 3. RSI period
+- **Current**: 14-bar Wilder smoothing (TradingView default).
+- **Possibly different**: 9? 7? Different smoothing?
+
+#### 4. MACD direction definition
+- **Current**: Just `today's MACD > yesterday's MACD` (line going up).
+- **Possibly different**: MACD line CROSSING above signal line (proper crossover)? MACD histogram turning positive (>0)?
+
+#### 5. RSI(3) period
+- **Current**: 3-bar RSI as rebound-zone confirmation.
+- **Possibly different**: Some other short-period RSI (5? 7?) with different threshold
+
+### 🟡 MEDIUM-PROBABILITY GAPS
+
+#### 6. Signal-to-entry timing
+- **Current**: 3-day sticky window from signal day.
+- **Possibly different**: Tighter (1-2 days = freshness matters more)? Looser (5+ days)?
+
+#### 7. Volume confirmation
+- **Current**: None.
+- **Possibly different**: Require volume spike on the trigger candle? Volume > X-day average?
+
+#### 8. Sector/index alignment
+- **Current**: None.
+- **Possibly different**: Require corresponding sector ETF (e.g. XLK for tech stocks) to also be bullish?
+
+#### 9. Pattern recognition on trigger candle
+- **Current**: None — any rising RSI+MACD qualifies.
+- **Possibly different**: Require a specific candle pattern (engulfing, hammer, marubozu)?
+
+### 🟢 LOW-PROBABILITY GAPS (but worth checking)
+
+#### 10. Discretionary skip rules
+- E.g. "If the signal day has unusually wide range, skip"
+- "If the stock is gapping at open, skip"
+- These can lift live trading WR but cannot be modeled in a mechanical backtest
+
+#### 11. Re-arming after expired signal
+- **Current**: After 3-day timeout, arm cancels and waits for a NEW signal day.
+- **Possibly different**: Continuous re-arming as long as RSI stays in extreme?
+
+#### 12. Sizing differently per setup quality
+- **Current**: Flat 2% per trade.
+- **Possibly different**: Higher % risk on high-conviction setups?
+
+---
+
+## Resolution decisions
+
+For each gap found, we'll record:
+
+```
+GAP: [description]
+  Video says: "..." (quote from transcript, episode + timestamp)
+  We built: [current behaviour]
+  Recommendation: [match the video / keep our deviation with reasoning]
+  Estimated impact on WR: [%]
+```
+
+This file gets updated commit-by-commit as gaps are found and resolved.
+
+---
+
+## Audit completion checklist
+
+- [ ] All transcripts present (currently 2/?)
+- [ ] All transcripts read and indexed
+- [ ] Section 1 (setup) audited
+- [ ] Section 2 (likely strategy) audited
+- [ ] Section 3 (likely risk) audited
+- [ ] Section 4 (likely advanced) audited
+- [ ] Gap analysis written for each identified discrepancy
+- [ ] User reviews findings and decides which to ship
+- [ ] Implementation patches drafted for accepted gaps
+- [ ] v1.8 (or v2.0) shipped with audit-derived changes
+- [ ] Backtest re-run to validate gap-closing impact
