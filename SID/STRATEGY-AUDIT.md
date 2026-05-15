@@ -19,12 +19,41 @@ instructor's actual rules:
    We use `daily RSI > yesterday AND daily MACD > yesterday`. Possible
    alternatives: MACD cross of signal line, specific candle pattern, weekly
    confirmation, intraday confirmation, etc.
+
 2. **RSI overbought level** — we use 75 (raised from 70 in v1.3 based on
    backtest). Need to verify what the instructor actually teaches. May be
    70 with a different confirmation rule that makes it work.
-3. **Blackout rules** — earnings 14-day pre-only, PPI 14-day pre-only,
-   VIX gate at 30. Need to verify these match what the instructor describes
-   vs being our inferences/additions.
+
+3. **Blackout rules** — verify what the instructor explicitly teaches:
+   - **Earnings**: confirmed = 14-day pre-only. Verify exact window and
+     "day after" rule.
+   - **PPI / CPI / FOMC / FOMC minutes**: these are OUR inferences from
+     "news events" guidance. Verify which specific event types the
+     instructor calls out by name.
+   - **VIX gate**: NOT directly taught by the instructor (per user
+     clarification). VIX is OUR mechanical proxy for what manual traders
+     can do via discretion ("don't trade today, there's a Fed event /
+     war / crash news"). Audit task: verify the SPIRIT matches — i.e.
+     instructor says "avoid trading on bad news days" and our VIX gate
+     approximates "today's macro environment is fearful = bad news day."
+     The mechanism is different (VIX vs reading the wire); the intent
+     is the same.
+
+### Architectural insight on this audit
+
+The 19pp WR gap between community-claimed 77% and our 57.8% backtest may be
+substantially explained by:
+
+  - **Manual traders discretionarily skip** signals on bad-news days,
+    pre-earnings/Fed days, geopolitically tense days, etc.
+  - **Backtests can't replicate this** — they fire on every signal.
+  - **VIX gate is the best mechanical substitute** but cruder than human
+    judgment.
+
+Our improvements (RSI 75, PPI blackout, VIX gate) are all attempts to
+MECHANIZE discretionary filters the instructor's human students apply
+naturally. The audit should confirm we're targeting the right intent,
+even when our mechanism differs.
 
 Other rules (stop = signal-day low/high rounded, TP = RSI 50 full exit, 2%
 risk, position sizing formula) are believed correct but will still be checked.
