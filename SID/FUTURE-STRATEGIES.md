@@ -297,6 +297,36 @@ existing broker-level stop orders may be sufficient.
 
 ---
 
+## Resources & tools to evaluate
+
+### StockCharts.com (user-flagged 2026-05-15)
+
+URL: https://stockcharts.com
+
+User noted as a potential resource. Worth evaluating for:
+
+| Capability | Use case for SID |
+|---|---|
+| **Personal dashboard** ("Your Dashboard") | Reference design for our cyberpunk dashboard — layout ideas, chart pane sizing |
+| **ChartLists** (managed watchlists) | Equivalent to our `watchlist-sid.json` but with manual curation tools |
+| **Pre-built scans** (Predefined Scan library) | Could provide setup ideas to add to SID Scout's universe |
+| **SharpCharts API** (Premium) | Possible alternative data source if yfinance becomes unreliable |
+| **ChartSchool** (free education) | Reference material for indicator implementations (RSI, MACD details) |
+| **ACP (Advanced Charting Platform)** | Alternative chart workspace if TradingView limits hit |
+
+Action items if/when we revisit:
+1. Sign up for free account to explore the dashboard UX
+2. Check Premium tier API documentation — what data is exposed, rate limits, cost
+3. See if ChartSchool's RSI/MACD definitions match ours exactly (Wilder smoothing,
+   period defaults) — could be a free way to validate our indicator calculations
+4. Test a side-by-side: same ticker, same date, our RSI calc vs StockCharts'
+   value. If they match, we have external validation.
+
+Not urgent — evaluation is exploration only. Current data via yfinance is
+working fine; this is for "what if" planning.
+
+---
+
 ## Other backlog items (low priority)
 
 - `sid-scanner.pine` — multi-symbol TradingView indicator that scans the
