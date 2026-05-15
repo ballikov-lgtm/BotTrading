@@ -10,14 +10,36 @@ deviated.
 
 ---
 
+## 🎯 USER-CONFIRMED AUDIT PRIORITIES (2026-05-15)
+
+User stated the three areas where our model most likely diverges from the
+instructor's actual rules:
+
+1. **Confirmation method** (highest priority) — what EXACTLY triggers entry?
+   We use `daily RSI > yesterday AND daily MACD > yesterday`. Possible
+   alternatives: MACD cross of signal line, specific candle pattern, weekly
+   confirmation, intraday confirmation, etc.
+2. **RSI overbought level** — we use 75 (raised from 70 in v1.3 based on
+   backtest). Need to verify what the instructor actually teaches. May be
+   70 with a different confirmation rule that makes it work.
+3. **Blackout rules** — earnings 14-day pre-only, PPI 14-day pre-only,
+   VIX gate at 30. Need to verify these match what the instructor describes
+   vs being our inferences/additions.
+
+Other rules (stop = signal-day low/high rounded, TP = RSI 50 full exit, 2%
+risk, position sizing formula) are believed correct but will still be checked.
+
+---
+
 ## Transcript inventory
 
 Will be updated as new transcripts land. Mark each `audited` once reviewed.
 
 | File | Status | Topic | Key findings |
 |---|---|---|---|
-| `S1_EP1_Watchlist.txt` | ⬜ pending audit | What/why of watchlist construction | TBD |
-| `S1_P2_Market_Indices.txt` | ⬜ pending audit | DIA/SPY/QQQ/IWM definitions | TBD |
+| `S1_EP1_Watchlist.txt` | ✅ scanned (no strategy content) | Watchlist intro | Setup only |
+| `S1_P2_Market_Indices.txt` | ✅ scanned (no strategy content) | DIA/SPY/QQQ/IWM definitions | Setup only |
+| `S1)Ep3_Stocks  ETFs.txt` | ✅ scanned (no strategy content) | Stocks + ETFs to include | **Watchlist gap**: FedEx (FDX) is in instructor's recommended stocks but in our `all_monitor_only` not active list |
 | _(more arriving)_ | ⬜ pending | | |
 
 ---
