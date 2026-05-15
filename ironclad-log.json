@@ -1,5 +1,136 @@
 [
   {
+    "timestamp": "2026-05-15T00:14:44.138Z",
+    "symbol": "NEARUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:43.859Z",
+    "symbol": "KASUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:43.599Z",
+    "symbol": "ZECUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:43.336Z",
+    "symbol": "AVAXUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:43.070Z",
+    "symbol": "TAOUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:42.790Z",
+    "symbol": "RENDERUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:42.513Z",
+    "symbol": "JUPUSDT",
+    "htfTrend": "bull",
+    "signal": "long",
+    "signalEntry": 0.2263,
+    "actualEntry": 0.2264,
+    "stopLoss": 0.2241,
+    "tp1": 0.23,
+    "tp2": 0.2503,
+    "tp3": 0.2762,
+    "rr1": 1.68,
+    "rr2": 10.91,
+    "rr3": 22.68,
+    "slAfterTp1": 0.2263,
+    "slAfterTp2": 0.23,
+    "split": [
+      0.4,
+      0.35,
+      0.25
+    ],
+    "emaLevels": {
+      "ema21": 0.2077602818020119,
+      "ema50": 0.18030200000000002,
+      "ema100": null,
+      "ema200": null
+    },
+    "fibLevels": {
+      "ratios": [
+        0.236,
+        0.382,
+        0.5,
+        0.618,
+        0.786,
+        1,
+        1.272,
+        1.618
+      ],
+      "levels": [
+        0.1838,
+        0.2015,
+        0.2157,
+        0.23,
+        0.2503,
+        0.2762,
+        0.3091,
+        0.3509
+      ]
+    },
+    "swingHigh": 0.2762,
+    "swingLow": 0.1553,
+    "reason": "HTF bullish + 15m higher low breakout (HL 0.2235 → 0.2246) above $0.2256",
+    "orderId": "1438974071906381825"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:33.358Z",
+    "symbol": "ONDOUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:33.097Z",
+    "symbol": "VIRTUALUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:32.837Z",
+    "symbol": "HYPEUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:32.579Z",
+    "symbol": "ETHUSDT",
+    "htfTrend": "neutral",
+    "signal": null,
+    "reason": "No clear daily trend"
+  },
+  {
+    "timestamp": "2026-05-15T00:14:32.309Z",
+    "symbol": "BTCUSDT",
+    "htfTrend": "bull",
+    "signal": null,
+    "reason": "No LTF breakout confirmed"
+  },
+  {
     "timestamp": "2026-05-14T23:59:35.513Z",
     "symbol": "NEARUSDT",
     "htfTrend": "bull",
@@ -1361,89 +1492,5 @@
     "htfTrend": "bull",
     "signal": null,
     "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:24:45.537Z",
-    "symbol": "RENDERUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-14T20:24:45.281Z",
-    "symbol": "ONDOUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-14T20:24:45.019Z",
-    "symbol": "HYPEUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:24:44.769Z",
-    "symbol": "ETHUSDT",
-    "htfTrend": "bear",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:24:44.509Z",
-    "symbol": "BTCUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:33.621Z",
-    "symbol": "SUIUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:33.356Z",
-    "symbol": "NEARUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:33.098Z",
-    "symbol": "KASUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:32.832Z",
-    "symbol": "ZECUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:32.562Z",
-    "symbol": "AVAXUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:32.302Z",
-    "symbol": "TAOUSDT",
-    "htfTrend": "bull",
-    "signal": null,
-    "reason": "No LTF breakout confirmed"
-  },
-  {
-    "timestamp": "2026-05-14T20:09:32.033Z",
-    "symbol": "RENDERUSDT",
-    "htfTrend": "neutral",
-    "signal": null,
-    "reason": "No clear daily trend"
   }
 ]
