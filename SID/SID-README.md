@@ -15,6 +15,33 @@ A slow and steady swing trading strategy focused exclusively on **US stocks and 
 
 ---
 
+## 📊 Backtest deliverable: SID Strategy Back Testing.xlsx
+
+A formatted Excel workbook with **every backtested trade** (355 trades over 5 years on the 71-ticker universe) — built for Trading Academy lesson submissions and any future strategy reviews.
+
+**Where to find it:**
+- **`C:\Users\balli\Downloads\SID Strategy Back Testing.xlsx`** (auto-copied here for easy access)
+- `SID/SID Strategy Back Testing.xlsx` (repo copy — same file)
+
+**What it contains:**
+1. **All Trades** sheet — 355 rows, AutoFilter on every column, SUBTOTAL formulas that respond to filters live, win/loss + long/short colour coding
+2. **Per-Ticker Summary** sheet — 70 tickers ranked by P&L, WR coloured by tier (≥60% green, <40% red)
+3. **Strategy Rules** sheet — full v1.5 / v1.6 parameter reference
+
+**Top-line numbers** (Sheet 1 subtitle): 60.8% WR / +$15,572 P&L / 355 trades / 5-year window / $200 risk per trade
+
+**Rebuilding when rules change** (e.g. after shipping v1.7 someday):
+
+```bash
+cd SID
+python scripts/export-all-trades.py    # regenerate trades CSV
+python scripts/build-backtest-xlsx.py  # rebuild Excel from CSV
+```
+
+Output: `SID/all-trades.csv` (raw) and `SID/SID Strategy Back Testing.xlsx` (formatted). Copy the xlsx to `~/Downloads/` afterwards if you want easy access.
+
+---
+
 ## What Makes SID Different
 
 | Feature | Detail |
