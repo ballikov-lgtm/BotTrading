@@ -1,13 +1,14 @@
 """
-export-all-trades.py — generate every v1.5 trade across the full
-71-ticker universe (favourites + all sections) over a 5-year window.
+export-all-trades.py — generate every v1.5/v1.6 trade across the
+expanded 80-ticker universe (refined 47 + tier1_expansion 32 +
+all_monitor) over a 5-year window. Adds VIX-at-entry + VIX gate flag
+for v1.7 evaluation.
 
-Output: SID/all-trades.csv with one row per trade, all columns needed
-for the "SID Strategy Back Testing" Excel deliverable.
+Output: SID/all-trades.csv with one row per trade. Columns include
+the proposed v1.7 VIX gate so the workbook can show both filtered
+and unfiltered samples.
 
-This uses the same v1.5 rules as bot-sid.js v1.6 (PPI filter OFF here
-because PPI cuts ~50% of trades and we need volume for the 300-trade
-threshold). All other filters match the live bot exactly:
+Rules match bot-sid.js v1.6+ (PPI filter OFF here for volume):
   - RSI(14) <30 / >75 to arm
   - RSI(3) rebound-zone confirmation
   - Weekly 50/200 SMA trend filter
@@ -16,6 +17,10 @@ threshold). All other filters match the live bot exactly:
   - 14-day pre-earnings blackout (yfinance dates)
   - RSI(14) = 50 take profit, single full exit
   - $200 risk per trade ($10K account at 2%)
+
+NEW v1.7 candidate filter (recorded per-trade, NOT applied):
+  - vix_at_entry: VIX closing value on entry day
+  - vix_gate: "pass" if VIX < 30 (would trade), "block" if VIX >= 30
 """
 
 import yfinance as yf
@@ -46,6 +51,9 @@ LONG_ONLY = {'XLC','QQQ','AMD','INTC','SPY','CAT','MSFT','TQQQ','XLK','GOLD','GS
 WATCHLIST_PATH = Path(__file__).parent.parent / 'watchlist-sid.json'
 EARNINGS_CACHE = Path(__file__).parent.parent / '.earnings-cache.json'
 OUT_CSV = Path(__file__).parent.parent / 'all-trades.csv'
+
+# v1.7 VIX gate parameters
+VIX_THRESHOLD = 30.0
 
 def wilder_rsi(closes, period=14):
     delta = closes.diff()
@@ -92,6 +100,17 @@ def in_pre_earnings(date, earnings_dates, days):
         if 0 <= delta <= days:
             return True
     return False
+
+def vix_at(date, vix_df):
+    """Return VIX close on the most recent trading day <= date, or None."""
+    try:
+        d = pd.to_datetime(date)
+        slc = vix_df[vix_df.index <= d].tail(1)
+        if slc.empty:
+            return None
+        return float(slc['Close'].iloc[-1])
+    except Exception:
+        return None
 
 def backtest_one(ticker, df, earnings_dates, allow_longs, allow_shorts):
     df = df.copy()
@@ -241,15 +260,25 @@ def backtest_one(ticker, df, earnings_dates, allow_longs, allow_shorts):
 
 def main():
     wl = json.loads(WATCHLIST_PATH.read_text(encoding='utf-8'))
-    favs = wl['sections'].get('favourites_reference_61') or wl['sections']['favourites']
-    all_section = wl['sections'].get('all_monitor_only') or wl['sections']['all']
-    universe = sorted(set(favs) | set(all_section))
-    print(f'Universe: {len(universe)} tickers (favs + all)')
+    # New universe: active tickers (refined + tier1_expansion) + community favourites + all_monitor
+    # so the backtest covers EVERY ticker we've considered.
+    active = wl.get('tickers', [])
+    favs = wl['sections'].get('favourites_reference_61') or wl['sections'].get('favourites', [])
+    all_section = wl['sections'].get('all_monitor_only') or wl['sections'].get('all', [])
+    universe = sorted(set(active) | set(favs) | set(all_section))
+    print(f'Universe: {len(universe)} tickers (active + favs + all_monitor)')
 
+    # Fetch VIX history once — used per-trade to record vix_at_entry + gate flag
     end = datetime.now()
     bstart = end - timedelta(days=365 * BACKTEST_YEARS)
     hstart = end - timedelta(days=HISTORY_WARMUP_DAYS + 365 * BACKTEST_YEARS)
     print(f'Window: {bstart.date()} -> {end.date()}\n')
+    print(f'Fetching VIX history...')
+    vix_df = yf.download('^VIX', start=hstart.strftime('%Y-%m-%d'),
+                         end=end.strftime('%Y-%m-%d'), interval='1d',
+                         progress=False, auto_adjust=False, multi_level_index=False)
+    vix_df.index = pd.to_datetime(vix_df.index)
+    print(f'  VIX bars: {len(vix_df)}\n')
 
     cache = load_earnings_cache()
     all_trades = []
@@ -283,25 +312,48 @@ def main():
     all_trades.sort(key=lambda t: t['entry_date'])
     for idx, t in enumerate(all_trades, 1):
         t['trade_no'] = idx
+        # v1.7 VIX annotation — record VIX on entry day + gate flag
+        vix_val = vix_at(t['entry_date'], vix_df)
+        t['vix_at_entry'] = round(vix_val, 2) if vix_val is not None else ''
+        if vix_val is None:
+            t['vix_gate'] = 'unknown'
+        else:
+            t['vix_gate'] = 'block' if vix_val >= VIX_THRESHOLD else 'pass'
 
     # Write CSV
     cols = ['trade_no','ticker','side','signal_date','entry_date','entry_price',
             'stop_loss','shares','position_value','risk_usd','exit_date','exit_price',
-            'exit_reason','pnl','pnl_pct','bars_held','rsi_at_signal','rsi_at_entry']
+            'exit_reason','pnl','pnl_pct','bars_held','rsi_at_signal','rsi_at_entry',
+            'vix_at_entry','vix_gate']
     with open(OUT_CSV, 'w', newline='', encoding='utf-8') as f:
         w = csv.DictWriter(f, fieldnames=cols)
         w.writeheader()
         for t in all_trades:
             w.writerow({c: t[c] for c in cols})
 
+    # Summary stats
     wins = sum(1 for t in all_trades if t['pnl'] > 0)
     losses = sum(1 for t in all_trades if t['pnl'] <= 0)
     total_pnl = sum(t['pnl'] for t in all_trades)
-    print(f'\n━━ TOTALS ━━')
+
+    passed = [t for t in all_trades if t['vix_gate'] == 'pass']
+    pwins = sum(1 for t in passed if t['pnl'] > 0)
+    ppnl = sum(t['pnl'] for t in passed)
+    blocked = [t for t in all_trades if t['vix_gate'] == 'block']
+    bpnl = sum(t['pnl'] for t in blocked)
+
+    print(f'\n━━ TOTALS (raw, all trades) ━━')
     print(f'  Trades: {len(all_trades)}')
     print(f'  Wins: {wins} ({wins/len(all_trades)*100:.1f}%)')
     print(f'  Losses: {losses}')
     print(f'  Net P&L: ${total_pnl:+.2f}')
+
+    print(f'\n━━ TOTALS (v1.7 VIX >= 30 filtered) ━━')
+    print(f'  Passed (VIX < 30): {len(passed)} trades')
+    print(f'  Win rate: {pwins/len(passed)*100:.1f}%' if passed else '  Win rate: n/a')
+    print(f'  Net P&L: ${ppnl:+.2f}')
+    print(f'  Blocked (VIX >= 30): {len(blocked)} trades, ${bpnl:+.2f} P&L removed')
+
     print(f'\nWrote {OUT_CSV.name}')
 
 if __name__ == '__main__':
