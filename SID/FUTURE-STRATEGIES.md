@@ -67,59 +67,86 @@ multiple things at once.
 
 ---
 
-## Strategy: Supply & Demand (instructor-claimed 70%+ WR)
+## ⚠️ Important constant — SID's TP is sacred
 
-**Goal:** complementary strategy to SID that closes the gap from ~25% to
-the 40% target annual return. Where SID is mean-reversion (buy oversold
-bounces), S&D is structural-zone trading.
+**SID's take profit is locked at daily RSI(14) reaching 50.** This is
+a non-negotiable instructor rule (project policy in memory). Every
+future strategy below is **ADDITIVE** to SID — none of them modify
+SID's rules. SID and any new strategy run in parallel on the same
+account, never overlapping or replacing each other.
 
-### Concept (per user's description 2026-05-15)
+---
 
-1. **Identify exhaustion price levels** on day + week timeframes:
-   - Tops with impulsive rejection candles
-   - Bottoms with impulsive accumulation candles
-2. **Mark these as supply (resistance) and demand (support) zones.**
-3. **Wait for price to return to these zones** after consolidation
-   elsewhere.
-4. **Entry at key points within each zone** (specifics TBD with user).
-5. **Stop loss tight** — beyond the zone extreme.
-6. **Take profit dynamic** — minimum 2:1 RR, can ride up to 10:1 if the
-   reversal is strong.
+## Strategy: Supply & Demand (lightly described — needs full spec)
 
-### Key advantage vs SID
+User briefly mentioned this — uses day/week trend detection to mark
+supply and demand zones from impulsive moves at exhaustion price
+levels. Trades fire when price returns to those zones.
 
-SID is **capped at ~2:1 RR by design** (stop at signal-day low, TP at
-RSI 50). S&D's variable TP — up to 10:1 — is what closes the return gap.
-Even at 70% WR with average 5:1 RR (well below the 10:1 cap), the
-expectancy is much higher than SID's.
+**Status:** concept only — no entry rules, stop rules, or TP rules
+have been provided yet. Cannot be built without more detail from the
+user (and ideally instructor source material).
 
-### Implementation scope (multi-session work, weeks)
+**When ready, user owes me:**
+- Mechanical definition of "impulsive move" and "exhaustion"
+- Zone construction rules (which bars, how wide)
+- Entry triggers within zones
+- Stop placement rules
+- TP rules
+- Sample charts marked up by instructor
+- Win rate evidence over a meaningful sample
 
-1. **Define exhaustion mechanically:**
-   - 3-bar reversal pattern with volume spike?
-   - ATR-relative impulsive move?
-   - Wick-to-body ratio threshold?
-2. **Define zone width** (high-low of exhaustion bar? Or extend further?)
-3. **Define entry triggers within zone** (limit order? Candle confirm?)
-4. **Define stop logic** (just beyond zone? ATR-multiple?)
-5. **Define TP rules** (fixed 2:1? Trailing? Structure-based?)
-6. **Backtest harness** (Python, like the SID v1.7 one)
-7. **Pine + bot integration** once parameters are validated
+---
 
-### When to build
+## Strategy: "Strategy X" (TBD — the 70%+ WR, 2:1-10:1 RR one)
 
-User said "**parked for a few weeks**" after v1.6 has been running live.
-Don't start until SID is stable and producing real-money trades for at
-least a month.
+This is a **separate** strategy the user mentioned — distinct from
+Supply & Demand. Closes the gap from SID's ~25% annual return to the
+40% target.
 
-### Pre-work the user owes me
+**What I know so far (per user 2026-05-15):**
+- 70%+ historical win rate per the instructor
+- Min 2:1 reward:risk, up to 10:1 depending on reversal strength
+- More complicated than SID — will take time to perfect
+- Parked for a few weeks until SID v1.6 has live data
 
-When ready, user will provide:
-- Exact rules from instructor (criteria, entries, stops, TP)
-- Sample charts marked up by instructor with annotated zones
-- Win rate evidence over a meaningful sample (300+ trades ideally)
+**What I don't know:**
+- Everything else. Rules, indicators, signal logic, stop placement, TP
+  scaling — all TBD.
 
-Until then, the only thing I should do is keep this spec updated.
+**When user is ready to describe it, I need:**
+- The actual rules (entry, exit, stop, TP scaling)
+- How it determines "reversal strength" that justifies the variable RR
+- Backtest validation criteria from the instructor's evidence
+
+Once spec'd, build process is identical to SID:
+1. Python backtest harness with isolated variants
+2. Validate on 5-year window across watchlist tickers
+3. Implement in bot + Pine if backtest clears threshold
+4. Tag previous version for revert before shipping
+
+---
+
+## How the strategies will coexist
+
+When both SID v1.6 and "Strategy X" (and possibly Supply & Demand) are
+running, they share:
+
+- **Same Alpaca account** — but they tag their own orders via distinct
+  `client_order_id` prefixes (e.g. `SID-AAPL-…` vs `SX-AAPL-…`) so we
+  can reconcile per-strategy P&L afterwards.
+- **Same dashboard** — separate sections per strategy (open positions,
+  closed P&L, signals).
+- **Same Telegram alerts** — but each message tagged with the strategy
+  name in the header.
+- **Independent position sizing** — each strategy risks its 2% of total
+  equity, so concurrent positions could put up to 4-6% at risk if all
+  three strategies fire simultaneously. We'll need a portfolio-level
+  cap (e.g. max 5% total risk across all strategies combined).
+
+The "max total risk" cap is the only architectural change that needs
+to happen before adding a second strategy. Worth flagging now so we
+build it correctly the first time.
 
 ---
 
