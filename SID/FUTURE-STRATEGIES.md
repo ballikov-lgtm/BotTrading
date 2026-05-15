@@ -150,6 +150,110 @@ build it correctly the first time.
 
 ---
 
+## Tool: SID Sentinel + Telegram Control (Railway service)
+
+**Goal:** continuous intraday safety net for SID — both autonomous
+(VIX/SPY panic detection) AND interactive (you send `/close_all` from
+your phone on holiday, the bot executes via Alpaca).
+
+User specifically flagged this when discussing v1.7 VIX gate (which
+only checks once per day at 9:35am ET). The daily check is a
+PREVENTION mechanism. The Sentinel is the REACTION mechanism — covers
+the gap when news hits intraday and stops would be slipped, OR when
+you're away from a terminal and need a remote kill-switch.
+
+### Architecture
+
+Single Node.js service running on Railway (alongside Ironclad-runner —
+shared infrastructure, no extra hosting cost). Two concurrent loops in
+the same process:
+
+```
+┌─────────────────────────────────────────────┐
+│           SID Sentinel (Railway)            │
+├─────────────────────────────────────────────┤
+│  Loop A — Market Monitor (every 60s)       │
+│    Poll VIX + SPY                          │
+│    Apply tier rules:                       │
+│      VIX 30-35: log only                   │
+│      VIX 35-40: Telegram warning           │
+│      VIX > 40:  auto-close + Telegram       │
+│      SPY -3% in 30min: auto-close + alert  │
+│                                             │
+│  Loop B — Telegram Listener (long-polling) │
+│    Accept commands from authorised user:   │
+│      /status                               │
+│      /positions                            │
+│      /close <SYMBOL>                       │
+│      /close_all                            │
+│      /pause       (manual VIX gate)        │
+│      /resume                               │
+│      /vix         (current VIX)            │
+│      /help                                 │
+│                                             │
+│  Shared: Alpaca client + state file        │
+└─────────────────────────────────────────────┘
+```
+
+### Toggle config (env vars on Railway)
+
+```env
+# Master switch
+SID_SENTINEL_ENABLED=true
+SID_SENTINEL_TELEGRAM_CONTROL=true
+
+# Market-monitor thresholds (auto-close = real money risk)
+SID_SENTINEL_VIX_WARN=33
+SID_SENTINEL_VIX_PANIC=40
+SID_SENTINEL_SPY_DROP_PCT=3
+SID_SENTINEL_SPY_DROP_WINDOW_MINS=30
+
+# Behaviour
+SID_SENTINEL_AUTO_CLOSE=false   # start in alert-only mode
+SID_SENTINEL_POLL_SECONDS=60
+
+# Telegram auth — only this chat_id can issue commands
+TELEGRAM_AUTHORIZED_CHAT_IDS=123456789
+```
+
+### Safety patterns
+
+- **Destructive commands require confirmation.** `/close_all` →
+  "Reply YES within 60s to confirm" → no reply, no action.
+- **Idempotency.** If Telegram delivers the same message twice (network
+  hiccup), the second one is rejected by message ID.
+- **Audit log.** Every command + response written to a log file on
+  Railway, also forwarded to a "audit" Telegram channel if desired.
+- **Auto-close OFF by default.** Initial deployment is alert-only.
+  User flips `SID_SENTINEL_AUTO_CLOSE=true` after testing.
+- **Heartbeat.** Every 15 min, post "still alive" to a private channel
+  so you know Railway hasn't died silently.
+
+### Build order when we get there
+
+1. **Phase 1 (alert-only Sentinel):** Market monitor loop with
+   thresholds. No Telegram commands yet. No auto-close.
+   Just: "VIX hit 35, Joe — heads up."
+2. **Phase 2 (Telegram listener):** Accept `/status`, `/positions`,
+   `/vix`, `/help` — read-only commands first. Test auth flow.
+3. **Phase 3 (closures via Telegram):** Add `/close`, `/close_all`,
+   `/pause`, `/resume` with confirmation flow.
+4. **Phase 4 (auto-close):** Flip `SID_SENTINEL_AUTO_CLOSE=true`.
+   Sentinel acts unilaterally on panic-tier signals.
+
+Build time estimate: 1 focused session for Phase 1+2, second session
+for Phase 3+4 with proper testing.
+
+### When to build
+
+After SID v1.7 has 30+ days of live paper trading data. We want to see
+how often v1.7's daily VIX gate actually triggers in practice before
+investing in continuous monitoring. If the gate is firing often enough
+to matter, Sentinel becomes valuable. If markets stay calm, the
+existing broker-level stop orders may be sufficient.
+
+---
+
 ## Other backlog items (low priority)
 
 - `sid-scanner.pine` — multi-symbol TradingView indicator that scans the
@@ -158,6 +262,3 @@ build it correctly the first time.
   state.
 - **Ironclad fixes** — user owns. Bitget reconcile work needs a fresh
   XLS export from 7 May.
-- **Two-way Telegram bot** — `/close AAPL` style commands to manually
-  close positions from the phone. Future feature only if the read-only
-  alerts prove insufficient.
