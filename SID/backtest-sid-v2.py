@@ -472,7 +472,31 @@ def main():
     # and PG were the highest-trade / highest-WR among the V1-dropped 14.
     BEST_OF_DROPPED = ['CSCO', 'EXPE', 'PG']
 
-    if UNIVERSE == 'tier1_83' or UNIVERSE == 'tier1+dropped' or UNIVERSE == '83':
+    # High-volatility expansion — cycles RSI<30 / RSI>70 more often than blue
+    # chips. Targets the instructor's claimed 2-4 trades/week pace.
+    HIGH_VOL_EXPANSION = [
+        # Crypto-adjacent (5)
+        'COIN', 'MSTR', 'MARA', 'BITF', 'HUT',
+        # Recent IPOs / EVs / AI (8)
+        'PLTR', 'RIVN', 'LCID', 'NIO', 'SMCI', 'ARM', 'AI', 'CVNA',
+        # Meme/momentum (3)
+        'GME', 'AMC', 'ROKU',
+        # Leveraged ETFs (6)
+        'SOXL', 'SOXS', 'BOIL', 'KOLD', 'JNUG', 'UVXY',
+        # Commodities (2)
+        'USO', 'UNG',
+        # International (4)
+        'FXI', 'EWZ', 'EWG', 'EWJ',
+        # Re-add from dropped (2)
+        'AAL', 'LUV',
+    ]
+
+    if UNIVERSE == 'tier1_113' or UNIVERSE == 'expanded' or UNIVERSE == '113':
+        r = wl['sections']['refined_47_active']
+        t = wl['sections']['tier1_expansion']
+        tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', []))
+                             + BEST_OF_DROPPED + HIGH_VOL_EXPANSION))
+    elif UNIVERSE == 'tier1_83' or UNIVERSE == 'tier1+dropped' or UNIVERSE == '83':
         r = wl['sections']['refined_47_active']
         t = wl['sections']['tier1_expansion']
         tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', [])) + BEST_OF_DROPPED))
