@@ -52,6 +52,13 @@ const BOT_VERSION = 'v2.0'; // V2 method launch (paper trading, 2026-05-16)
 //        - NEW: 1% risk default (instructor S3_Ep4)
 //        - NEW: AUTO/HUMAN tier routing — HUMAN tier currently LOG-only,
 //          Telegram approval flow deferred to v2.1
+//        - NEW: PDT-IMMUNE DESIGN — bot manages stops itself instead of
+//          submitting Alpaca stop orders. Stop checks happen on each daily
+//          run; if breached, the bot submits a market close at next-day
+//          open. Guarantees entry and exit are on different calendar days
+//          → no day trades ever → no PDT classification at sub-$25K
+//          accounts. Trade-off: stop fills at next-morning open price,
+//          ±1-2% slippage vs the exact stop level.
 //        - DEFERRED to v2.1: weekly RSI/MACD direction check (full V2 method
 //          per spec). Without it the bot is "V2-partial" — backtest equivalent
 //          v2-nogo-only variant on 113 universe gives 668 trades / 52.4% WR.
@@ -589,13 +596,22 @@ async function checkPositions(executor = null) {
     const icon    = outcome === 'WIN' ? '✅' : '❌';
 
     // ── Send exit order to Alpaca if running paper/live ──────────────────────
-    // For RSI 50 exits we submit a market close (Alpaca's stop order handles SL
-    // fills server-side, which the next syncPositions run will reconcile).
-    // If the Alpaca close fails, leave the position open locally and try again
-    // next run — do NOT realise P&L on a phantom exit.
-    if (executor && exitLevel === 'rsi50') {
+    // V2.0+ PDT-immune design: the bot manages stops itself (no Alpaca stop
+    // order at entry). When we detect a stop was hit on a prior candle, we
+    // submit a market close NOW — which fires on the next trading day open,
+    // guaranteeing entry-day and exit-day are different. No same-day round-
+    // trip = no day trade = PDT immune.
+    //
+    // Trade-off: stop fills at next-day open price, not at the exact stop
+    // level. The exit_price logged below uses pos.stopLoss as the INTENDED
+    // stop; the actual fill from Alpaca will reconcile via syncPositions on
+    // the next run. Slippage is usually ±1-2% of the stop distance.
+    if (executor && (exitLevel === 'rsi50' || exitLevel === 'sl')) {
+      const reason = exitLevel === 'rsi50'
+        ? `RSI 50 reached (${exitCandle.rsi?.toFixed(1)})`
+        : `Stop loss breached at $${pos.stopLoss} on ${exitCandle.date} (bot-managed)`;
       try {
-        await executor.closePosition(pos, `RSI 50 reached (${exitCandle.rsi?.toFixed(1)})`);
+        await executor.closePosition(pos, reason);
       } catch (err) {
         console.log(`    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
         writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
