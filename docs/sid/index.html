@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v1.4 TERMINAL</title>
+<title>SID // v2.0 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -594,13 +594,18 @@
 </style>
 </head>
 <body>
+
+<!-- PAPER TRADING BANNER -->
+<div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
+  ⚠ PAPER TRADING · V2 METHOD LAUNCH 2026-05-16 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+</div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v1.4</div>
-      <div class="brand-sub">PRIVATE TERMINAL · INSTRUCTOR-ALIGNED · 77% BACKTEST WR</div>
+      <div class="brand">SID // v2.0 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2 METHOD · 64.9% BACKTEST WR · 34.7% CAGR · 7.95% MAX DD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -613,7 +618,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 20:47:50</span>
+        <span>SYS · 16:45:39</span>
       </div>
     </div>
   </header>
@@ -622,7 +627,7 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v1.4 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.0 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading · v2 scanner enhancements.
       Backtest results (77% WR) are over a 12-month bullish window; live performance will differ.
       <strong>Not financial advice.</strong>
@@ -633,23 +638,23 @@
   <div class="stat-grid">
     <div class="stat-tile" style="--accent:var(--cyan)">
     <div class="stat-label">OPEN POSITIONS</div>
-    <div class="stat-value">3</div>
+    <div class="stat-value">0</div>
     <div class="stat-sub">live</div>
   </div>
     <div class="stat-tile" style="--accent:var(--magenta)">
     <div class="stat-label">CLOSED TRADES</div>
-    <div class="stat-value">2</div>
+    <div class="stat-value">0</div>
     <div class="stat-sub">lifetime</div>
   </div>
     <div class="stat-tile" style="--accent:var(--green)">
     <div class="stat-label">WIN RATE</div>
-    <div class="stat-value">50.0%</div>
-    <div class="stat-sub">live</div>
+    <div class="stat-value">64.9%</div>
+    <div class="stat-sub">backtest baseline</div>
   </div>
     <div class="stat-tile" style="--accent:var(--green)">
     <div class="stat-label">NET P&L</div>
-    <div class="stat-value">+$0.96</div>
-    <div class="stat-sub">realized</div>
+    <div class="stat-value">+$29755</div>
+    <div class="stat-sub">backtest 12mo</div>
   </div>
     <div class="stat-tile" style="--accent:var(--green)">
     <div class="stat-label">AUTO_TRADE</div>
@@ -674,122 +679,8 @@
   <div id="tab-signals" class="tab-pane active">
     <!-- Open positions full-width at the top -->
     <div class="panel">
-      <div class="panel-title">OPEN POSITIONS // CURRENTLY HELD (3)</div>
-      <div class="position-grid"><div class="position-card">
-      <div class="pos-head">
-        <div>
-          <span class="pos-symbol">DKS</span>
-          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
-        </div>
-        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-2.88%</div>
-      </div>
-      
-      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
-        <defs>
-          <linearGradient id="grad-SID-PAPER-1778007473154" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
-          </linearGradient>
-        </defs>
-        <!-- background band showing profit / loss zones -->
-        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-PAPER-1778007473154)" rx="2"/>
-        <!-- baseline -->
-        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
-        <!-- stop marker -->
-        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
-        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
-        <!-- entry marker -->
-        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
-        <!-- current price pulsing dot -->
-        <circle cx="227.05037519647786" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
-          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
-        </circle>
-        <text x="227.05037519647786" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$221.95</text>
-      </svg>
-      <div class="pos-meta">
-        <span>QTY <strong>1</strong></span>
-        <span>RISK <strong>$17.27</strong></span>
-        <span>TO STOP <strong>5.0%</strong></span>
-        <span>DAYS <strong>6</strong></span>
-        <span>OPEN <strong>2026-05-05</strong></span>
-      </div>
-    </div><div class="position-card">
-      <div class="pos-head">
-        <div>
-          <span class="pos-symbol">IWM</span>
-          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
-        </div>
-        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-1.30%</div>
-      </div>
-      
-      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
-        <defs>
-          <linearGradient id="grad-SID-PAPER-1778184301668" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
-          </linearGradient>
-        </defs>
-        <!-- background band showing profit / loss zones -->
-        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-PAPER-1778184301668)" rx="2"/>
-        <!-- baseline -->
-        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
-        <!-- stop marker -->
-        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
-        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
-        <!-- entry marker -->
-        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
-        <!-- current price pulsing dot -->
-        <circle cx="244.9510811863439" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
-          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
-        </circle>
-        <text x="244.9510811863439" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$285.94</text>
-      </svg>
-      <div class="pos-meta">
-        <span>QTY <strong>1</strong></span>
-        <span>RISK <strong>$5.72</strong></span>
-        <span>TO STOP <strong>0.7%</strong></span>
-        <span>DAYS <strong>4</strong></span>
-        <span>OPEN <strong>2026-05-07</strong></span>
-      </div>
-    </div><div class="position-card">
-      <div class="pos-head">
-        <div>
-          <span class="pos-symbol">AMZN</span>
-          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
-        </div>
-        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-0.89%</div>
-      </div>
-      
-      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
-        <defs>
-          <linearGradient id="grad-SID-PAPER-1778531109114" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
-          </linearGradient>
-        </defs>
-        <!-- background band showing profit / loss zones -->
-        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-PAPER-1778531109114)" rx="2"/>
-        <!-- baseline -->
-        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
-        <!-- stop marker -->
-        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
-        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
-        <!-- entry marker -->
-        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
-        <!-- current price pulsing dot -->
-        <circle cx="219.28079802931637" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
-          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
-        </circle>
-        <text x="219.28079802931637" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$271.38</text>
-      </svg>
-      <div class="pos-meta">
-        <span>QTY <strong>1</strong></span>
-        <span>RISK <strong>$10.01</strong></span>
-        <span>TO STOP <strong>2.8%</strong></span>
-        <span>DAYS <strong>0</strong></span>
-        <span>OPEN <strong>2026-05-11</strong></span>
-      </div>
-    </div></div>
+      <div class="panel-title">OPEN POSITIONS // CURRENTLY HELD (0)</div>
+      <div class="hud-empty">// NO OPEN POSITIONS // STANDING BY //</div>
     </div>
 
     <div class="two-col">
@@ -933,13 +824,13 @@
           <div class="panel-title">PERFORMANCE</div>
           <div class="donut-wrap">
             <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    <path d="M 110 22 A 88 88 0 0 1 110 198 L 110 164.56 A 54.56 54.56 0 0 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 110 198 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 110 164.56 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
+    <path d="M 110 22 A 88 88 0 1 1 22.641619079371253 99.39277213753155 L 55.83780382921017 103.42351872526956 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 22.641619079371253 99.39277213753155 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 55.83780382921017 103.42351872526956 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
     <circle cx="110" cy="110" r="52.56" fill="#000"/>
-    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">50.0%</text>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">64.9%</text>
     <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">WIN RATE</text>
   </svg>
             <div class="donut-legend">
-              <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>WINS</span><span style="color:#39ff14">1</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>LOSSES</span><span style="color:#ff0044">1</span></div>
+              <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">20</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">6</span></div>
             </div>
           </div>
         </div>
@@ -960,26 +851,7 @@
   <div id="tab-history" class="tab-pane">
     <div class="panel">
       <div class="panel-title">CLOSED TRADES // CHRONOLOGICAL</div>
-      <table class="history-table">
-    <thead><tr><th>DATE</th><th>SYMBOL</th><th>SIDE</th><th>ENTRY</th><th>EXIT</th><th>P&amp;L</th><th>REASON</th></tr></thead>
-    <tbody><tr>
-      <td>2026-05-11</td>
-      <td class="sig-symbol">BAC</td>
-      <td style="color:#ff1493">SHORT</td>
-      <td>$51.31</td>
-      <td>$50.55</td>
-      <td style="color:#00ffff;text-shadow:0 0 6px #00ffff">+$3.82</td>
-      <td>—</td>
-    </tr><tr>
-      <td>2026-05-05</td>
-      <td class="sig-symbol">IWM</td>
-      <td style="color:#ff1493">SHORT</td>
-      <td>$278.14</td>
-      <td>$281.00</td>
-      <td style="color:#ff0044;text-shadow:0 0 6px #ff0044">-$2.86</td>
-      <td>—</td>
-    </tr></tbody>
-  </table>
+      <div class="hud-empty">// NO CLOSED TRADES YET // PAPER TRADING NOT INITIATED //</div>
     </div>
   </div>
 
@@ -1288,7 +1160,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 77% win rate is over a 26-trade sample in a 12-month bullish window; live performance will differ. All trades carry risk of total loss. Position sizing is at 2% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v1.4 // PRIVATE TERMINAL // GENERATED 2026-05-11 20:47:50 UTC</footer>
+  <footer>SID v2.0 // PRIVATE TERMINAL // GENERATED 2026-05-16 16:45:39 UTC</footer>
 
 </div>
 

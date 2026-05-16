@@ -29,13 +29,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '1.7';
-// v1.7 backtest stats — 5-year window on expanded 80-ticker universe.
-// 425 trades after VIX >= 30 gate. 58.6% WR is lower than v1.6's 74.8%
-// because we widened the universe to 80 tickers (from 47); the gain is
-// statistical robustness — 3.5x more trades to validate the rules.
-const HEADLINE_BACKTEST_WR = 58.6;
-const HEADLINE_BACKTEST_PNL = 17616;
+const STRATEGY_VERSION = '2.0';
+// v2.0 launched 2026-05-16 — V2 method on 113-ticker universe (5y).
+// Position-sized at 1% risk (instructor S3_Ep4 default).
+// Backtest: $10K → $43,328 (+333%), CAGR 34.7%, max DD 7.95%, 64.9% WR.
+// Currently PAPER TRADING — switching to live once Alpaca account confirmed.
+const HEADLINE_BACKTEST_WR = 64.9;
+const HEADLINE_BACKTEST_PNL = 29755;  // 5y net P&L at fixed $200 risk
+const HEADLINE_BACKTEST_CAGR = 34.7;  // Compounded annual @ 1% risk position sizing
+const HEADLINE_MAX_DD = 7.95;
+const PAPER_TRADING_MODE = true;       // Banner flag — flip to false after Alpaca live
 
 // ── Data loading (all optional) ──────────────────────────────────────────
 function loadJSON(relPath, fallback) {
@@ -996,13 +999,18 @@ const html = `<!DOCTYPE html>
 </style>
 </head>
 <body>
+${PAPER_TRADING_MODE ? `
+<!-- PAPER TRADING BANNER -->
+<div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
+  ⚠ PAPER TRADING · V2 METHOD LAUNCH 2026-05-16 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+</div>` : ''}
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v${STRATEGY_VERSION}</div>
-      <div class="brand-sub">PRIVATE TERMINAL · INSTRUCTOR-ALIGNED · ${HEADLINE_BACKTEST_WR}% BACKTEST WR</div>
+      <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
+      <div class="brand-sub">V2 METHOD · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · ${HEADLINE_BACKTEST_CAGR}% CAGR · ${HEADLINE_MAX_DD}% MAX DD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
