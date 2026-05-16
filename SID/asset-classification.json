@@ -1,527 +1,1148 @@
 {
-  "generated": "2026-05-11T21:02:41.926769",
-  "strategy_version": "1.2",
-  "data_source": "backtest-report_rsi75_lo_rsi3_weekly.json",
+  "generated": "2026-05-16",
+  "strategy_version": "v2.0",
+  "data_source": "V2 backtest (v2-weekly-or, 113 universe, 5y) \u2014 see SID/backtest-v2-validation-report.json",
   "rules": {
-    "auto_trade": {
-      "min_trades": 3,
-      "min_net_pnl": 50.0,
-      "min_profit_factor": 1.5,
-      "min_win_rate": 40.0
-    },
-    "monitor": {
-      "min_trades": 2,
-      "min_profit_factor": 0.8,
-      "min_win_rate": 25.0,
-      "max_net_loss": 75.0
-    }
+    "AUTO_TRADE": "V2 AUTO tier (80 tickers): refined-47 + tier1 expansion. Proven via 5y V1 backtest. Bot auto-fires.",
+    "MONITOR": "V2 HUMAN tier (33 tickers): crypto/EV/leveraged/intl ETFs/re-adds. Telegram approval required (v2.1 wires the flow).",
+    "EXCLUDED": "Removed from universe entirely."
   },
   "summary": {
-    "AUTO_TRADE": 2,
-    "MONITOR": 2,
-    "EXCLUDED": 1,
-    "INSUFFICIENT_DATA": 45
+    "auto_trade": 80,
+    "monitor": 33,
+    "excluded": 0,
+    "total": 113
   },
   "tickers": [
+    {
+      "symbol": "AAL",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": -43.46,
+      "trade_count": 3,
+      "reason": "V2 HUMAN tier - Telegram approval required, 3 V2 trades / WR 66.7% / P&L $-43"
+    },
+    {
+      "symbol": "AAPL",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 86.5,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+86"
+    },
+    {
+      "symbol": "ABBV",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 14.17,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 50.0% / P&L $+14"
+    },
+    {
+      "symbol": "ABT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 211.09,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+211"
+    },
+    {
+      "symbol": "ADBE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 57.1,
+      "profit_factor": 0,
+      "net_pnl": 707.2,
+      "trade_count": 7,
+      "reason": "V2 AUTO tier - proven 5y backtest, 7 V2 trades / WR 57.1% / P&L $+707"
+    },
+    {
+      "symbol": "AI",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 328.17,
+      "trade_count": 2,
+      "reason": "V2 HUMAN tier - Telegram approval required, 2 V2 trades / WR 100.0% / P&L $+328"
+    },
+    {
+      "symbol": "AMAT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 AUTO tier - proven 5y backtest, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "AMC",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 45.9,
+      "trade_count": 2,
+      "reason": "V2 HUMAN tier - Telegram approval required, 2 V2 trades / WR 50.0% / P&L $+46"
+    },
+    {
+      "symbol": "AMD",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 471.74,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+472"
+    },
+    {
+      "symbol": "AMZN",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 109.18,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 50.0% / P&L $+109"
+    },
+    {
+      "symbol": "ARM",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -591.56,
+      "trade_count": 3,
+      "reason": "V2 HUMAN tier - Telegram approval required, 3 V2 trades / WR 0.0% / P&L $-592"
+    },
+    {
+      "symbol": "AVGO",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -199.68,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 0.0% / P&L $-200"
+    },
+    {
+      "symbol": "AXP",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 78.72,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 100.0% / P&L $+79"
+    },
+    {
+      "symbol": "B",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 337.5,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+338"
+    },
     {
       "symbol": "BA",
       "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 66.7,
-      "profit_factor": 4.69,
-      "net_pnl": 726.6,
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 1978.17,
       "trade_count": 3,
-      "reason": "WR=67% PF=4.69 P&L=$+727 over 3 trades \u2014 consistent"
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+1978"
     },
     {
-      "symbol": "COST",
+      "symbol": "BITF",
       "tier": "MONITOR",
       "direction": "both",
       "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 496.64,
-      "trade_count": 2,
-      "reason": "WR=100% PF=999.00 P&L=$+497 over 2 trades \u2014 borderline, needs sentiment check"
+      "profit_factor": 0,
+      "net_pnl": 34.4,
+      "trade_count": 1,
+      "reason": "V2 HUMAN tier - Telegram approval required, 1 V2 trades / WR 100.0% / P&L $+34"
     },
     {
-      "symbol": "BAC",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "BLK",
+      "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 310.44,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 114.57,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+115"
     },
     {
-      "symbol": "XLI",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 296.14,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "TQQQ",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 265.44,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "QQQ",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 260.19,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "AAPL",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 248.2,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "DIA",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 239.55,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "VZ",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 238.14,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "SPY",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 231.03,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLV",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 168.3,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLF",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 153.72,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLC",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 150.45,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLK",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 108.64,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "DIS",
+      "symbol": "BOIL",
       "tier": "MONITOR",
       "direction": "both",
       "win_rate": 50.0,
-      "profit_factor": 1.52,
-      "net_pnl": 104.29,
-      "trade_count": 2,
-      "reason": "WR=50% PF=1.52 P&L=$+104 over 2 trades \u2014 borderline, needs sentiment check"
-    },
-    {
-      "symbol": "MSFT",
-      "tier": "AUTO_TRADE",
-      "direction": "long-only",
-      "win_rate": 66.7,
-      "profit_factor": 1.51,
-      "net_pnl": 101.21,
-      "trade_count": 3,
-      "reason": "WR=67% PF=1.51 P&L=$+101 over 3 trades \u2014 consistent"
-    },
-    {
-      "symbol": "MA",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 999.0,
-      "net_pnl": 81.48,
-      "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
-    },
-    {
-      "symbol": "AMD",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "AMZN",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "profit_factor": 0,
+      "net_pnl": -157.96,
+      "trade_count": 4,
+      "reason": "V2 HUMAN tier - Telegram approval required, 4 V2 trades / WR 50.0% / P&L $-158"
     },
     {
       "symbol": "CAT",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": -249.19,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 33.3% / P&L $-249"
     },
     {
-      "symbol": "DKS",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "COIN",
+      "tier": "MONITOR",
       "direction": "both",
       "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "profit_factor": 0,
+      "net_pnl": -199.76,
+      "trade_count": 1,
+      "reason": "V2 HUMAN tier - Telegram approval required, 1 V2 trades / WR 0.0% / P&L $-200"
     },
     {
-      "symbol": "ETSY",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "COST",
+      "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 386.99,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+387"
     },
     {
-      "symbol": "FCX",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "CRM",
+      "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 57.1,
+      "profit_factor": 0,
+      "net_pnl": 937.2,
+      "trade_count": 7,
+      "reason": "V2 AUTO tier - proven 5y backtest, 7 V2 trades / WR 57.1% / P&L $+937"
     },
     {
-      "symbol": "FDX",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "CSCO",
+      "tier": "MONITOR",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": -263.38,
+      "trade_count": 5,
+      "reason": "V2 HUMAN tier - Telegram approval required, 5 V2 trades / WR 40.0% / P&L $-263"
     },
     {
-      "symbol": "GM",
-      "tier": "INSUFFICIENT_DATA",
+      "symbol": "CVNA",
+      "tier": "MONITOR",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 1070.04,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 50.0% / P&L $+1070"
     },
     {
-      "symbol": "GOLD",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "symbol": "CVX",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": 75.49,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 40.0% / P&L $+75"
+    },
+    {
+      "symbol": "DE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 829.98,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+830"
+    },
+    {
+      "symbol": "DIA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 438.42,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 66.7% / P&L $+438"
+    },
+    {
+      "symbol": "DIS",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 44.4,
+      "profit_factor": 0,
+      "net_pnl": 128.84,
+      "trade_count": 9,
+      "reason": "V2 AUTO tier - proven 5y backtest, 9 V2 trades / WR 44.4% / P&L $+129"
+    },
+    {
+      "symbol": "EEM",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 680.6,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 100.0% / P&L $+681"
+    },
+    {
+      "symbol": "EFA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 839.37,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 100.0% / P&L $+839"
+    },
+    {
+      "symbol": "EWG",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 60.0,
+      "profit_factor": 0,
+      "net_pnl": 695.23,
+      "trade_count": 5,
+      "reason": "V2 HUMAN tier - Telegram approval required, 5 V2 trades / WR 60.0% / P&L $+695"
+    },
+    {
+      "symbol": "EWJ",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 186.89,
+      "trade_count": 9,
+      "reason": "V2 HUMAN tier - Telegram approval required, 9 V2 trades / WR 66.7% / P&L $+187"
+    },
+    {
+      "symbol": "EWZ",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 709.35,
+      "trade_count": 4,
+      "reason": "V2 HUMAN tier - Telegram approval required, 4 V2 trades / WR 100.0% / P&L $+709"
+    },
+    {
+      "symbol": "EXPE",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 57.1,
+      "profit_factor": 0,
+      "net_pnl": 970.59,
+      "trade_count": 7,
+      "reason": "V2 HUMAN tier - Telegram approval required, 7 V2 trades / WR 57.1% / P&L $+971"
+    },
+    {
+      "symbol": "F",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 847.81,
+      "trade_count": 7,
+      "reason": "V2 AUTO tier - proven 5y backtest, 7 V2 trades / WR 100.0% / P&L $+848"
+    },
+    {
+      "symbol": "FXI",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 480.37,
+      "trade_count": 8,
+      "reason": "V2 HUMAN tier - Telegram approval required, 8 V2 trades / WR 75.0% / P&L $+480"
+    },
+    {
+      "symbol": "GDX",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 83.3,
+      "profit_factor": 0,
+      "net_pnl": 371.69,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 83.3% / P&L $+372"
+    },
+    {
+      "symbol": "GE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": -604.52,
+      "trade_count": 9,
+      "reason": "V2 AUTO tier - proven 5y backtest, 9 V2 trades / WR 33.3% / P&L $-605"
+    },
+    {
+      "symbol": "GLD",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 977.27,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+977"
+    },
+    {
+      "symbol": "GME",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 1044.62,
+      "trade_count": 3,
+      "reason": "V2 HUMAN tier - Telegram approval required, 3 V2 trades / WR 100.0% / P&L $+1045"
     },
     {
       "symbol": "GOOG",
-      "tier": "INSUFFICIENT_DATA",
+      "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 264.9,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+265"
     },
     {
       "symbol": "GS",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "IBM",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "INTC",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "IWM",
-      "tier": "INSUFFICIENT_DATA",
+      "tier": "AUTO_TRADE",
       "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "JPM",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "MCD",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "META",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "PYPL",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "QYLD",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "SLV",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "SQQQ",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "short-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "TGT",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "short-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "TNA",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "TSLA",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "TZA",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "short-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "WMT",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLB",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLE",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "long-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLP",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLRE",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
-    },
-    {
-      "symbol": "XLU",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "both",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": 0.0,
-      "trade_count": 0,
-      "reason": "only 0 trade(s) in 12 months"
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 923.31,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 100.0% / P&L $+923"
     },
     {
       "symbol": "HD",
-      "tier": "INSUFFICIENT_DATA",
-      "direction": "short-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": -199.5,
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 334.62,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+335"
+    },
+    {
+      "symbol": "HON",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 325.36,
+      "trade_count": 9,
+      "reason": "V2 AUTO tier - proven 5y backtest, 9 V2 trades / WR 66.7% / P&L $+325"
+    },
+    {
+      "symbol": "HUT",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 29.1,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 50.0% / P&L $+29"
+    },
+    {
+      "symbol": "IBB",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 841.0,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+841"
+    },
+    {
+      "symbol": "IBM",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 84.76,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+85"
+    },
+    {
+      "symbol": "INTC",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 113.95,
       "trade_count": 1,
-      "reason": "only 1 trade(s) in 12 months"
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 100.0% / P&L $+114"
+    },
+    {
+      "symbol": "IWM",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": -25.18,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $-25"
+    },
+    {
+      "symbol": "IYR",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 60.0,
+      "profit_factor": 0,
+      "net_pnl": 142.84,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 60.0% / P&L $+143"
+    },
+    {
+      "symbol": "JNJ",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 177.7,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 66.7% / P&L $+178"
+    },
+    {
+      "symbol": "JNUG",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 868.72,
+      "trade_count": 4,
+      "reason": "V2 HUMAN tier - Telegram approval required, 4 V2 trades / WR 100.0% / P&L $+869"
+    },
+    {
+      "symbol": "JPM",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 AUTO tier - proven 5y backtest, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "KHC",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 513.47,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+513"
+    },
+    {
+      "symbol": "KOLD",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": -0.69,
+      "trade_count": 5,
+      "reason": "V2 HUMAN tier - Telegram approval required, 5 V2 trades / WR 40.0% / P&L $-1"
+    },
+    {
+      "symbol": "LCID",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 HUMAN tier - Telegram approval required, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "LLY",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 181.84,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+182"
+    },
+    {
+      "symbol": "LMT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 85.7,
+      "profit_factor": 0,
+      "net_pnl": 1214.59,
+      "trade_count": 7,
+      "reason": "V2 AUTO tier - proven 5y backtest, 7 V2 trades / WR 85.7% / P&L $+1215"
+    },
+    {
+      "symbol": "LRCX",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -198.4,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 0.0% / P&L $-198"
+    },
+    {
+      "symbol": "LUV",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 16.7,
+      "profit_factor": 0,
+      "net_pnl": -941.41,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 16.7% / P&L $-941"
+    },
+    {
+      "symbol": "MARA",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": -234.47,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 33.3% / P&L $-234"
+    },
+    {
+      "symbol": "MCD",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 80.0,
+      "profit_factor": 0,
+      "net_pnl": 894.65,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 80.0% / P&L $+895"
+    },
+    {
+      "symbol": "MDLZ",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 226.19,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+226"
+    },
+    {
+      "symbol": "META",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": 228.54,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 40.0% / P&L $+229"
+    },
+    {
+      "symbol": "MRK",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 262.08,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 50.0% / P&L $+262"
+    },
+    {
+      "symbol": "MSTR",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 16.7,
+      "profit_factor": 0,
+      "net_pnl": -818.44,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 16.7% / P&L $-818"
+    },
+    {
+      "symbol": "NIO",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": -8.07,
+      "trade_count": 2,
+      "reason": "V2 HUMAN tier - Telegram approval required, 2 V2 trades / WR 50.0% / P&L $-8"
+    },
+    {
+      "symbol": "NKE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": -336.99,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 40.0% / P&L $-337"
+    },
+    {
+      "symbol": "NOW",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": -225.23,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 33.3% / P&L $-225"
+    },
+    {
+      "symbol": "NUGT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": -298.85,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 33.3% / P&L $-299"
+    },
+    {
+      "symbol": "NVDA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -199.29,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 0.0% / P&L $-199"
+    },
+    {
+      "symbol": "ORCL",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 683.42,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+683"
+    },
+    {
+      "symbol": "PFE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 190.18,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 100.0% / P&L $+190"
+    },
+    {
+      "symbol": "PG",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": -164.17,
+      "trade_count": 2,
+      "reason": "V2 HUMAN tier - Telegram approval required, 2 V2 trades / WR 50.0% / P&L $-164"
+    },
+    {
+      "symbol": "PLTR",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 HUMAN tier - Telegram approval required, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "PYPL",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 364.91,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+365"
+    },
+    {
+      "symbol": "QQQ",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 290.85,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+291"
+    },
+    {
+      "symbol": "RIOT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 83.3,
+      "profit_factor": 0,
+      "net_pnl": 613.11,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 83.3% / P&L $+613"
+    },
+    {
+      "symbol": "RIVN",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 196.08,
+      "trade_count": 1,
+      "reason": "V2 HUMAN tier - Telegram approval required, 1 V2 trades / WR 100.0% / P&L $+196"
+    },
+    {
+      "symbol": "ROKU",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 16.7,
+      "profit_factor": 0,
+      "net_pnl": -879.06,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 16.7% / P&L $-879"
+    },
+    {
+      "symbol": "RTX",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 33.3,
+      "profit_factor": 0,
+      "net_pnl": 192.7,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 33.3% / P&L $+193"
+    },
+    {
+      "symbol": "SBUX",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": -91.09,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 50.0% / P&L $-91"
+    },
+    {
+      "symbol": "SCHW",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -197.22,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 0.0% / P&L $-197"
+    },
+    {
+      "symbol": "SLV",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 630.76,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+631"
+    },
+    {
+      "symbol": "SMCI",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 40.0,
+      "profit_factor": 0,
+      "net_pnl": 238.53,
+      "trade_count": 5,
+      "reason": "V2 HUMAN tier - Telegram approval required, 5 V2 trades / WR 40.0% / P&L $+239"
+    },
+    {
+      "symbol": "SOXL",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 54.4,
+      "trade_count": 3,
+      "reason": "V2 HUMAN tier - Telegram approval required, 3 V2 trades / WR 66.7% / P&L $+54"
+    },
+    {
+      "symbol": "SOXS",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 HUMAN tier - Telegram approval required, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "SPY",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 402.59,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+403"
+    },
+    {
+      "symbol": "SQQQ",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 172.08,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+172"
+    },
+    {
+      "symbol": "TGT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 75.0,
+      "profit_factor": 0,
+      "net_pnl": 424.77,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 75.0% / P&L $+425"
+    },
+    {
+      "symbol": "TNA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 98.71,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+99"
+    },
+    {
+      "symbol": "TQQQ",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 727.82,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 100.0% / P&L $+728"
+    },
+    {
+      "symbol": "TSLA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 71.4,
+      "profit_factor": 0,
+      "net_pnl": 800.03,
+      "trade_count": 7,
+      "reason": "V2 AUTO tier - proven 5y backtest, 7 V2 trades / WR 71.4% / P&L $+800"
+    },
+    {
+      "symbol": "TZA",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 437.93,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 100.0% / P&L $+438"
+    },
+    {
+      "symbol": "UNG",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 404.71,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 50.0% / P&L $+405"
+    },
+    {
+      "symbol": "UNH",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 901.83,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+902"
+    },
+    {
+      "symbol": "USO",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 61.91,
+      "trade_count": 6,
+      "reason": "V2 HUMAN tier - Telegram approval required, 6 V2 trades / WR 66.7% / P&L $+62"
+    },
+    {
+      "symbol": "UVXY",
+      "tier": "MONITOR",
+      "direction": "both",
+      "win_rate": 0.0,
+      "profit_factor": 0,
+      "net_pnl": -199.58,
+      "trade_count": 1,
+      "reason": "V2 HUMAN tier - Telegram approval required, 1 V2 trades / WR 0.0% / P&L $-200"
+    },
+    {
+      "symbol": "V",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 226.72,
+      "trade_count": 1,
+      "reason": "V2 AUTO tier - proven 5y backtest, 1 V2 trades / WR 100.0% / P&L $+227"
+    },
+    {
+      "symbol": "WFC",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 808.42,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 100.0% / P&L $+808"
+    },
+    {
+      "symbol": "WMT",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 330.33,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+330"
+    },
+    {
+      "symbol": "XHB",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 864.72,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+865"
+    },
+    {
+      "symbol": "XLC",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": -36.19,
+      "trade_count": 2,
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 50.0% / P&L $-36"
+    },
+    {
+      "symbol": "XLE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 0,
+      "profit_factor": 0,
+      "net_pnl": 0,
+      "trade_count": 0,
+      "reason": "V2 AUTO tier - proven 5y backtest, no V2-qualifying trades in 5y window"
+    },
+    {
+      "symbol": "XLF",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 99.6,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 66.7% / P&L $+100"
+    },
+    {
+      "symbol": "XLI",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 510.48,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+510"
+    },
+    {
+      "symbol": "XLK",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 59.33,
+      "trade_count": 3,
+      "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 66.7% / P&L $+59"
+    },
+    {
+      "symbol": "XLP",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 80.0,
+      "profit_factor": 0,
+      "net_pnl": 632.3,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 80.0% / P&L $+632"
+    },
+    {
+      "symbol": "XLRE",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 80.0,
+      "profit_factor": 0,
+      "net_pnl": 414.39,
+      "trade_count": 5,
+      "reason": "V2 AUTO tier - proven 5y backtest, 5 V2 trades / WR 80.0% / P&L $+414"
+    },
+    {
+      "symbol": "XLU",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 66.7,
+      "profit_factor": 0,
+      "net_pnl": 99.62,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 66.7% / P&L $+100"
+    },
+    {
+      "symbol": "XLV",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 83.3,
+      "profit_factor": 0,
+      "net_pnl": 413.86,
+      "trade_count": 6,
+      "reason": "V2 AUTO tier - proven 5y backtest, 6 V2 trades / WR 83.3% / P&L $+414"
     },
     {
       "symbol": "XLY",
-      "tier": "EXCLUDED",
-      "direction": "short-only",
-      "win_rate": 0.0,
-      "profit_factor": 0.0,
-      "net_pnl": -396.84,
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 50.0,
+      "profit_factor": 0,
+      "net_pnl": 486.52,
+      "trade_count": 4,
+      "reason": "V2 AUTO tier - proven 5y backtest, 4 V2 trades / WR 50.0% / P&L $+487"
+    },
+    {
+      "symbol": "XOM",
+      "tier": "AUTO_TRADE",
+      "direction": "both",
+      "win_rate": 100.0,
+      "profit_factor": 0,
+      "net_pnl": 269.59,
       "trade_count": 2,
-      "reason": "WR=0% PF=0.00 P&L=$-397 over 2 trades \u2014 net negative without edge"
+      "reason": "V2 AUTO tier - proven 5y backtest, 2 V2 trades / WR 100.0% / P&L $+270"
     }
   ]
 }
