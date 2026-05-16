@@ -864,6 +864,43 @@ const html = `<!DOCTYPE html>
   /* by default, hide EXCLUDED tier dots from heatmap — toggle reveals them */
   body:not(.show-excluded) .heatmap-dot[data-tier="EXCLUDED"] { display: none; }
 
+  /* ── HEATMAP DOT HOVER ────────────────────────────────────
+     Magnify + brighten + larger label on hover. Uses fill-box
+     transform-origin so each dot scales around its own centre,
+     not the SVG origin. */
+  .heatmap-dot { cursor: pointer; }
+  .heatmap-dot circle,
+  .heatmap-dot text {
+    transition:
+      transform 150ms cubic-bezier(0.34, 1.4, 0.64, 1),
+      fill-opacity 150ms ease,
+      stroke-width 150ms ease,
+      font-size 150ms ease;
+    transform-box: fill-box;
+    transform-origin: center center;
+  }
+  .heatmap-dot:hover circle {
+    transform: scale(1.7);
+    fill-opacity: 0.9 !important;
+    stroke-width: 3 !important;
+    animation: dot-pulse 1.4s ease-in-out infinite;
+  }
+  .heatmap-dot:hover text {
+    transform: scale(1.4);
+    fill: #ffffff !important;
+    font-weight: 900 !important;
+  }
+  /* Dim non-hovered dots when something is hovered — pulls eye to active one */
+  .heatmap-dot:has(~ .heatmap-dot:hover) circle,
+  .heatmap-dot:hover ~ .heatmap-dot circle {
+    fill-opacity: 0.15;
+    transition: fill-opacity 200ms ease;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { stroke-opacity: 1; }
+    50%      { stroke-opacity: 0.4; }
+  }
+
   /* ── POSITION CARDS ─────────────────────────────────── */
   .position-grid {
     display: grid;

@@ -432,6 +432,43 @@
   /* by default, hide EXCLUDED tier dots from heatmap — toggle reveals them */
   body:not(.show-excluded) .heatmap-dot[data-tier="EXCLUDED"] { display: none; }
 
+  /* ── HEATMAP DOT HOVER ────────────────────────────────────
+     Magnify + brighten + larger label on hover. Uses fill-box
+     transform-origin so each dot scales around its own centre,
+     not the SVG origin. */
+  .heatmap-dot { cursor: pointer; }
+  .heatmap-dot circle,
+  .heatmap-dot text {
+    transition:
+      transform 150ms cubic-bezier(0.34, 1.4, 0.64, 1),
+      fill-opacity 150ms ease,
+      stroke-width 150ms ease,
+      font-size 150ms ease;
+    transform-box: fill-box;
+    transform-origin: center center;
+  }
+  .heatmap-dot:hover circle {
+    transform: scale(1.7);
+    fill-opacity: 0.9 !important;
+    stroke-width: 3 !important;
+    animation: dot-pulse 1.4s ease-in-out infinite;
+  }
+  .heatmap-dot:hover text {
+    transform: scale(1.4);
+    fill: #ffffff !important;
+    font-weight: 900 !important;
+  }
+  /* Dim non-hovered dots when something is hovered — pulls eye to active one */
+  .heatmap-dot:has(~ .heatmap-dot:hover) circle,
+  .heatmap-dot:hover ~ .heatmap-dot circle {
+    fill-opacity: 0.15;
+    transition: fill-opacity 200ms ease;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { stroke-opacity: 1; }
+    50%      { stroke-opacity: 0.4; }
+  }
+
   /* ── POSITION CARDS ─────────────────────────────────── */
   .position-grid {
     display: grid;
@@ -618,7 +655,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 20:43:58</span>
+        <span>SYS · 20:46:27</span>
       </div>
     </div>
   </header>
@@ -1496,7 +1533,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 77% win rate is over a 26-trade sample in a 12-month bullish window; live performance will differ. All trades carry risk of total loss. Position sizing is at 2% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.0 // PRIVATE TERMINAL // GENERATED 2026-05-16 20:43:58 UTC</footer>
+  <footer>SID v2.0 // PRIVATE TERMINAL // GENERATED 2026-05-16 20:46:27 UTC</footer>
 
 </div>
 
