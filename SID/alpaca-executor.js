@@ -155,13 +155,25 @@ class AlpacaExecutor {
   }
 
   /**
-   * Submits a market-entry order + stop-loss for a new signal.
+   * Submits a market-entry order ONLY. Stop is bot-managed, not Alpaca-managed.
+   *
+   * PDT-IMMUNE DESIGN (v2.0+):
+   * We deliberately do NOT submit a stop-loss order to Alpaca alongside entry.
+   * The bot tracks the stop level locally and, on each daily run, checks the
+   * prior day's low against the stop. If hit, the bot submits a market sell
+   * at the NEXT trading day's open. This guarantees entry and exit are on
+   * different calendar days → no same-day round-trips → no day trades → no
+   * PDT classification, even at sub-$25K account sizes.
+   *
+   * Trade-off: stop fills at next morning's open price, not at the actual stop
+   * price. Slippage on a typical loser is ~0-2% of the stop distance in either
+   * direction (sometimes the gap helps, sometimes hurts).
    *
    * @param {Object} args
    * @param {Object} args.signal    output of detectEntrySignal in bot-sid.js
    * @param {Object} args.sizing    output of calcPositionSize in bot-sid.js
    * @param {string} args.symbol
-   * @returns {{ entryOrderId: string, stopOrderId: string }}
+   * @returns {{ entryOrderId: string }}
    */
   async openEntry({ signal, sizing, symbol }) {
     if (!this.clock?.is_open) {
@@ -182,22 +194,24 @@ class AlpacaExecutor {
       signalDate: signal.signalDate,
     });
 
-    this.log.log(`    [Alpaca:${this.mode}] Submitting ${side.toUpperCase()} ${sizing.shares} ${symbol} @ market, stop $${signal.stopLoss}`);
+    this.log.log(`    [Alpaca:${this.mode}] Submitting ${side.toUpperCase()} ${sizing.shares} ${symbol} @ market (bot-managed stop: $${signal.stopLoss})`);
 
-    const { entryOrder, stopOrder } = await this.client.submitEntryWithStop({
+    // Entry only — NO stop order. Bot will close the position on the NEXT
+    // daily run if yesterday's low breached the stop level.
+    const entryOrder = await this.client.submitOrder({
       symbol,
-      side,
       qty: sizing.shares,
-      stopPrice: signal.stopLoss,
-      clientOrderIdPrefix: prefix,
+      side,
+      type: 'market',
+      time_in_force: 'day',
+      client_order_id: `${prefix}-entry`,
     });
 
     this.log.log(`    [Alpaca:${this.mode}] Entry order ${entryOrder.id} submitted (status: ${entryOrder.status})`);
-    this.log.log(`    [Alpaca:${this.mode}] Stop order  ${stopOrder.id} submitted at $${signal.stopLoss}`);
 
     return {
       entryOrderId: entryOrder.id,
-      stopOrderId:  stopOrder.id,
+      stopOrderId:  null,        // PDT-immune: no Alpaca stop order
       clientOrderIdPrefix: prefix,
     };
   }
@@ -214,14 +228,16 @@ class AlpacaExecutor {
       throw new Error(`Market closed — refusing to submit close for ${localPos.symbol}`);
     }
 
-    // Cancel any outstanding stop order on this symbol before closing.
-    // Otherwise the stop and the close race each other.
+    // V2.0+ PDT-immune design: we don't submit stop orders to Alpaca anymore,
+    // so there's nothing to cancel ahead of the close. Legacy stops (from
+    // positions opened pre-v2.0) are still scrubbed defensively in case any
+    // remain in flight.
     try {
       const openOrders = await this.client.listOrders({ status: 'open', symbols: localPos.symbol });
       for (const order of openOrders) {
         if (order.client_order_id?.endsWith('-stop')) {
           await this.client.cancelOrder(order.id);
-          this.log.log(`    [Alpaca:${this.mode}] Cancelled stop ${order.id} ahead of close`);
+          this.log.log(`    [Alpaca:${this.mode}] Cancelled legacy stop ${order.id} ahead of close`);
         }
       }
     } catch (err) {
