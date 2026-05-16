@@ -75,35 +75,48 @@ EARNINGS_CACHE = Path(__file__).parent / '.earnings-cache.json'
 VARIANTS = [
     {
         'name': 'v1.7-shipped',
-        'desc': 'V1 baseline: RSI 75, no weekly direction, no no-go cap',
+        'desc': 'V1 baseline: RSI 75, no weekly, no no-go cap, 1-bar daily alignment',
         'rsi_overbought':       RSI_OVERBOUGHT_V1,
         'use_weekly_direction': False,
         'weekly_mode':          'none',
         'use_nogo_zone':        False,
+        'slope_bars':           1,
     },
     {
         'name': 'v2-nogo-only',
-        'desc': 'V2 minimal: RSI 70 threshold + RSI 45/55 no-go cap, NO weekly filter',
+        'desc': 'V2 minimal: RSI 70 + 45/55 no-go cap, 1-bar daily alignment',
         'rsi_overbought':       RSI_OVERBOUGHT_V2,
         'use_weekly_direction': False,
         'weekly_mode':          'none',
         'use_nogo_zone':        True,
+        'slope_bars':           1,
     },
     {
         'name': 'v2-weekly-or',
-        'desc': 'V2 medium: + weekly RSI OR weekly MACD rising (one of two)',
+        'desc': 'V2 medium: + weekly RSI OR MACD rising (1-bar daily alignment)',
         'rsi_overbought':       RSI_OVERBOUGHT_V2,
         'use_weekly_direction': True,
         'weekly_mode':          'or',
         'use_nogo_zone':        True,
+        'slope_bars':           1,
+    },
+    {
+        'name': 'v2-slope',
+        'desc': '*** V2 + 2-bar daily slope (RSI & MACD rising 2 days running) ***',
+        'rsi_overbought':       RSI_OVERBOUGHT_V2,
+        'use_weekly_direction': True,
+        'weekly_mode':          'or',
+        'use_nogo_zone':        True,
+        'slope_bars':           2,
     },
     {
         'name': 'v2-method',
-        'desc': '*** V2 full: + weekly RSI AND weekly MACD rising (both required) ***',
+        'desc': 'V2 strict: + weekly RSI AND MACD rising (1-bar daily alignment)',
         'rsi_overbought':       RSI_OVERBOUGHT_V2,
         'use_weekly_direction': True,
         'weekly_mode':          'and',
         'use_nogo_zone':        True,
+        'slope_bars':           1,
     },
 ]
 
@@ -238,8 +251,11 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
     prev_rsi  = None
     prev_macd = None
     prev_signal = None
+    prev_prev_rsi  = None   # 2-bar back, for slope_bars=2
+    prev_prev_macd = None
 
     rsi_overbought = variant['rsi_overbought']
+    slope_bars = variant.get('slope_bars', 1)
 
     for i, (date, row) in enumerate(df.iterrows()):
         rsi    = row['RSI']
@@ -257,6 +273,18 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
         macd_falling = m < prev_macd
         macd_cross_up   = m > s and prev_macd <= prev_signal
         macd_cross_down = m < s and prev_macd >= prev_signal
+
+        # 2-bar slope: indicator rising/falling for TWO bars running
+        if slope_bars == 2 and prev_prev_rsi is not None and prev_prev_macd is not None:
+            rsi_rising_2  = rsi_rising  and prev_rsi  > prev_prev_rsi
+            rsi_falling_2 = rsi_falling and prev_rsi  < prev_prev_rsi
+            macd_rising_2  = macd_rising  and prev_macd > prev_prev_macd
+            macd_falling_2 = macd_falling and prev_macd < prev_prev_macd
+        else:
+            rsi_rising_2  = rsi_rising
+            rsi_falling_2 = rsi_falling
+            macd_rising_2  = macd_rising
+            macd_falling_2 = macd_falling
 
         # ── EXIT FIRST ─────────────────────────────────────────────────────
         if in_pos is not None:
@@ -294,6 +322,7 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
                 })
                 in_pos = None
             else:
+                prev_prev_rsi, prev_prev_macd = prev_rsi, prev_macd
                 prev_rsi, prev_macd, prev_signal = rsi, m, s
                 continue
 
@@ -325,7 +354,9 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
         wk_macd_ok = bool(row['wk_macd_rising'])
 
         if arm_dir == 'LONG' and in_pos is None:
-            macd_ok = macd_rising  # V2 uses direction (V2.1 may swap to cross)
+            # 1-bar OR 2-bar slope depending on variant
+            macd_ok = macd_rising_2 if slope_bars == 2 else macd_rising
+            rsi_dir_ok = rsi_rising_2 if slope_bars == 2 else rsi_rising
             # V2 no-go zone
             nogo_ok = (not variant['use_nogo_zone']) or rsi < RSI_NOGO_LONG_HI
             # V2 weekly confirmation
@@ -339,7 +370,7 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
             else:
                 weekly_ok = True
 
-            if rsi_rising and macd_ok and nogo_ok and weekly_ok:
+            if rsi_dir_ok and macd_ok and nogo_ok and weekly_ok:
                 stop = math.floor(arm_low)
                 ep = row['Close']
                 if ep > stop:
@@ -358,7 +389,8 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
                     }
                     arm_dir = None
         elif arm_dir == 'SHORT' and in_pos is None:
-            macd_ok = macd_falling
+            macd_ok = macd_falling_2 if slope_bars == 2 else macd_falling
+            rsi_dir_ok = rsi_falling_2 if slope_bars == 2 else rsi_falling
             nogo_ok = (not variant['use_nogo_zone']) or rsi > RSI_NOGO_SHORT_LO
             # Weekly for shorts: invert rising → falling per mode
             mode = variant.get('weekly_mode', 'and')
@@ -371,7 +403,7 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
             else:
                 weekly_ok = True
 
-            if rsi_falling and macd_ok and nogo_ok and weekly_ok:
+            if rsi_dir_ok and macd_ok and nogo_ok and weekly_ok:
                 stop = math.ceil(arm_high)
                 ep = row['Close']
                 if stop > ep:
@@ -390,6 +422,7 @@ def backtest_ticker(ticker, df, variant, earnings_dates,
                     }
                     arm_dir = None
 
+        prev_prev_rsi, prev_prev_macd = prev_rsi, prev_macd
         prev_rsi, prev_macd, prev_signal = rsi, m, s
 
     return trades

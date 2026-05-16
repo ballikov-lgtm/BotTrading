@@ -35,10 +35,10 @@ report = json.loads(JSON_PATH.read_text(encoding='utf-8'))
 trades_by_variant = report['all_trades']
 agg = report['aggregates']
 
-# Find the headline V2 variant — choose the one with most trades that ISN'T
-# the V1 baseline. Falls back to whatever is biggest if the strictest is too
-# sparse. This gives the 300+ row table the user asked for.
-V2_VARIANT_PRIORITY = ['v2-method', 'v2-weekly-or', 'v2-nogo-only']
+# Headline V2 variant priority — the FIRST one with >=300 trades wins.
+# v2-weekly-or wins by economic value ($88/trade vs $50/trade for v2-slope).
+# v2-slope is the "cleaner alignment" alternative but cuts trade count by 66%.
+V2_VARIANT_PRIORITY = ['v2-weekly-or', 'v2-slope', 'v2-method', 'v2-nogo-only']
 headline_variant = None
 for cand in V2_VARIANT_PRIORITY:
     if cand in trades_by_variant and len(trades_by_variant[cand]) >= 100:
@@ -494,7 +494,7 @@ for col_idx, label in enumerate(grid_cols, 1):
 ws3.row_dimensions[GRID_HEADER].height = 28
 
 GRID_DATA = GRID_HEADER + 1
-variant_order = ['v1.7-shipped', 'v2-nogo-only', 'v2-weekly-or', 'v2-method']
+variant_order = ['v1.7-shipped', 'v2-nogo-only', 'v2-weekly-or', 'v2-slope', 'v2-method']
 for i, vname in enumerate(variant_order):
     if vname not in agg:
         continue
