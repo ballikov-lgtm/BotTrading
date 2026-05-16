@@ -1,0 +1,215 @@
+//@version=6
+// =============================================================================
+// SID Divergence Indicator v1.0 — Cyberpunk theme (cyan/magenta with glow)
+// =============================================================================
+// Detects classical RSI divergences:
+//
+//   BULLISH DIVERGENCE (cyan line, cyan glow)
+//     - Two pivot lows in RSI within lookback window
+//     - Price at L2 is at-or-near L1 (within configurable similarity %)
+//     - RSI at L2 is HIGHER than RSI at L1
+//     - = early reversal signal: price hasn't recovered but momentum has
+//     - Classical W-bottom in RSI pane
+//
+//   BEARISH DIVERGENCE (magenta line, magenta glow)
+//     - Two pivot highs in RSI
+//     - Price at H2 is at-or-near H1
+//     - RSI at H2 is LOWER than RSI at H1
+//     - = early top signal: price still pushing but momentum fading
+//
+// User insight (2026-05-16): real W-bottoms typically do NOT have BOTH lows
+// in the RSI < 30 oversold zone. The second low usually has RSI in 35-50.
+// This indicator therefore does NOT require L2 to be in oversold — only
+// that RSI at L2 is higher than at L1. Same logic mirrored for highs.
+//
+// Theme: cyberpunk neon. Cyan #00FFFF for bullish, hot magenta #FF1493 for
+// bearish. Both rendered with a 3-layer glow effect:
+//   - Outer halo (wide, transparent)
+//   - Mid glow (medium, semi-transparent)
+//   - Core line (thin, opaque)
+//
+// USAGE: Add to chart. Right-click → "Merge into existing pane" → select
+// your RSI pane. The divergence lines will draw on top of the RSI plot.
+// Indicator does NOT plot its own RSI — it uses the same RSI(14) calc and
+// only draws the divergence lines.
+//
+// PROJECT: SID Strategy V2 Method
+// =============================================================================
+
+indicator(
+   title         = "SID Divergence (Cyberpunk)",
+   shorttitle    = "SID Div",
+   overlay       = false,
+   max_lines_count   = 500,
+   max_labels_count  = 500
+   )
+
+// --- Inputs ---------------------------------------------------------------
+g_calc = "RSI calculation"
+i_rsiLen      = input.int(14, "RSI Length", minval=2, maxval=50, group=g_calc,
+   tooltip="Should match the RSI period on the chart for consistency. SID method uses 14.")
+
+g_piv = "Pivot detection"
+i_lbL         = input.int(5, "Pivot Left Bars",  minval=1, maxval=20, group=g_piv,
+   tooltip="Bars to the LEFT of a pivot that must be higher (low) or lower (high) to confirm it.")
+i_lbR         = input.int(5, "Pivot Right Bars", minval=1, maxval=20, group=g_piv,
+   tooltip="Bars to the RIGHT of a pivot to confirm it. Larger = later confirmation but less noise.")
+
+g_range = "Divergence window"
+i_minBars     = input.int(5,  "Min bars between pivots", minval=1, maxval=50, group=g_range,
+   tooltip="Pivots closer than this are ignored (too noisy).")
+i_maxBars     = input.int(60, "Max bars between pivots", minval=10, maxval=200, group=g_range,
+   tooltip="Pivots further apart than this are ignored (no longer 'recent' divergence).")
+i_priceTol    = input.float(2.0, "Price similarity (%)", minval=0.0, maxval=10.0, step=0.5, group=g_range,
+   tooltip="How close L2 must be to L1 (or H2 to H1). 2% catches the classical pattern.")
+
+g_filt = "Direction & quality filters"
+i_showBull    = input.bool(true, "Show bullish divergences", group=g_filt)
+i_showBear    = input.bool(true, "Show bearish divergences", group=g_filt)
+i_requireOSL1 = input.bool(true,  "Require L1 in oversold zone (RSI < 30)", group=g_filt,
+   tooltip="Per SID method: only act on divergences where the FIRST low was a proper oversold signal.")
+i_requireOBH1 = input.bool(true,  "Require H1 in overbought zone (RSI > 70)", group=g_filt,
+   tooltip="Per SID method: only act on divergences where the FIRST high was a proper overbought signal.")
+
+g_style = "Cyberpunk theme"
+i_bullCore    = input.color(color.rgb(0,   255, 255), "Bullish line color (cyan)",     group=g_style)
+i_bearCore    = input.color(color.rgb(255,  20, 147), "Bearish line color (magenta)",  group=g_style)
+i_lineWidth   = input.int(3, "Core line width", minval=1, maxval=8, group=g_style)
+i_glow        = input.bool(true, "Enable neon glow effect", group=g_style,
+   tooltip="Adds two transparent halo layers behind each line for the cyberpunk neon look.")
+i_showLabels  = input.bool(true, "Show BULL DIV / BEAR DIV labels", group=g_style)
+
+// --- RSI calculation ------------------------------------------------------
+osc = ta.rsi(close, i_rsiLen)
+
+// --- Plot the RSI itself with cyberpunk theme so this indicator stands ----
+// alone, OR merges nicely with the user's existing RSI pane. -------------
+plot(osc, "RSI", color=color.rgb(170, 102, 255), linewidth=2)
+hline(70, "Overbought", color=color.new(color.rgb(255, 20, 147), 60), linestyle=hline.style_dashed)
+hline(50, "Midline",    color=color.new(color.rgb(120, 120, 140), 70), linestyle=hline.style_dotted)
+hline(30, "Oversold",   color=color.new(color.rgb(0, 255, 255),   60), linestyle=hline.style_dashed)
+
+// Background tint zones for the cyberpunk look
+bgcolor(osc > 70 ? color.new(color.rgb(255, 20, 147), 92) : na, title="Overbought zone")
+bgcolor(osc < 30 ? color.new(color.rgb(0, 255, 255),  92) : na, title="Oversold zone")
+
+// --- Pivot detection ------------------------------------------------------
+// Confirmed pivots — i_lbR bars in the past
+pivotLowOsc  = ta.pivotlow(osc,  i_lbL, i_lbR)
+pivotHighOsc = ta.pivothigh(osc, i_lbL, i_lbR)
+
+pivotLowPrice  = ta.pivotlow(low,  i_lbL, i_lbR)
+pivotHighPrice = ta.pivothigh(high, i_lbL, i_lbR)
+
+plLowFound  = not na(pivotLowOsc)
+phHighFound = not na(pivotHighOsc)
+
+// --- Track previous pivot lows/highs --------------------------------------
+var int   prevLowBar    = na
+var float prevLowOsc    = na
+var float prevLowPrice  = na
+
+var int   prevHighBar    = na
+var float prevHighOsc    = na
+var float prevHighPrice  = na
+
+// --- Helper: draw a glowing line on the RSI pane --------------------------
+drawNeonLine(int x1, float y1, int x2, float y2, color coreColor) =>
+    if i_glow
+        // Outer halo (widest, most transparent)
+        line.new(x1, y1, x2, y2,
+           color=color.new(coreColor, 85),
+           width=i_lineWidth + 4,
+           xloc=xloc.bar_index, extend=extend.none, style=line.style_solid)
+        // Mid glow
+        line.new(x1, y1, x2, y2,
+           color=color.new(coreColor, 60),
+           width=i_lineWidth + 2,
+           xloc=xloc.bar_index, extend=extend.none, style=line.style_solid)
+    // Core (always drawn)
+    line.new(x1, y1, x2, y2,
+       color=color.new(coreColor, 0),
+       width=i_lineWidth,
+       xloc=xloc.bar_index, extend=extend.none, style=line.style_solid)
+
+// --- BULLISH DIVERGENCE CHECK ---------------------------------------------
+// When a new pivot low in RSI is confirmed:
+//   - Look back at the previous pivot low
+//   - Check the bar distance is within the lookback window
+//   - Check the price at this pivot is similar to (or lower than) the previous
+//   - Check the RSI at this pivot is HIGHER than at the previous (= divergence)
+//   - Optional: require previous pivot's RSI was below 30 (proper oversold)
+
+if plLowFound and i_showBull
+    currBar   = bar_index - i_lbR  // bar at which the pivot occurred
+    currOsc   = pivotLowOsc
+    currPrice = pivotLowPrice
+
+    if not na(prevLowBar)
+        bars   = currBar - prevLowBar
+        inRange = bars >= i_minBars and bars <= i_maxBars
+
+        // Price condition: current low at-or-below previous low, within tolerance band
+        priceSim    = math.abs(currPrice - prevLowPrice) / prevLowPrice * 100.0 <= i_priceTol
+        priceLower  = currPrice < prevLowPrice
+        priceOk     = priceSim or priceLower
+
+        // Divergence: current RSI > previous RSI
+        rsiHigher   = currOsc > prevLowOsc
+
+        // SID-aligned quality filter: previous pivot must have been a proper
+        // oversold signal (RSI < 30) at L1.
+        l1Oversold  = (not i_requireOSL1) or (prevLowOsc < 30)
+
+        if inRange and priceOk and rsiHigher and l1Oversold
+            drawNeonLine(prevLowBar, prevLowOsc, currBar, currOsc, i_bullCore)
+            if i_showLabels
+                label.new(currBar, currOsc - 6,
+                   text = "BULL DIV",
+                   color = color.new(i_bullCore, 80),
+                   textcolor = i_bullCore,
+                   size = size.tiny,
+                   style = label.style_label_up)
+
+    // Update tracker
+    prevLowBar   := currBar
+    prevLowOsc   := currOsc
+    prevLowPrice := currPrice
+
+// --- BEARISH DIVERGENCE CHECK ---------------------------------------------
+// Mirror logic for highs.
+
+if phHighFound and i_showBear
+    currBar   = bar_index - i_lbR
+    currOsc   = pivotHighOsc
+    currPrice = pivotHighPrice
+
+    if not na(prevHighBar)
+        bars   = currBar - prevHighBar
+        inRange = bars >= i_minBars and bars <= i_maxBars
+
+        // Price condition: current high at-or-above previous high, within tolerance
+        priceSim    = math.abs(currPrice - prevHighPrice) / prevHighPrice * 100.0 <= i_priceTol
+        priceHigher = currPrice > prevHighPrice
+        priceOk     = priceSim or priceHigher
+
+        // Divergence: current RSI < previous RSI
+        rsiLower    = currOsc < prevHighOsc
+
+        // SID-aligned quality filter: previous pivot must have been overbought
+        h1Overbought = (not i_requireOBH1) or (prevHighOsc > 70)
+
+        if inRange and priceOk and rsiLower and h1Overbought
+            drawNeonLine(prevHighBar, prevHighOsc, currBar, currOsc, i_bearCore)
+            if i_showLabels
+                label.new(currBar, currOsc + 6,
+                   text = "BEAR DIV",
+                   color = color.new(i_bearCore, 80),
+                   textcolor = i_bearCore,
+                   size = size.tiny,
+                   style = label.style_label_down)
+
+    // Update tracker
+    prevHighBar   := currBar
+    prevHighOsc   := currOsc
+    prevHighPrice := currPrice
