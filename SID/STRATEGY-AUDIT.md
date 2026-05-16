@@ -5,6 +5,32 @@
 Source: 14 transcripts across Sections 1-3 of the SID Academy course.
 Section 4 (Options) intentionally skipped — we trade equities only.
 
+## 🔑 Critical context: V1 vs V2 of the course
+
+The user took a Version 1 of this course previously where the instructor
+strictly said *"don't divert from the rules"* — but **V1 had no price
+pattern confirmation** layer. What we built in v1.0 through v1.7 of our
+bot was essentially V1 of the course (RSI + MACD direction-align) plus
+our own additions (PPI/VIX/earnings blackouts, RSI 75 threshold).
+
+**V2 of the course (the current transcripts) introduced:**
+1. **Weekly RSI/MACD direction check** as primary weekly confirmation
+   (replacing/supplementing the SMA-based check from V1)
+2. **Daily price pattern recognition** (double bottom, inverted H&S,
+   double top, H&S) as bonus confirmation layer
+3. **Explicit no-go zones** when RSI is too close to TP (45-50/50-55)
+
+These V2 enhancements are what explain the community's claimed 77% WR
+vs our backtested 57.8%. Our WR matches V1 expectations almost exactly.
+
+**The Phase A → B → C migration plan below is essentially:**
+- Phase A: Patch V1 rule gaps (RSI cap, watchlist, defaults)
+- **Phase B: Migrate V1 → V2 weekly confirmation** (the biggest jump)
+- **Phase C: Implement V2's price pattern layer** (final piece)
+
+Each phase tested in isolation so we can validate the WR gain from
+each upgrade independently.
+
 ---
 
 ## 🎯 EXECUTIVE SUMMARY
