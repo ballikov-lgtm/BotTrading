@@ -16,6 +16,7 @@ const CONFIG = {
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
   rsiNoGoLong:      parseFloat(process.env.SID_RSI_NOGO_LONG)    || 45,     // V2: reject long entry if RSI >= this
   rsiNoGoShort:     parseFloat(process.env.SID_RSI_NOGO_SHORT)   || 55,     // V2: reject short entry if RSI <= this
+  useWeeklyDirection: process.env.SID_WEEKLY_DIRECTION !== 'false',         // V2: require weekly RSI OR MACD to align with trade direction (default ON)
   paperTrading:     process.env.SID_PAPER !== 'false',                       // legacy flag — still honoured for trade-log labelling
   tradingMode:      resolveTradingMode(),                                    // 'dry_run' | 'paper' | 'live' — controls Alpaca execution
 };
@@ -59,11 +60,17 @@ const BOT_VERSION = 'v2.0'; // V2 method launch (paper trading, 2026-05-16)
 //          → no day trades ever → no PDT classification at sub-$25K
 //          accounts. Trade-off: stop fills at next-morning open price,
 //          ±1-2% slippage vs the exact stop level.
-//        - DEFERRED to v2.1: weekly RSI/MACD direction check (full V2 method
-//          per spec). Without it the bot is "V2-partial" — backtest equivalent
-//          v2-nogo-only variant on 113 universe gives 668 trades / 52.4% WR.
-//        - Target with full V2 (v2-weekly-or, paper): tracks 64.9% WR /
-//          34.7% CAGR / 7.95% max DD from backtest.
+//        - NEW: WEEKLY RSI / MACD DIRECTION CHECK at entry (OR mode):
+//          require either weekly RSI rising OR weekly MACD rising for
+//          longs (mirror for shorts). Resampling groups daily candles by
+//          their Monday-key so the in-progress week is addressable. This
+//          completes the full V2 method (v2-weekly-or backtest variant):
+//          64.9% WR / PF 2.04 / 34.7% CAGR / 7.95% max DD over 5y on
+//          113-ticker universe.
+//        - Toggle: SID_WEEKLY_DIRECTION=false to disable the weekly gate
+//          (falls back to v2-nogo-only behaviour: ~56% WR / more trades).
+//        - DEFERRED to v2.1: Telegram approval flow for HUMAN-tier signals
+//          (currently LOG-only).
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
@@ -388,13 +395,67 @@ function calcMACD(closes) {
   return { macdLine, signal };
 }
 
+// ── Weekly Resampling & Direction Check (V2 method) ───────────────────────────
+// Groups daily candles by their week's Monday-key so the IN-PROGRESS week is
+// addressable. The current week's "close" is the most recent daily close
+// (so the weekly indicator reflects the partial week's data, matching the
+// backtest's Friday-resample-then-shift-back-to-Monday alignment).
+
+function resampleWeekly(candles) {
+  if (!candles || candles.length === 0) return [];
+  const byWeek = new Map();
+  for (const c of candles) {
+    if (c.close === null || c.close === undefined || isNaN(c.close)) continue;
+    const d = new Date(c.date);
+    const day = d.getUTCDay();                // 0=Sun, 1=Mon, ..., 6=Sat
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    d.setUTCDate(d.getUTCDate() + mondayOffset);
+    const key = d.toISOString().slice(0, 10); // YYYY-MM-DD of that week's Monday
+    // Iteration is chronological → the last daily close in each week wins.
+    byWeek.set(key, c.close);
+  }
+  const keys = Array.from(byWeek.keys()).sort();
+  return keys.map(k => ({ date: k, close: byWeek.get(k) }));
+}
+
+// V2 weekly direction check. Returns:
+//   { rsiRising, macdRising, weeklyRsi, weeklyMacd, enoughHistory }
+// rising/falling are computed as this-week's-partial value vs the prior
+// fully-formed weekly value (week-over-week 1-bar slope).
+function weeklyDirection(candles) {
+  const weekly = resampleWeekly(candles);
+  if (weekly.length < 30) {
+    return { rsiRising: null, macdRising: null, enoughHistory: false };
+  }
+  const closes = weekly.map(w => w.close);
+  const rsiArr = calcRSI(closes);
+  const { macdLine } = calcMACD(closes);
+  const n = closes.length;
+  const lastRsi  = rsiArr[n - 1];
+  const prevRsi  = rsiArr[n - 2];
+  const lastMacd = macdLine[n - 1];
+  const prevMacd = macdLine[n - 2];
+  if (lastRsi == null || prevRsi == null || lastMacd == null || prevMacd == null) {
+    return { rsiRising: null, macdRising: null, enoughHistory: false };
+  }
+  return {
+    rsiRising:    lastRsi  > prevRsi,
+    macdRising:   lastMacd > prevMacd,
+    weeklyRsi:    lastRsi,
+    weeklyMacd:   lastMacd,
+    enoughHistory: true,
+  };
+}
+
 // ── Signal Detection ──────────────────────────────────────────────────────────
 // Returns a signal object or null.
-// Logic follows the SID Quick Win Method checklist exactly:
+// Logic follows the SID V2 method checklist:
 //   1. RSI went below 30 (oversold signal) — note the signal date
-//   2. RSI & MACD both pointing in same direction today = entry
-//   3. Stop = lowest low (signal date → entry date) rounded to whole dollar
-//   4. Take profit: RSI reaches 50 (monitored separately)
+//   2. RSI & MACD both pointing in same direction today
+//   3. V2: RSI at entry < 45 (long) / > 55 (short) — no-go zone
+//   4. V2: Weekly RSI OR Weekly MACD aligned with trade direction
+//   5. Stop = lowest low (signal date → entry date) rounded to whole dollar
+//   6. Take profit: RSI reaches 50 (monitored separately)
 
 function detectEntrySignal(candles) {
   const closes = candles.map(c => c.close);
@@ -431,6 +492,23 @@ function detectEntrySignal(candles) {
         rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} >= ${CONFIG.rsiNoGoLong} for long entry (too close to RSI 50 TP)`,
       };
     }
+    // V2 weekly direction (OR mode): require weekly RSI OR weekly MACD rising.
+    // Best WR/PF/CAGR combo in the backtest (v2-weekly-or = 64.9% WR over 5y).
+    if (CONFIG.useWeeklyDirection) {
+      const wk = weeklyDirection(candles);
+      if (!wk.enoughHistory) {
+        return {
+          signal: null,
+          rejectReason: `V2 weekly direction: insufficient weekly history (need 30+ weeks)`,
+        };
+      }
+      if (!(wk.rsiRising || wk.macdRising)) {
+        return {
+          signal: null,
+          rejectReason: `V2 weekly direction: both weekly RSI (${wk.weeklyRsi?.toFixed(1)}) and MACD (${wk.weeklyMacd?.toFixed(4)}) falling — RED FLAG for long`,
+        };
+      }
+    }
     const signalDate  = candles[oversoldIdx].date;
     const episodeCandles = candles.slice(oversoldIdx); // Signal date → today
     const lowestLow   = Math.min(...episodeCandles.map(c => c.low));
@@ -466,6 +544,22 @@ function detectEntrySignal(candles) {
         signal: null,
         rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} <= ${CONFIG.rsiNoGoShort} for short entry (too close to RSI 50 TP)`,
       };
+    }
+    // V2 weekly direction (OR mode): require weekly RSI OR weekly MACD FALLING.
+    if (CONFIG.useWeeklyDirection) {
+      const wk = weeklyDirection(candles);
+      if (!wk.enoughHistory) {
+        return {
+          signal: null,
+          rejectReason: `V2 weekly direction: insufficient weekly history (need 30+ weeks)`,
+        };
+      }
+      if (!((!wk.rsiRising) || (!wk.macdRising))) {
+        return {
+          signal: null,
+          rejectReason: `V2 weekly direction: both weekly RSI (${wk.weeklyRsi?.toFixed(1)}) and MACD (${wk.weeklyMacd?.toFixed(4)}) rising — RED FLAG for short`,
+        };
+      }
     }
     const signalDate  = candles[overboughtIdx].date;
     const episodeCandles = candles.slice(overboughtIdx);
