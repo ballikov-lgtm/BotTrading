@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SID // v1.7 TERMINAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000;
+    --bg-panel: #050818;
+    --cyan: #00ffff;
+    --magenta: #ff00ff;
+    --green: #39ff14;
+    --pink: #ff1493;
+    --red: #ff0044;
+    --amber: #ffaa00;
+    --border: #1a4040;
+    --border-glow: #00ffff33;
+    --text: #c8e8ff;
+    --text-dim: #6080a0;
+    --text-data: #e0f8ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(rgba(0, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.02) 1px, transparent 1px),
+      radial-gradient(ellipse at 50% 0%, rgba(255, 0, 255, 0.08), transparent 60%),
+      radial-gradient(ellipse at 100% 100%, rgba(0, 255, 255, 0.06), transparent 50%);
+    background-size: 40px 40px, 40px 40px, auto, auto;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* scan lines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 255, 255, 0.015) 2px,
+      rgba(0, 255, 255, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .container {
+    position: relative;
+    z-index: 2;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 32px 48px;
+  }
+
+  /* ── HEADER ──────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 28px;
+    background: linear-gradient(180deg, rgba(0,255,255,0.04), transparent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  header::before, header::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  header::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  header::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .brand {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    text-shadow: 0 0 12px var(--cyan), 0 0 24px rgba(0,255,255,0.4);
+  }
+  .brand-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--magenta);
+    letter-spacing: 2px;
+    margin-top: 4px;
+    text-shadow: 0 0 6px var(--magenta);
+  }
+
+  .live-status {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .live-dot {
+    width: 10px; height: 10px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--green), 0 0 20px var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  /* ── TABS ─────────────────────────────────────────────── */
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 14px 24px;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active {
+    color: var(--cyan);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 2px;
+    background: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan), 0 0 20px var(--cyan);
+  }
+  .tab-pane { display: none; animation: fadein 0.3s ease; }
+  .tab-pane.active { display: block; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── PANELS ───────────────────────────────────────────── */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .panel::before, .panel::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--cyan);
+    opacity: 0.6;
+  }
+  .panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .panel::after  { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    text-shadow: 0 0 6px rgba(0,255,255,0.4);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .panel-title::before {
+    content: '▸';
+    color: var(--magenta);
+    text-shadow: 0 0 6px var(--magenta);
+  }
+
+  /* ── STAT TILES ───────────────────────────────────────── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .stat-tile {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-tile::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, var(--accent) 200%);
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--accent);
+    text-shadow: 0 0 8px var(--accent);
+    letter-spacing: 1px;
+  }
+  .stat-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* ── TWO-COLUMN ───────────────────────────────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── TABLES ───────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--text-dim);
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px;
+    border-bottom: 1px solid rgba(26, 64, 64, 0.4);
+    color: var(--text-data);
+  }
+  tr.signal-row:hover, tr:hover td {
+    background: rgba(0, 255, 255, 0.04);
+  }
+  .sig-arrow { font-size: 18px; width: 30px; }
+  .sig-symbol { font-weight: 700; color: var(--cyan); letter-spacing: 1px; }
+  .sig-state { font-size: 12px; letter-spacing: 1px; }
+  .sig-rsi, .sig-price { font-variant-numeric: tabular-nums; }
+  .sig-tier { font-size: 11px; letter-spacing: 1px; font-weight: 700; }
+
+  .hud-empty {
+    padding: 28px;
+    text-align: center;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+  }
+
+  /* ── DONUT ────────────────────────────────────────────── */
+  .donut-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .legend-item {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+  .legend-swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  /* ── DISCLAIMER ───────────────────────────────────────── */
+  .disclaimer {
+    margin-top: 32px;
+    padding: 16px 20px;
+    background: rgba(255, 0, 68, 0.04);
+    border: 1px solid rgba(255, 0, 68, 0.2);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.7;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .disclaimer strong {
+    color: var(--red);
+    text-shadow: 0 0 6px var(--red);
+    letter-spacing: 2px;
+  }
+
+  footer {
+    margin-top: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  /* ── BETA BANNER ───────────────────────────────────── */
+  .beta-banner {
+    background: linear-gradient(90deg, rgba(255,170,0,0.08), rgba(255,0,255,0.06), rgba(255,170,0,0.08));
+    border: 1px solid var(--amber);
+    border-left: 4px solid var(--amber);
+    border-radius: 4px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 1px;
+    line-height: 1.6;
+    box-shadow: 0 0 14px rgba(255, 170, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .beta-banner .badge {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    background: var(--amber);
+    color: #000;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-shadow: none;
+    border-radius: 2px;
+    box-shadow: 0 0 12px var(--amber);
+  }
+  .beta-banner .msg strong { color: var(--amber); }
+
+  /* ── HEATMAP TOGGLE ───────────────────────────────── */
+  .heatmap-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+  .toggle-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .toggle-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0,255,255,0.3);
+  }
+  .toggle-btn.active {
+    background: rgba(0,255,255,0.1);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    text-shadow: 0 0 6px var(--cyan);
+    box-shadow: 0 0 10px rgba(0,255,255,0.4);
+  }
+  .toggle-btn .state-on  { display: none; color: var(--green); }
+  .toggle-btn .state-off { display: inline; color: var(--text-dim); }
+  .toggle-btn.active .state-on  { display: inline; }
+  .toggle-btn.active .state-off { display: none; }
+
+  /* by default, hide EXCLUDED tier dots from heatmap — toggle reveals them */
+  body:not(.show-excluded) .heatmap-dot[data-tier="EXCLUDED"] { display: none; }
+
+  /* ── POSITION CARDS ─────────────────────────────────── */
+  .position-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  .position-card {
+    background: rgba(0, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    position: relative;
+  }
+  .position-card::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px;
+    width: 12px; height: 12px;
+    border-top: 1.5px solid var(--cyan);
+    border-left: 1.5px solid var(--cyan);
+    opacity: 0.7;
+  }
+  .pos-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .pos-symbol {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 2px;
+    text-shadow: 0 0 6px var(--cyan);
+    margin-right: 12px;
+  }
+  .pos-side {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+  .pos-pnl {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .position-chart {
+    width: 100%;
+    height: auto;
+    margin: 8px 0 6px;
+  }
+  .pos-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+  }
+  .pos-meta strong {
+    color: var(--text);
+    font-weight: 400;
+    margin-left: 4px;
+  }
+
+  /* ── HEADER RIGHT (clock + toggle + status) ────────── */
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .market-clock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(0,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+  .market-state-dot {
+    width: 8px; height: 8px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: all 0.3s;
+  }
+  .market-clock.open .market-state-dot {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .market-clock.closed .market-state-dot {
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+  }
+  .market-clock.open .market-state-label { color: var(--green); }
+  .market-clock.closed .market-state-label { color: var(--amber); }
+
+  .theme-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+  .theme-toggle:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 6px rgba(0,255,255,0.3);
+  }
+  body:not(.light-mode) .theme-icon-light { display: none; }
+  body.light-mode       .theme-icon-dark  { display: none; }
+
+  /* ── LIGHT MODE ───────────────────────────────────── */
+  body.light-mode {
+    --bg: #f5f3ee;
+    --bg-panel: #ffffff;
+    --cyan: #00838f;
+    --magenta: #c2185b;
+    --green: #2e7d32;
+    --pink: #d81b60;
+    --red: #d32f2f;
+    --amber: #ed6c02;
+    --border: #b0bec5;
+    --border-glow: #00838f33;
+    --text: #1a1a1a;
+    --text-dim: #5a6e7c;
+    --text-data: #0d2c40;
+  }
+  body.light-mode::before {
+    background:
+      linear-gradient(rgba(0, 131, 143, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 131, 143, 0.04) 1px, transparent 1px),
+      radial-gradient(ellipse at 50% 0%, rgba(194, 24, 91, 0.05), transparent 60%);
+  }
+  body.light-mode::after {
+    background: repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.015) 2px, rgba(0,0,0,0.015) 4px);
+  }
+  body.light-mode .brand,
+  body.light-mode .pos-symbol,
+  body.light-mode .panel-title {
+    text-shadow: 0 0 1px var(--cyan);  /* lighter glow in light mode */
+  }
+</style>
+</head>
+<body>
+<!-- HISTORIC SNAPSHOT BANNER (archive page only) -->
+<div style="background:linear-gradient(90deg,#ff1493,#00ffff);color:#000;padding:8px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:12px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;">
+  HISTORIC SNAPSHOT · CAPTURED 2026-05-16 · SID V1 METHOD FROZEN AT TAG <code style="background:#000;color:#00ffff;padding:2px 6px;border-radius:3px;">sid-v1-method-baseline</code> · BOT v1.7
+</div>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <div class="brand">SID // v1.7 <span style="color:#ff1493;font-size:0.6em;">[ARCHIVE]</span></div>
+      <div class="brand-sub">PRIVATE TERMINAL · INSTRUCTOR-ALIGNED · 58.6% BACKTEST WR</div>
+    </div>
+    <div class="header-right">
+      <div id="market-clock" class="market-clock">
+        <span class="market-state-dot"></span>
+        <span class="market-state-label">— · —</span>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" title="Toggle light/dark mode">
+        <span class="theme-icon-dark">◐</span>
+        <span class="theme-icon-light">◑</span>
+      </button>
+      <div class="live-status">
+        <span class="live-dot"></span>
+        <span>SYS · 08:33:17</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- BETA BANNER -->
+  <div class="beta-banner">
+    <span class="badge">BETA</span>
+    <div class="msg">
+      <strong>SID v1.7 is under active development.</strong> Currently in paper-trading validation phase.
+      Features in progress: Telegram alerts · sentiment integration · Alpaca live trading · v2 scanner enhancements.
+      Backtest results (77% WR) are over a 12-month bullish window; live performance will differ.
+      <strong>Not financial advice.</strong>
+    </div>
+  </div>
+
+  <!-- STAT TILES -->
+  <div class="stat-grid">
+    <div class="stat-tile" style="--accent:var(--cyan)">
+    <div class="stat-label">OPEN POSITIONS</div>
+    <div class="stat-value">3</div>
+    <div class="stat-sub">live</div>
+  </div>
+    <div class="stat-tile" style="--accent:var(--magenta)">
+    <div class="stat-label">CLOSED TRADES</div>
+    <div class="stat-value">4</div>
+    <div class="stat-sub">lifetime</div>
+  </div>
+    <div class="stat-tile" style="--accent:var(--green)">
+    <div class="stat-label">WIN RATE</div>
+    <div class="stat-value">75.0%</div>
+    <div class="stat-sub">live</div>
+  </div>
+    <div class="stat-tile" style="--accent:var(--green)">
+    <div class="stat-label">NET P&L</div>
+    <div class="stat-value">+$12.96</div>
+    <div class="stat-sub">realized</div>
+  </div>
+    <div class="stat-tile" style="--accent:var(--green)">
+    <div class="stat-label">AUTO_TRADE</div>
+    <div class="stat-value">2</div>
+    <div class="stat-sub">auto-executing</div>
+  </div>
+    <div class="stat-tile" style="--accent:var(--amber)">
+    <div class="stat-label">MONITOR</div>
+    <div class="stat-value">2</div>
+    <div class="stat-sub">manual review</div>
+  </div>
+  </div>
+
+  <!-- TABS -->
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
+    <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
+    <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
+  </nav>
+
+  <!-- TAB: SIGNALS -->
+  <div id="tab-signals" class="tab-pane active">
+    <!-- Open positions full-width at the top -->
+    <div class="panel">
+      <div class="panel-title">OPEN POSITIONS // CURRENTLY HELD (3)</div>
+      <div class="position-grid"><div class="position-card">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">IWM</span>
+          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
+        </div>
+        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-1.30%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-SID-PAPER-1778184301668" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-PAPER-1778184301668)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="244.9510811863439" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="244.9510811863439" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$285.94</text>
+      </svg>
+      <div class="pos-meta">
+        <span>QTY <strong>1</strong></span>
+        <span>RISK <strong>$5.72</strong></span>
+        <span>TO STOP <strong>0.7%</strong></span>
+        <span>DAYS <strong>9</strong></span>
+        <span>OPEN <strong>2026-05-07</strong></span>
+      </div>
+    </div><div class="position-card">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">AMZN</span>
+          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
+        </div>
+        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-0.89%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-SID-PAPER-1778531109114" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-PAPER-1778531109114)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="219.28079802931637" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="219.28079802931637" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$271.38</text>
+      </svg>
+      <div class="pos-meta">
+        <span>QTY <strong>1</strong></span>
+        <span>RISK <strong>$10.01</strong></span>
+        <span>TO STOP <strong>2.8%</strong></span>
+        <span>DAYS <strong>5</strong></span>
+        <span>OPEN <strong>2026-05-11</strong></span>
+      </div>
+    </div><div class="position-card">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">AVGO</span>
+          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
+        </div>
+        <div class="pos-pnl" style="color:#888;text-shadow:0 0 8px #888">0.00%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-SID-DRYRUN-1778875522324" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-SID-DRYRUN-1778875522324)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="204" cy="28" r="5" fill="#888" style="filter: drop-shadow(0 0 6px #888)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="204" y="18" text-anchor="middle" font-size="9" fill="#888" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #888)">$425.19</text>
+      </svg>
+      <div class="pos-meta">
+        <span>QTY <strong>1</strong></span>
+        <span>RISK <strong>$17.81</strong></span>
+        <span>TO STOP <strong>4.2%</strong></span>
+        <span>DAYS <strong>1</strong></span>
+        <span>OPEN <strong>2026-05-15</strong></span>
+      </div>
+    </div></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="panel">
+          <div class="panel-title">ACTIVE SIGNALS // READY TO ARM OR ENTER</div>
+          <table class="signals-table">
+    <thead><tr><th></th><th>SYMBOL</th><th>STATE</th><th>RSI</th><th>PRICE</th><th>TIER</th></tr></thead>
+    <tbody><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">GOOG</td>
+      <td class="sig-state" style="color:#ff1493">SIGNAL SHORT</td>
+      <td class="sig-rsi">75.3</td>
+      <td class="sig-price">$389.70</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">AMZN</td>
+      <td class="sig-state" style="color:#ff1493">SIGNAL SHORT</td>
+      <td class="sig-rsi">72.8</td>
+      <td class="sig-price">$271.38</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">QQQ</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">83.0</td>
+      <td class="sig-price">$712.36</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">AMD</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">81.5</td>
+      <td class="sig-price">$463.36</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">TQQQ</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">83.9</td>
+      <td class="sig-price">$76.74</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">XLK</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">84.7</td>
+      <td class="sig-price">$177.52</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">AAPL</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">70.2</td>
+      <td class="sig-price">$291.51</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">SQQQ</td>
+      <td class="sig-state" style="color:#00ffff">OVERSOLD · WAITING MACD</td>
+      <td class="sig-rsi">19.9</td>
+      <td class="sig-price">$42.37</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">TSLA</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">72.6</td>
+      <td class="sig-price">$438.71</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">INTC</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">85.3</td>
+      <td class="sig-price">$125.88</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">SPY</td>
+      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
+      <td class="sig-rsi">75.9</td>
+      <td class="sig-price">$739.05</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
+      <td class="sig-symbol">MCD</td>
+      <td class="sig-state" style="color:#00ffff">OVERSOLD · WAITING MACD</td>
+      <td class="sig-rsi">24.1</td>
+      <td class="sig-price">$273.85</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr></tbody>
+  </table>
+        </div>
+        <div class="panel">
+          <div class="panel-title">APPROACHING ZONE // WITHIN 5 PTS OF TRIGGER</div>
+          <table class="signals-table">
+    <thead><tr><th></th><th>SYMBOL</th><th>STATE</th><th>RSI</th><th>PRICE</th><th>TIER</th></tr></thead>
+    <tbody><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">CAT</td>
+      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
+      <td class="sig-rsi">69.7</td>
+      <td class="sig-price">$917.64</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
+      <td class="sig-symbol">TZA</td>
+      <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
+      <td class="sig-rsi">32.1</td>
+      <td class="sig-price">$4.55</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">IWM</td>
+      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
+      <td class="sig-rsi">67.7</td>
+      <td class="sig-price">$285.94</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">TNA</td>
+      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
+      <td class="sig-rsi">66.8</td>
+      <td class="sig-price">$66.37</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">QYLD</td>
+      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
+      <td class="sig-rsi">67.3</td>
+      <td class="sig-price">$18.11</td>
+      <td class="sig-tier" style="color:#888">·</td>
+    </tr></tbody>
+  </table>
+        </div>
+      </div>
+      <div>
+        <div class="panel">
+          <div class="panel-title">PERFORMANCE</div>
+          <div class="donut-wrap">
+            <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    <path d="M 110 22 A 88 88 0 1 1 22 110.00000000000001 L 55.44 110 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 22 110.00000000000001 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 55.44 110 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
+    <circle cx="110" cy="110" r="52.56" fill="#000"/>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">75.0%</text>
+    <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">WIN RATE</text>
+  </svg>
+            <div class="donut-legend">
+              <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>WINS</span><span style="color:#39ff14">3</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>LOSSES</span><span style="color:#ff0044">1</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">CLASSIFICATION</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-family:'Share Tech Mono', monospace;font-size:12px">
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--green)">▰ AUTO_TRADE</span><span>2</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--amber)">▰ MONITOR</span><span>2</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--text-dim)">▰ INSUFFICIENT</span><span>45</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--red)">▰ EXCLUDED</span><span>1</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: HISTORY -->
+  <div id="tab-history" class="tab-pane">
+    <div class="panel">
+      <div class="panel-title">CLOSED TRADES // CHRONOLOGICAL</div>
+      <table class="history-table">
+    <thead><tr><th>DATE</th><th>SYMBOL</th><th>SIDE</th><th>ENTRY</th><th>EXIT</th><th>P&amp;L</th><th>REASON</th></tr></thead>
+    <tbody><tr>
+      <td>2026-05-15</td>
+      <td class="sig-symbol">XLRE</td>
+      <td style="color:#ff1493">SHORT</td>
+      <td>$44.21</td>
+      <td>$43.22</td>
+      <td style="color:#00ffff;text-shadow:0 0 6px #00ffff">+$10.89</td>
+      <td>—</td>
+    </tr><tr>
+      <td>2026-05-13</td>
+      <td class="sig-symbol">DKS</td>
+      <td style="color:#ff1493">SHORT</td>
+      <td>$215.73</td>
+      <td>$214.62</td>
+      <td style="color:#00ffff;text-shadow:0 0 6px #00ffff">+$1.11</td>
+      <td>—</td>
+    </tr><tr>
+      <td>2026-05-11</td>
+      <td class="sig-symbol">BAC</td>
+      <td style="color:#ff1493">SHORT</td>
+      <td>$51.31</td>
+      <td>$50.55</td>
+      <td style="color:#00ffff;text-shadow:0 0 6px #00ffff">+$3.82</td>
+      <td>—</td>
+    </tr><tr>
+      <td>2026-05-05</td>
+      <td class="sig-symbol">IWM</td>
+      <td style="color:#ff1493">SHORT</td>
+      <td>$278.14</td>
+      <td>$281.00</td>
+      <td style="color:#ff0044;text-shadow:0 0 6px #ff0044">-$2.86</td>
+      <td>—</td>
+    </tr></tbody>
+  </table>
+    </div>
+  </div>
+
+  <!-- TAB: HEATMAP -->
+  <div id="tab-heatmap" class="tab-pane">
+    <div class="panel">
+      <div class="panel-title">RSI × TRADABILITY SCATTER // APPROVED ASSETS</div>
+      <div class="heatmap-controls">
+        <button id="toggle-excluded" class="toggle-btn">
+          <span class="state-off">▢ SHOW EXCLUDED</span>
+          <span class="state-on">▣ EXCLUDED VISIBLE</span>
+        </button>
+      </div>
+      <svg viewBox="0 0 900 480" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;background:#000;border:1px solid #1a4040;border-radius:4px">
+    
+    <line x1="60" y1="40" x2="60" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="60" y1="430" x2="870" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+  
+    <line x1="262.5" y1="40" x2="262.5" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="60" y1="332.5" x2="870" y2="332.5" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+  
+    <line x1="465" y1="40" x2="465" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="60" y1="235" x2="870" y2="235" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+  
+    <line x1="667.5" y1="40" x2="667.5" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="60" y1="137.5" x2="870" y2="137.5" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+  
+    <line x1="870" y1="40" x2="870" y2="430" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="60" y1="40" x2="870" y2="40" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+  
+    
+    <line x1="303" y1="40" x2="303" y2="430" stroke="#39ff14" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" style="filter: drop-shadow(0 0 4px #39ff14)"/>
+    <line x1="667.5" y1="40" x2="667.5" y2="430" stroke="#ff1493" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" style="filter: drop-shadow(0 0 4px #ff1493)"/>
+  
+    <line x1="60" y1="40" x2="60" y2="430" stroke="#00ffff" stroke-width="1" opacity="0.6"/>
+    <line x1="60" y1="430" x2="870" y2="430" stroke="#00ffff" stroke-width="1" opacity="0.6"/>
+    
+    <text x="465" y="468" text-anchor="middle" fill="#00ffff" font-size="11" font-family="Orbitron, monospace" style="filter: drop-shadow(0 0 4px #00ffff)">RSI(14)</text>
+    <text x="18" y="235" text-anchor="middle" fill="#00ffff" font-size="11" font-family="Orbitron, monospace" transform="rotate(-90 18 235)" style="filter: drop-shadow(0 0 4px #00ffff)">TRADABILITY SCORE</text>
+    <text x="181.5" y="58" text-anchor="middle" fill="#39ff14" font-size="10" font-family="Orbitron, monospace" style="filter: drop-shadow(0 0 4px #39ff14)">OVERSOLD ◀</text>
+    <text x="748.5" y="58" text-anchor="middle" fill="#ff1493" font-size="10" font-family="Orbitron, monospace" style="filter: drop-shadow(0 0 4px #ff1493)">▶ OVERBOUGHT</text>
+  
+    <g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="669.93" cy="40" r="13" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>GOOG · SIGNAL_SHORT · INSUFFICIENT_DATA · RSI 75.3 · Score 100</title>
+      </circle>
+      <text x="669.93" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GOOG</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="649.68" cy="59.500000000000014" r="13" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>AMZN · SIGNAL_SHORT · INSUFFICIENT_DATA · RSI 72.8 · Score 95</title>
+      </circle>
+      <text x="649.68" y="62.500000000000014" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMZN</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="732.3" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>QQQ · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 83.0 · Score 100</title>
+      </circle>
+      <text x="732.3" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">QQQ</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="720.15" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>AMD · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 81.5 · Score 100</title>
+      </circle>
+      <text x="720.15" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMD</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="739.59" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>TQQQ · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 83.9 · Score 100</title>
+      </circle>
+      <text x="739.59" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TQQQ</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="746.0699999999999" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLK · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 84.7 · Score 100</title>
+      </circle>
+      <text x="746.0699999999999" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLK</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="628.62" cy="106.30000000000001" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>AAPL · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 70.2 · Score 83</title>
+      </circle>
+      <text x="628.62" y="109.30000000000001" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AAPL</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="221.19" cy="106.30000000000001" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>SQQQ · OVERSOLD_WAIT_MACD · INSUFFICIENT_DATA · RSI 19.9 · Score 83</title>
+      </circle>
+      <text x="221.19" y="109.30000000000001" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SQQQ</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="648.06" cy="106.30000000000001" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>TSLA · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 72.6 · Score 83</title>
+      </circle>
+      <text x="648.06" y="109.30000000000001" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TSLA</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="750.93" cy="117.99999999999999" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>INTC · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 85.3 · Score 80</title>
+      </circle>
+      <text x="750.93" y="120.99999999999999" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">INTC</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="674.79" cy="137.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>SPY · OVERBOUGHT_WAIT_MACD · INSUFFICIENT_DATA · RSI 75.9 · Score 75</title>
+      </circle>
+      <text x="674.79" y="140.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SPY</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="255.21" cy="164.79999999999998" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>MCD · OVERSOLD_WAIT_MACD · INSUFFICIENT_DATA · RSI 24.1 · Score 68</title>
+      </circle>
+      <text x="255.21" y="167.79999999999998" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MCD</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="624.57" cy="117.99999999999999" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>CAT · APPROACHING_SHORT · INSUFFICIENT_DATA · RSI 69.7 · Score 80</title>
+      </circle>
+      <text x="624.57" y="120.99999999999999" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CAT</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="320.01" cy="145.3" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>TZA · APPROACHING_LONG · INSUFFICIENT_DATA · RSI 32.1 · Score 73</title>
+      </circle>
+      <text x="320.01" y="148.3" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TZA</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="608.37" cy="149.20000000000002" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>IWM · APPROACHING_SHORT · INSUFFICIENT_DATA · RSI 67.7 · Score 72</title>
+      </circle>
+      <text x="608.37" y="152.20000000000002" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IWM</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="601.0799999999999" cy="153.10000000000002" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>TNA · APPROACHING_SHORT · INSUFFICIENT_DATA · RSI 66.8 · Score 71</title>
+      </circle>
+      <text x="601.0799999999999" y="156.10000000000002" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TNA</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="605.13" cy="227.2" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>QYLD · APPROACHING_SHORT · INSUFFICIENT_DATA · RSI 67.3 · Score 52</title>
+      </circle>
+      <text x="605.13" y="230.2" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">QYLD</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="519.27" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>FCX · IDLE · INSUFFICIENT_DATA · RSI 56.7 · Score 100</title>
+      </circle>
+      <text x="519.27" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">FCX</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="360.51" cy="40" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>PYPL · IDLE · INSUFFICIENT_DATA · RSI 37.1 · Score 100</title>
+      </circle>
+      <text x="360.51" y="43" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PYPL</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="355.65" cy="71.19999999999999" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>HD · IDLE · INSUFFICIENT_DATA · RSI 36.5 · Score 92</title>
+      </circle>
+      <text x="355.65" y="74.19999999999999" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HD</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="484.44" cy="79" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>FDX · IDLE · INSUFFICIENT_DATA · RSI 52.4 · Score 90</title>
+      </circle>
+      <text x="484.44" y="82" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">FDX</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="580.83" cy="98.5" r="9" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>BA · IDLE · AUTO_TRADE · RSI 64.3 · Score 85</title>
+      </circle>
+      <text x="580.83" y="101.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BA</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="455.28" cy="98.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>ETSY · IDLE · INSUFFICIENT_DATA · RSI 48.8 · Score 85</title>
+      </circle>
+      <text x="455.28" y="101.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ETSY</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="416.4" cy="98.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>GM · IDLE · INSUFFICIENT_DATA · RSI 44.0 · Score 85</title>
+      </circle>
+      <text x="416.4" y="101.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GM</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="549.24" cy="98.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>GS · IDLE · INSUFFICIENT_DATA · RSI 60.4 · Score 85</title>
+      </circle>
+      <text x="549.24" y="101.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GS</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="367.8" cy="106.30000000000001" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>IBM · IDLE · INSUFFICIENT_DATA · RSI 38.0 · Score 83</title>
+      </circle>
+      <text x="367.8" y="109.30000000000001" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IBM</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="453.65999999999997" cy="110.20000000000002" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>VZ · IDLE · INSUFFICIENT_DATA · RSI 48.6 · Score 82</title>
+      </circle>
+      <text x="453.65999999999997" y="113.20000000000002" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">VZ</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="583.2599999999999" cy="117.99999999999999" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>SLV · IDLE · INSUFFICIENT_DATA · RSI 64.6 · Score 80</title>
+      </circle>
+      <text x="583.2599999999999" y="120.99999999999999" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SLV</text>
+    </g><g class="heatmap-dot" data-tier="MONITOR">
+      <circle cx="496.59000000000003" cy="141.4" r="9" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>DIS · IDLE · MONITOR · RSI 53.9 · Score 74</title>
+      </circle>
+      <text x="496.59000000000003" y="144.4" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIS</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="365.37" cy="141.4" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>TGT · IDLE · INSUFFICIENT_DATA · RSI 37.7 · Score 74</title>
+      </circle>
+      <text x="365.37" y="144.4" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TGT</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="432.6" cy="145.3" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>GOLD · IDLE · INSUFFICIENT_DATA · RSI 46.0 · Score 73</title>
+      </circle>
+      <text x="432.6" y="148.3" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GOLD</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="448.8" cy="145.3" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLE · IDLE · INSUFFICIENT_DATA · RSI 48.0 · Score 73</title>
+      </circle>
+      <text x="448.8" y="148.3" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLE</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="379.95" cy="145.3" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLV · IDLE · INSUFFICIENT_DATA · RSI 39.5 · Score 73</title>
+      </circle>
+      <text x="379.95" y="148.3" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLV</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="464.19" cy="164.79999999999998" r="9" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>MSFT · IDLE · AUTO_TRADE · RSI 49.9 · Score 68</title>
+      </circle>
+      <text x="464.19" y="167.79999999999998" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MSFT</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="462.57000000000005" cy="164.79999999999998" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLP · IDLE · INSUFFICIENT_DATA · RSI 49.7 · Score 68</title>
+      </circle>
+      <text x="462.57000000000005" y="167.79999999999998" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLP</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="380.76" cy="176.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>META · IDLE · INSUFFICIENT_DATA · RSI 39.6 · Score 65</title>
+      </circle>
+      <text x="380.76" y="179.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">META</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="407.49" cy="176.5" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLU · IDLE · INSUFFICIENT_DATA · RSI 42.9 · Score 65</title>
+      </circle>
+      <text x="407.49" y="179.5" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLU</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="396.15" cy="188.2" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>BAC · IDLE · INSUFFICIENT_DATA · RSI 41.5 · Score 62</title>
+      </circle>
+      <text x="396.15" y="191.2" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BAC</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="443.13" cy="188.2" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>MA · IDLE · INSUFFICIENT_DATA · RSI 47.3 · Score 62</title>
+      </circle>
+      <text x="443.13" y="191.2" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MA</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="450.42" cy="188.2" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLC · IDLE · INSUFFICIENT_DATA · RSI 48.2 · Score 62</title>
+      </circle>
+      <text x="450.42" y="191.2" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLC</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="543.5699999999999" cy="196" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>DIA · IDLE · INSUFFICIENT_DATA · RSI 59.7 · Score 60</title>
+      </circle>
+      <text x="543.5699999999999" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIA</text>
+    </g><g class="heatmap-dot" data-tier="MONITOR">
+      <circle cx="435.03" cy="196" r="9" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>COST · IDLE · MONITOR · RSI 46.3 · Score 60</title>
+      </circle>
+      <text x="435.03" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">COST</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="494.16" cy="196" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>DKS · IDLE · INSUFFICIENT_DATA · RSI 53.6 · Score 60</title>
+      </circle>
+      <text x="494.16" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DKS</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="438.27000000000004" cy="196" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>WMT · IDLE · INSUFFICIENT_DATA · RSI 46.7 · Score 60</title>
+      </circle>
+      <text x="438.27000000000004" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">WMT</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="441.51000000000005" cy="196" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLF · IDLE · INSUFFICIENT_DATA · RSI 47.1 · Score 60</title>
+      </circle>
+      <text x="441.51000000000005" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLF</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="516.8399999999999" cy="196" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLI · IDLE · INSUFFICIENT_DATA · RSI 56.4 · Score 60</title>
+      </circle>
+      <text x="516.8399999999999" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLI</text>
+    </g><g class="heatmap-dot" data-tier="EXCLUDED">
+      <circle cx="538.71" cy="196" r="9" fill="#ff0044" fill-opacity="0.2" stroke="#ff0044" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #ff0044)">
+        <title>XLY · IDLE · EXCLUDED · RSI 59.1 · Score 60</title>
+      </circle>
+      <text x="538.71" y="199" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLY</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="408.3" cy="207.70000000000002" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>JPM · IDLE · INSUFFICIENT_DATA · RSI 43.0 · Score 57</title>
+      </circle>
+      <text x="408.3" y="210.70000000000002" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JPM</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="526.5600000000001" cy="207.70000000000002" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLB · IDLE · INSUFFICIENT_DATA · RSI 57.6 · Score 57</title>
+      </circle>
+      <text x="526.5600000000001" y="210.70000000000002" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLB</text>
+    </g><g class="heatmap-dot" data-tier="INSUFFICIENT_DATA">
+      <circle cx="558.15" cy="235" r="9" fill="#00ffff" fill-opacity="0.4" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #00ffff)">
+        <title>XLRE · IDLE · INSUFFICIENT_DATA · RSI 61.5 · Score 50</title>
+      </circle>
+      <text x="558.15" y="238" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLRE</text>
+    </g>
+  </svg>
+      <div style="margin-top:14px;display:flex;gap:20px;font-family:'Share Tech Mono', monospace;font-size:11px;flex-wrap:wrap;color:var(--text-dim)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);box-shadow:0 0 6px var(--green);margin-right:6px"></span>AUTO_TRADE</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);box-shadow:0 0 6px var(--amber);margin-right:6px"></span>MONITOR</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--cyan);box-shadow:0 0 6px var(--cyan);margin-right:6px"></span>INSUFFICIENT_DATA · pending</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);box-shadow:0 0 6px var(--red);margin-right:6px"></span>EXCLUDED · hidden by default</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCLAIMER -->
+  <div class="disclaimer">
+    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 77% win rate is over a 26-trade sample in a 12-month bullish window; live performance will differ. All trades carry risk of total loss. Position sizing is at 2% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
+  </div>
+
+  <footer>SID v1.7 // PRIVATE TERMINAL // GENERATED 2026-05-16 08:33:17 UTC</footer>
+
+</div>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Toggle EXCLUDED visibility on heatmap
+  const toggleBtn = document.getElementById('toggle-excluded');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('show-excluded');
+      toggleBtn.classList.toggle('active');
+    });
+  }
+
+  // Theme toggle (dark <-> light)
+  const themeBtn = document.getElementById('theme-toggle');
+  function applyTheme(t) {
+    if (t === 'light') document.body.classList.add('light-mode');
+    else document.body.classList.remove('light-mode');
+  }
+  applyTheme(localStorage.getItem('sid-theme') || 'dark');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const isLight = document.body.classList.toggle('light-mode');
+      localStorage.setItem('sid-theme', isLight ? 'light' : 'dark');
+    });
+  }
+
+  // Market hours clock (US Eastern, 09:30–16:00 ET, Mon–Fri)
+  // Uses Intl.DateTimeFormat for reliable ET conversion regardless of viewer's TZ
+  function getETParts() {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York', hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', weekday: 'short'
+    });
+    const parts = {};
+    for (const p of fmt.formatToParts(new Date())) {
+      if (p.type !== 'literal') parts[p.type] = p.value;
+    }
+    return parts;
+  }
+  function fmtCountdown(ms) {
+    if (ms <= 0) return '0s';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+    if (m > 0) return m + 'm ' + s + 's';
+    return s + 's';
+  }
+  function updateMarketClock() {
+    const el = document.getElementById('market-clock');
+    if (!el) return;
+    const p = getETParts();
+    const weekday = p.weekday;
+    const hour = parseInt(p.hour, 10);
+    const minute = parseInt(p.minute, 10);
+    const second = parseInt(p.second, 10);
+    const isWeekday = ['Mon','Tue','Wed','Thu','Fri'].includes(weekday);
+    const minutesIntoDay = hour * 60 + minute;
+    const openMin = 9 * 60 + 30;
+    const closeMin = 16 * 60;
+    const label = el.querySelector('.market-state-label');
+
+    if (isWeekday && minutesIntoDay >= openMin && minutesIntoDay < closeMin) {
+      // Market OPEN — countdown to close
+      const closeMs = ((closeMin - minutesIntoDay) * 60 - second) * 1000;
+      el.classList.remove('closed'); el.classList.add('open');
+      label.textContent = 'MARKET OPEN · CLOSES IN ' + fmtCountdown(closeMs);
+    } else {
+      // Market CLOSED — compute next open
+      let daysAhead = 0;
+      const dayOrder = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      let dayIdx = dayOrder.indexOf(weekday);
+      // If past close today AND it's a weekday, next day is +1 (unless Friday → +3)
+      // If pre-market on weekday, daysAhead stays 0
+      if (isWeekday && minutesIntoDay >= closeMin) {
+        daysAhead = (weekday === 'Fri') ? 3 : 1;
+      } else if (!isWeekday) {
+        // Sat -> Mon (+2), Sun -> Mon (+1)
+        daysAhead = (weekday === 'Sat') ? 2 : 1;
+      }
+      // Time remaining today (until midnight ET) + full days until next open (until 9:30 of target day)
+      const minsLeftToday = (24 * 60) - minutesIntoDay;
+      const totalMinsToOpen = (daysAhead > 0 ? minsLeftToday : 0) + (daysAhead > 0 ? (daysAhead - 1) * 24 * 60 : 0) + (daysAhead > 0 ? openMin : (openMin - minutesIntoDay));
+      const totalMs = totalMinsToOpen * 60 * 1000 - second * 1000;
+      el.classList.remove('open'); el.classList.add('closed');
+      label.textContent = 'MARKET CLOSED · OPENS IN ' + fmtCountdown(totalMs);
+    }
+  }
+  updateMarketClock();
+  setInterval(updateMarketClock, 1000);
+</script>
+
+</body>
+</html>
