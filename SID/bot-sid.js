@@ -8,19 +8,35 @@ import * as tg from './telegram-alerts.js';
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  accountUsd:       parseFloat(process.env.SID_ACCOUNT_USD)     || 5000,   // Portfolio size for sizing
-  riskPct:          parseFloat(process.env.SID_RISK_PCT)         || 0.005,  // 0.5% risk per trade (paper start)
+  accountUsd:       parseFloat(process.env.SID_ACCOUNT_USD)     || 10000,  // V2 paper start ($10K matches backtest)
+  riskPct:          parseFloat(process.env.SID_RISK_PCT)         || 0.01,   // V2 default 1% per instructor S3_Ep4
   maxPositionPct:   parseFloat(process.env.SID_MAX_POS_PCT)      || 0.10,   // 10% of account max per trade
   maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 3,      // Never hold more than 3 at once
   maxPerDay:        parseInt(process.env.SID_MAX_PER_DAY)        || 1,      // Max new entries per run
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
+  rsiNoGoLong:      parseFloat(process.env.SID_RSI_NOGO_LONG)    || 45,     // V2: reject long entry if RSI >= this
+  rsiNoGoShort:     parseFloat(process.env.SID_RSI_NOGO_SHORT)   || 55,     // V2: reject short entry if RSI <= this
   paperTrading:     process.env.SID_PAPER !== 'false',                       // legacy flag — still honoured for trade-log labelling
   tradingMode:      resolveTradingMode(),                                    // 'dry_run' | 'paper' | 'live' — controls Alpaca execution
 };
 
+// ── V2 Approval Tiers (see SID/docs/V2-TELEGRAM-APPROVAL-SPEC.md) ────────────
+// AUTO: 80 tickers proven via 5y V1 backtest — bot fires automatically
+// HUMAN: 32 high-vol/crypto/new — Telegram approval required (deferred to v2.1)
+const AUTO_APPROVED_TICKERS = new Set([
+  'AAPL','ABBV','ABT','ADBE','AMAT','AMD','AMZN','AVGO','AXP','B',
+  'BA','BLK','CAT','COST','CRM','CVX','DE','DIA','DIS','EEM',
+  'EFA','F','GDX','GE','GLD','GOOG','GS','HD','HON','IBB',
+  'IBM','INTC','IWM','IYR','JNJ','JPM','KHC','LLY','LMT','LRCX',
+  'MCD','MDLZ','META','MRK','NKE','NOW','NUGT','NVDA','ORCL','PFE',
+  'PYPL','QQQ','RIOT','RTX','SBUX','SCHW','SLV','SPY','SQQQ','TGT',
+  'TNA','TQQQ','TSLA','TZA','UNH','V','WFC','WMT','XHB','XLC',
+  'XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY','XOM',
+]);
+
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v1.7'; // v1.7: VIX >= 30 gate + 32-ticker tier1 expansion
+const BOT_VERSION = 'v2.0'; // V2 method launch (paper trading, 2026-05-16)
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
@@ -29,12 +45,18 @@ const BOT_VERSION = 'v1.7'; // v1.7: VIX >= 30 gate + 32-ticker tier1 expansion
 //   v1.4 weekly 50/200 SMA trend filter (locked at tag sid-v1.4-baseline)
 //   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings)
 //   v1.6 PPI blackout + REFINED 47 watchlist (locked at tag sid-v1.6-baseline)
-//   v1.7 VIX >= 30 gate (skip new entries on high-fear days) + tier1
-//        ticker expansion (80 active tickers up from 47). Inspired by user
-//        observation of Sept 2022 FOMC + UK pension crisis loss cluster.
-//        VIX is the market's implied-volatility / fear gauge — when >= 30
-//        the gate fires and the bot blocks new arms for the day. Backtest
-//        on 5y data showed +3pp WR improvement with this gate.
+//   v1.7 VIX >= 30 gate + 80-ticker tier1 expansion (locked at sid-v1-method-baseline)
+//   v2.0 V2 METHOD LAUNCH (2026-05-16, paper trading):
+//        - RSI 70 not 75 (already in bot from v1.3)
+//        - NEW: RSI 45/55 no-go zone at entry (instructor S2_Ep3)
+//        - NEW: 1% risk default (instructor S3_Ep4)
+//        - NEW: AUTO/HUMAN tier routing — HUMAN tier currently LOG-only,
+//          Telegram approval flow deferred to v2.1
+//        - DEFERRED to v2.1: weekly RSI/MACD direction check (full V2 method
+//          per spec). Without it the bot is "V2-partial" — backtest equivalent
+//          v2-nogo-only variant on 113 universe gives 668 trades / 52.4% WR.
+//        - Target with full V2 (v2-weekly-or, paper): tracks 64.9% WR /
+//          34.7% CAGR / 7.95% max DD from backtest.
 
 const TRADES_PATH     = './trades-sid.csv';
 const POSITIONS_PATH  = './open-positions-sid.json';
@@ -394,7 +416,14 @@ function detectEntrySignal(candles) {
   }
 
   if (oversoldIdx !== null && rsiNow > rsiPrev && macdNow > macdPrev) {
-    // Both RSI and MACD pointing up — valid long entry
+    // Both RSI and MACD pointing up — valid long entry (V1 logic)
+    // V2 no-go zone: reject if RSI already too close to RSI 50 (instructor S2_Ep3)
+    if (rsiNow >= CONFIG.rsiNoGoLong) {
+      return {
+        signal: null,
+        rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} >= ${CONFIG.rsiNoGoLong} for long entry (too close to RSI 50 TP)`,
+      };
+    }
     const signalDate  = candles[oversoldIdx].date;
     const episodeCandles = candles.slice(oversoldIdx); // Signal date → today
     const lowestLow   = Math.min(...episodeCandles.map(c => c.low));
@@ -424,6 +453,13 @@ function detectEntrySignal(candles) {
   }
 
   if (overboughtIdx !== null && rsiNow < rsiPrev && macdNow < macdPrev) {
+    // V2 no-go zone: reject if RSI too close to RSI 50 (mirror of long check)
+    if (rsiNow <= CONFIG.rsiNoGoShort) {
+      return {
+        signal: null,
+        rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} <= ${CONFIG.rsiNoGoShort} for short entry (too close to RSI 50 TP)`,
+      };
+    }
     const signalDate  = candles[overboughtIdx].date;
     const episodeCandles = candles.slice(overboughtIdx);
     const highestHigh = Math.max(...episodeCandles.map(c => c.high));
@@ -766,6 +802,28 @@ async function run() {
       const rsiNow = rsiArr[rsiArr.length - 1];
       console.log(`No signal (RSI ${rsiNow?.toFixed(1) ?? '—'})`);
       writeLog({ symbol, signal: null, reason: 'No RSI/MACD entry alignment' });
+      continue;
+    }
+
+    // V2 signal-detector can return {signal: null, rejectReason} for no-go zone
+    if (!signal.signal && signal.rejectReason) {
+      console.log(`🚫 ${signal.rejectReason}`);
+      writeLog({ symbol, signal: null, reason: signal.rejectReason });
+      continue;
+    }
+
+    // V2 AUTO/HUMAN tier routing
+    if (!AUTO_APPROVED_TICKERS.has(symbol)) {
+      console.log(`⚠️  HUMAN-tier signal (${symbol} ${signal.signal.toUpperCase()}) — Telegram approval not yet wired (v2.1). Skipping.`);
+      writeLog({
+        symbol,
+        signal: signal.signal,
+        reason: `HUMAN-tier: requires Telegram approval (deferred to v2.1)`,
+        v2_tier: 'HUMAN',
+        proposed_entry: signal.entry,
+        proposed_stop: signal.stopLoss,
+        proposed_rsi: signal.rsiAtEntry,
+      });
       continue;
     }
 
