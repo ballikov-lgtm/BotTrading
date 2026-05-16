@@ -317,10 +317,14 @@ function renderHeatmap() {
   if (!valid.length) {
     return `<div class="hud-empty">// NO ASSETS WITH DATA YET //</div>`;
   }
-  const W = 900, H = 480, padL = 60, padR = 30, padT = 40, padB = 50;
+  // Geometry tuned for 113-ticker V2 universe (was 480 tall — too cramped).
+  // Tickers cluster heavily in the top half (score 80-100), so we give the
+  // upper region more room and apply a deterministic jitter so overlapping
+  // dots become individually visible.
+  const W = 900, H = 600, padL = 60, padR = 30, padT = 60, padB = 60;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const xOf = rsi => padL + (Math.max(0, Math.min(100, rsi)) / 100) * innerW;
-  const yOf = score => padT + (1 - Math.max(0, Math.min(100, score)) / 100) * innerH;
+  const yOfBase = score => padT + (1 - Math.max(0, Math.min(100, score)) / 100) * innerH;
 
   const tierColor = (sym) => {
     const tier = classification?.tickers?.find(c => c.symbol === sym)?.tier;
@@ -332,7 +336,7 @@ function renderHeatmap() {
 
   const grid = [0, 25, 50, 75, 100].map(v => `
     <line x1="${xOf(v)}" y1="${padT}" x2="${xOf(v)}" y2="${padT + innerH}" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
-    <line x1="${padL}" y1="${yOf(v)}" x2="${padL + innerW}" y2="${yOf(v)}" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
+    <line x1="${padL}" y1="${yOfBase(v)}" x2="${padL + innerW}" y2="${yOfBase(v)}" stroke="#0a4a4a" stroke-width="0.5" opacity="0.6"/>
   `).join('');
 
   const refLines = `
@@ -340,17 +344,40 @@ function renderHeatmap() {
     <line x1="${xOf(75)}" y1="${padT}" x2="${xOf(75)}" y2="${padT + innerH}" stroke="#ff1493" stroke-width="1" stroke-dasharray="4,4" opacity="0.5" style="filter: drop-shadow(0 0 4px #ff1493)"/>
   `;
 
-  const dots = valid.map(t => {
-    const x = xOf(t.rsi), y = yOf(t.score);
+  // Collision-resolving jitter: sort by score, walk through and offset any
+  // dot whose base position is within `minDist` of the previous one.
+  // Deterministic so the layout is stable across builds.
+  const minDist = 18;
+  const placed = [];
+  const positioned = valid
+    .slice()
+    .sort((a, b) => (b.score - a.score) || (a.rsi - b.rsi))
+    .map(t => {
+      const x = xOf(t.rsi);
+      let y = yOfBase(t.score);
+      // Find an open vertical slot if another dot is too close in (x,y) space
+      let attempt = 0;
+      while (attempt < 12 && placed.some(p => Math.hypot(p.x - x, p.y - y) < minDist)) {
+        // Alternate above / below
+        y = yOfBase(t.score) + (attempt % 2 === 0 ? 1 : -1) * (minDist * Math.ceil((attempt + 1) / 2));
+        attempt++;
+      }
+      placed.push({ x, y });
+      return { ...t, x, y };
+    });
+
+  const dots = positioned.map(t => {
+    const { x, y } = t;
     const color = tierColor(t.symbol);
-    const r = (t.status || '').startsWith('SIGNAL') ? 13 : 9;
+    const isSignal = (t.status || '').startsWith('SIGNAL');
+    const r = isSignal ? 12 : 7;  // Smaller non-signal dots reduce overlap
     const isExcluded = excludedSet.has(t.symbol);
     const tierLabel = classification?.tickers?.find(c => c.symbol === t.symbol)?.tier || 'UNCLASSIFIED';
     return `<g class="heatmap-dot" data-tier="${tierLabel}">
       <circle cx="${x}" cy="${y}" r="${r}" fill="${color}" fill-opacity="${isExcluded ? '0.2' : '0.4'}" stroke="${color}" stroke-width="1.5" style="filter: drop-shadow(0 0 ${isExcluded ? '4' : '8'}px ${color})">
         <title>${t.symbol} · ${t.status} · ${tierLabel} · RSI ${t.rsi.toFixed(1)} · Score ${t.score}</title>
       </circle>
-      <text x="${x}" y="${y + 3}" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">${t.symbol}</text>
+      <text x="${x}" y="${y + 3}" text-anchor="middle" fill="#fff" font-size="${isSignal ? 8 : 7}" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">${t.symbol}</text>
     </g>`;
   }).join('');
 
