@@ -434,7 +434,16 @@ def main():
     print(f'━━ SID V2 Method — {BACKTEST_YEARS}y on {UNIVERSE.upper()} ━━\n')
     wl = json.loads(WATCHLIST_PATH.read_text(encoding='utf-8'))
 
-    if UNIVERSE == 'tier1_80' or UNIVERSE == 'tier1' or UNIVERSE == '80':
+    # "Best of the dropped" — added to chase 300-trade target without polluting
+    # the universe with bad performers. CSCO is on the instructor's list; EXPE
+    # and PG were the highest-trade / highest-WR among the V1-dropped 14.
+    BEST_OF_DROPPED = ['CSCO', 'EXPE', 'PG']
+
+    if UNIVERSE == 'tier1_83' or UNIVERSE == 'tier1+dropped' or UNIVERSE == '83':
+        r = wl['sections']['refined_47_active']
+        t = wl['sections']['tier1_expansion']
+        tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', [])) + BEST_OF_DROPPED))
+    elif UNIVERSE == 'tier1_80' or UNIVERSE == 'tier1' or UNIVERSE == '80':
         r = wl['sections']['refined_47_active']
         t = wl['sections']['tier1_expansion']
         tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', []))))
@@ -443,10 +452,10 @@ def main():
     elif UNIVERSE == 'reference_61':
         tickers = wl['sections']['favourites_reference_61']
     else:
-        # Default: 80-ticker tier1 universe (matches V1 backtest universe)
+        # Default: 83-ticker = tier1_80 + best-of-dropped (CSCO/EXPE/PG)
         r = wl['sections']['refined_47_active']
         t = wl['sections']['tier1_expansion']
-        tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', []))))
+        tickers = sorted(set(list(r) + list(t.get('stocks', [])) + list(t.get('etfs', [])) + BEST_OF_DROPPED))
     print(f'Universe: {UNIVERSE} ({len(tickers)} tickers)\n')
     for v in VARIANTS:
         print(f'  - {v["name"]:18}  {v["desc"]}')
