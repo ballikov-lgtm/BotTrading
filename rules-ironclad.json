@@ -1,5 +1,7 @@
 {
   "strategy": "Ironclad Multi-Timeframe Swing Strategy",
+  "paused": true,
+  "pause_reason": "On hold — too many entries firing in choppy/neutral market conditions. Pending filter improvements.",
   "description": "Based on backtested parameter optimization achieving 72.17% win rate and 957% return. Daily trend filter with 15m entries. Originally designed for Forex, adapted for crypto futures.",
   "source": "https://youtu.be/s9HV_jyeUDk?t=535",
 

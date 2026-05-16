@@ -1495,6 +1495,15 @@ async function run() {
 
   console.log(`\n══ IRONCLAD Bot run ${new Date().toISOString()} ══`);
 
+  // ── Pause check — set paused:true in rules-ironclad.json to hold all new entries ─
+  if (rules.paused) {
+    console.log(`⏸  PAUSED — bot is on hold. No new entries will be placed.`);
+    console.log(`   Reason: ${rules.pause_reason || 'manually paused'}`);
+    console.log(`   Existing positions will continue to be monitored.`);
+    await checkPositions();
+    return;
+  }
+
   // ── Step 0: Check open paper positions before scanning for new entries ────────
   await checkPositions();
   console.log(`Strategy  : ${rules.strategy}`);
