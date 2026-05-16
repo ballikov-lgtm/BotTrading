@@ -38,6 +38,20 @@ OUT_PATH  = Path(__file__).parent.parent / 'SID V2 Method Back Testing.xlsx'
 STARTING_BALANCE = 10000.0
 RISK_PCT         = 0.01      # 1% per instructor default (S3_Ep4)
 
+# Auto-approved tickers — proven via 5y V1 backtest, refined-47 + tier1 expansion
+# (the original 80-ticker universe). Anything OUTSIDE this list requires
+# human approval via Telegram (see V2-TELEGRAM-APPROVAL-SPEC.md).
+AUTO_APPROVED = {
+    'AAPL','ABBV','ABT','ADBE','AMAT','AMD','AMZN','AVGO','AXP','B',
+    'BA','BLK','CAT','COST','CRM','CVX','DE','DIA','DIS','EEM',
+    'EFA','F','GDX','GE','GLD','GOOG','GS','HD','HON','IBB',
+    'IBM','INTC','IWM','IYR','JNJ','JPM','KHC','LLY','LMT','LRCX',
+    'MCD','MDLZ','META','MRK','NKE','NOW','NUGT','NVDA','ORCL','PFE',
+    'PYPL','QQQ','RIOT','RTX','SBUX','SCHW','SLV','SPY','SQQQ','TGT',
+    'TNA','TQQQ','TSLA','TZA','UNH','V','WFC','WMT','XHB','XLC',
+    'XLE','XLF','XLI','XLK','XLP','XLRE','XLU','XLV','XLY','XOM',
+}
+
 if not JSON_PATH.exists():
     print(f'ERROR: {JSON_PATH} not found. Run backtest-sid-v2.py first.')
     sys.exit(1)
@@ -209,7 +223,7 @@ ws.title = 'All Trades (V2 sized)'
 TITLE = (f"SID V2 Method — Position-Sized Backtest "
          f"(${STARTING_BALANCE:,.0f} start, {RISK_PCT*100:.1f}% risk/trade, "
          f"{report['backtest_years']}y, {len(report['tickers'])} tickers)")
-ws.merge_cells('A1:X1')
+ws.merge_cells('A1:Y1')
 ws['A1'] = TITLE
 ws['A1'].font = Font(name=ARIAL, size=16, bold=True, color=THEME['title_fg'])
 ws['A1'].fill = PatternFill('solid', fgColor=THEME['title_bg'])
@@ -223,7 +237,7 @@ subtitle = (
     f"({v2_summary['total_return_pct']:+.1f}% total, {v2_summary['cagr_pct']:.1f}% CAGR over {v2_summary['years']}y)  |  "
     f"Max DD {v2_summary['max_drawdown_pct']}%  |  Generated {datetime.now().strftime('%Y-%m-%d')}"
 )
-ws.merge_cells('A2:X2')
+ws.merge_cells('A2:Y2')
 ws['A2'] = subtitle
 ws['A2'].font = Font(name=ARIAL, size=11, color='2D3748', italic=True)
 ws['A2'].fill = PatternFill('solid', fgColor='F7FAFC')
@@ -257,6 +271,7 @@ COLS = [
     ('RSI @ Entry',      'entry_rsi',         'rsi',     11, False),
     ('Wkly RSI',         'wk_rsi_rising_at_entry',  'flag', 10, False),
     ('Wkly MACD',        'wk_macd_rising_at_entry', 'flag', 10, False),
+    ('Approval',         None,                'approval', 11, False),
     ('Outcome',          None,                'outcome', 10, False),
 ]
 
@@ -278,7 +293,10 @@ for i, t in enumerate(v2_sorted):
     for col_idx, (_, key, kind, _, is_sizing) in enumerate(COLS, 1):
         c = ws.cell(row=row, column=col_idx)
         # Pick value
-        if key is None and kind == 'outcome':
+        if key is None and kind == 'approval':
+            tier = 'AUTO' if t['ticker'] in AUTO_APPROVED else 'HUMAN'
+            c.value = tier
+        elif key is None and kind == 'outcome':
             c.value = 'WIN' if is_win else 'LOSS'
         elif key == 'trade_no':
             c.value = i + 1; c.number_format = '0'
@@ -329,6 +347,15 @@ for i, t in enumerate(v2_sorted):
                 c.fill = PatternFill('solid', fgColor='E2E8F0')
                 c.font = Font(name=ARIAL, size=10, color='4A5568')
 
+        if kind == 'approval':
+            tier = 'AUTO' if t['ticker'] in AUTO_APPROVED else 'HUMAN'
+            if tier == 'AUTO':
+                c.fill = PatternFill('solid', fgColor=THEME['win_bg'])
+                c.font = Font(name=ARIAL, size=10, bold=True, color=THEME['win_fg'])
+            else:
+                c.fill = PatternFill('solid', fgColor='FED7AA')  # Amber/warning
+                c.font = Font(name=ARIAL, size=10, bold=True, color='9C4221')
+
         if kind == 'outcome':
             if is_win:
                 c.fill = PatternFill('solid', fgColor=THEME['win_bg'])
@@ -346,7 +373,7 @@ for i, t in enumerate(v2_sorted):
 DATA_END = DATA_START + len(v2_sorted) - 1
 ws.freeze_panes = 'D4'
 if DATA_END >= DATA_START:
-    ws.auto_filter.ref = f"A{HEADER_ROW}:X{DATA_END}"
+    ws.auto_filter.ref = f"A{HEADER_ROW}:Y{DATA_END}"
 
 # ============================================================================
 # Sheet 2: Per-Ticker Summary
@@ -731,6 +758,129 @@ for r_off, (param, val, note) in enumerate(rules):
 ws5.column_dimensions['A'].width = 38
 ws5.column_dimensions['B'].width = 50
 ws5.column_dimensions['C'].width = 55
+
+# ============================================================================
+# Sheet 6: Approval Tier Breakdown
+# ============================================================================
+ws6 = wb.create_sheet('Approval Tiers')
+ws6.merge_cells('A1:F1')
+ws6['A1'] = 'V2 Trades — Auto-Approved vs Human-Approval Required'
+ws6['A1'].font = Font(name=ARIAL, size=16, bold=True, color=THEME['title_fg'])
+ws6['A1'].fill = PatternFill('solid', fgColor=THEME['title_bg'])
+ws6['A1'].alignment = Alignment(horizontal='center', vertical='center')
+ws6.row_dimensions[1].height = 32
+
+ws6.merge_cells('A2:F2')
+ws6['A2'] = ('AUTO = ticker in proven 80-ticker tier1 list (5y V1 backtest validated). '
+             'HUMAN = high-vol / crypto / leveraged ETFs / re-added dropouts. '
+             'Bot sends Telegram alert with proposed Entry / SL / TP for HUMAN trades.')
+ws6['A2'].font = Font(name=ARIAL, size=10, italic=True, color='2D3748')
+ws6['A2'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+ws6['A2'].fill = PatternFill('solid', fgColor='F7FAFC')
+ws6.row_dimensions[2].height = 36
+
+# Split trades by tier
+auto_trades = [t for t in v2_sorted if t['ticker'] in AUTO_APPROVED]
+human_trades = [t for t in v2_sorted if t['ticker'] not in AUTO_APPROVED]
+
+def tier_stats(trades):
+    if not trades:
+        return {'n': 0, 'wins': 0, 'wr': 0, 'pnl': 0, 'avg_pnl': 0,
+                'tickers': 0}
+    wins = sum(1 for t in trades if t['pnl_sized'] > 0)
+    pnl = sum(t['pnl_sized'] for t in trades)
+    return {
+        'n': len(trades),
+        'wins': wins,
+        'losses': len(trades) - wins,
+        'wr': round(wins / len(trades) * 100, 1),
+        'pnl': round(pnl, 2),
+        'avg_pnl': round(pnl / len(trades), 2),
+        'tickers': len(set(t['ticker'] for t in trades)),
+    }
+
+auto_stats = tier_stats(auto_trades)
+human_stats = tier_stats(human_trades)
+
+# Summary table
+T_HEADER = 4
+headers = ['Tier', 'Trades', 'Tickers', 'WR (%)', 'Net P&L ($)', 'Avg P&L per trade ($)']
+for col_idx, label in enumerate(headers, 1):
+    c = ws6.cell(row=T_HEADER, column=col_idx, value=label)
+    c.font = Font(name=ARIAL, size=11, bold=True, color=THEME['header_fg'])
+    c.fill = PatternFill('solid', fgColor=THEME['header_bg'])
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = BORDER
+    ws6.column_dimensions[get_column_letter(col_idx)].width = 22
+
+ws6.row_dimensions[T_HEADER].height = 30
+
+rows_data = [
+    ('AUTO (tier1 80)',  auto_stats,  THEME['win_bg'],  THEME['win_fg']),
+    ('HUMAN (tier2 32)', human_stats, 'FED7AA',         '9C4221'),
+    ('TOTAL',            tier_stats(v2_sorted), THEME['subtotal_bg'], THEME['subtotal_fg']),
+]
+
+for i, (label, st, bg, fg) in enumerate(rows_data):
+    r = T_HEADER + 1 + i
+    vals = [label, st['n'], st['tickers'], st['wr'], st['pnl'], st['avg_pnl']]
+    for col_idx, val in enumerate(vals, 1):
+        c = ws6.cell(row=r, column=col_idx, value=val)
+        c.font = Font(name=ARIAL, size=11, bold=(i == 2), color=fg)
+        c.fill = PatternFill('solid', fgColor=bg)
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = BORDER
+    ws6.cell(row=r, column=2).number_format = '0'
+    ws6.cell(row=r, column=3).number_format = '0'
+    ws6.cell(row=r, column=4).number_format = '0.0'
+    ws6.cell(row=r, column=5).number_format = '$#,##0.00;[Red]-$#,##0.00'
+    ws6.cell(row=r, column=6).number_format = '$#,##0.00;[Red]-$#,##0.00'
+    ws6.row_dimensions[r].height = 28
+
+# Per-ticker breakdown for HUMAN tier (so user can see which need approval most)
+H_HEADER = T_HEADER + 6
+ws6.cell(row=H_HEADER, column=1, value='HUMAN-tier tickers — trade count, WR, P&L (rank by total trades)')
+ws6.cell(row=H_HEADER, column=1).font = Font(name=ARIAL, size=12, bold=True, color='2D3748')
+ws6.merge_cells(start_row=H_HEADER, start_column=1, end_row=H_HEADER, end_column=6)
+
+h_headers = ['Ticker', 'Trades', 'Wins', 'Losses', 'WR (%)', 'Net P&L ($)']
+for col_idx, label in enumerate(h_headers, 1):
+    c = ws6.cell(row=H_HEADER + 2, column=col_idx, value=label)
+    c.font = Font(name=ARIAL, size=11, bold=True, color=THEME['header_fg'])
+    c.fill = PatternFill('solid', fgColor=THEME['header_bg'])
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = BORDER
+
+# Group by ticker
+by_ticker_h = {}
+for t in human_trades:
+    by_ticker_h.setdefault(t['ticker'], []).append(t)
+rows_h = []
+for tk, ts in by_ticker_h.items():
+    w = sum(1 for x in ts if x['pnl_sized'] > 0)
+    pnl = sum(x['pnl_sized'] for x in ts)
+    rows_h.append((tk, len(ts), w, len(ts) - w, w / len(ts) * 100, pnl))
+rows_h.sort(key=lambda r: -r[1])
+
+for i, row in enumerate(rows_h):
+    r = H_HEADER + 3 + i
+    tk, n, w, l, wr, pnl = row
+    for col_idx, val in enumerate(row, 1):
+        c = ws6.cell(row=r, column=col_idx, value=val)
+        c.font = Font(name=ARIAL, size=10)
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = BORDER
+        c.fill = PatternFill('solid', fgColor=(THEME['row_white'] if i % 2 == 0 else THEME['row_alt']))
+    ws6.cell(row=r, column=2).number_format = '0'
+    ws6.cell(row=r, column=3).number_format = '0'
+    ws6.cell(row=r, column=4).number_format = '0'
+    ws6.cell(row=r, column=5).number_format = '0.0'
+    ws6.cell(row=r, column=6).number_format = '$#,##0.00;[Red]-$#,##0.00'
+    c_pnl = ws6.cell(row=r, column=6)
+    if pnl > 0:
+        c_pnl.font = Font(name=ARIAL, size=10, bold=True, color='22543D')
+    elif pnl < 0:
+        c_pnl.font = Font(name=ARIAL, size=10, bold=True, color='742A2A')
 
 # Save
 wb.save(OUT_PATH)
