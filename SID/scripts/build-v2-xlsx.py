@@ -375,6 +375,88 @@ ws.freeze_panes = 'D4'
 if DATA_END >= DATA_START:
     ws.auto_filter.ref = f"A{HEADER_ROW}:Y{DATA_END}"
 
+# ── Filter-aware subtotal row ───────────────────────────────────────────────
+# Uses SUBTOTAL(function, range) for live recalculation as filters toggle.
+# Win Rate column uses SUMPRODUCT+SUBTOTAL(3, OFFSET(...)) to count visible
+# "WIN" outcomes vs total visible rows — recalculates as filters change.
+SUBTOTAL_ROW = DATA_END + 1
+SUBTOTAL_LABELS = {
+    1:  ('subtotal_label', None),                          # Trade # — label
+    2:  ('count_text',     None),                          # Ticker — "N trades"
+    3:  ('blank',          None),                          # Side
+    4:  ('blank',          None),                          # Entry Date
+    5:  ('avg_money',      'E'),                           # Entry $
+    6:  ('avg_money',      'F'),                           # Stop $
+    7:  ('blank',          None),                          # Exit Date
+    8:  ('avg_money',      'H'),                           # Exit $
+    9:  ('blank',          None),                          # Exit Reason
+    10: ('blank',          None),                          # Acct Before (not meaningful aggregated)
+    11: ('blank',          None),                          # Risk %
+    12: ('sum_money',      'L'),                           # Risk $
+    13: ('avg_money',      'M'),                           # Risk/Share
+    14: ('sum_money',      'N'),                           # Position $
+    15: ('sum_int',        'O'),                           # Shares
+    16: ('sum_money',      'P'),                           # P&L $
+    17: ('avg_pct_raw',    'Q'),                           # P&L %
+    18: ('blank',          None),                          # Acct After
+    19: ('avg_decimal',    'S'),                           # Bars Held
+    20: ('avg_decimal',    'T'),                           # RSI @ Entry
+    21: ('blank',          None),                          # Wkly RSI
+    22: ('blank',          None),                          # Wkly MACD
+    23: ('blank',          None),                          # Approval
+    24: ('win_rate',       'X'),                           # Outcome → WIN RATE %
+}
+
+def get_col_letter_from_idx(idx):
+    return get_column_letter(idx)
+
+for col_idx, (kind, col_ref) in SUBTOTAL_LABELS.items():
+    c = ws.cell(row=SUBTOTAL_ROW, column=col_idx)
+    rng_start = f"{col_ref}{DATA_START}" if col_ref else None
+    rng_end   = f"{col_ref}{DATA_END}"   if col_ref else None
+
+    if kind == 'subtotal_label':
+        c.value = 'SUBTOTAL ▼'
+    elif kind == 'count_text':
+        # Number of VISIBLE trades after filtering
+        c.value = f'=SUBTOTAL(3,B{DATA_START}:B{DATA_END})&" trades"'
+    elif kind == 'sum_money':
+        c.value = f'=SUBTOTAL(9,{rng_start}:{rng_end})'
+        c.number_format = '$#,##0.00;[Red]-$#,##0.00'
+    elif kind == 'sum_int':
+        c.value = f'=SUBTOTAL(9,{rng_start}:{rng_end})'
+        c.number_format = '#,##0'
+    elif kind == 'avg_money':
+        c.value = f'=IFERROR(SUBTOTAL(1,{rng_start}:{rng_end}),0)'
+        c.number_format = '$#,##0.00'
+    elif kind == 'avg_pct_raw':
+        c.value = f'=IFERROR(SUBTOTAL(1,{rng_start}:{rng_end}),0)'
+        c.number_format = '0.00%;[Red]-0.00%'
+    elif kind == 'avg_decimal':
+        c.value = f'=IFERROR(SUBTOTAL(1,{rng_start}:{rng_end}),0)'
+        c.number_format = '0.0'
+    elif kind == 'win_rate':
+        # Counts visible "WIN" outcomes / total visible rows
+        # SUMPRODUCT iterates each row; SUBTOTAL(3, OFFSET(...)) returns
+        # 1 if visible, 0 if hidden by filter. Multiplied by ="WIN" gives
+        # count of visible wins. Divided by total visible (with MAX(...,1)
+        # to avoid div-by-zero when everything filtered out).
+        c.value = (
+            f'=IFERROR(SUMPRODUCT(SUBTOTAL(3,OFFSET({col_ref}{DATA_START},'
+            f'ROW({col_ref}{DATA_START}:{col_ref}{DATA_END})-ROW({col_ref}{DATA_START}),0))'
+            f'*({col_ref}{DATA_START}:{col_ref}{DATA_END}="WIN"))'
+            f'/MAX(SUBTOTAL(3,{col_ref}{DATA_START}:{col_ref}{DATA_END}),1),0)'
+        )
+        c.number_format = '0.0%'
+    # blank → leave value as None
+
+    c.font = Font(name=ARIAL, size=11, bold=True, color=THEME['subtotal_fg'])
+    c.fill = PatternFill('solid', fgColor=THEME['subtotal_bg'])
+    c.alignment = Alignment(horizontal='center', vertical='center')
+    c.border = BORDER
+
+ws.row_dimensions[SUBTOTAL_ROW].height = 28
+
 # ============================================================================
 # Sheet 2: Per-Ticker Summary
 # ============================================================================
