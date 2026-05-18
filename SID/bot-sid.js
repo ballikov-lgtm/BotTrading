@@ -19,6 +19,10 @@ const CONFIG = {
   useWeeklyDirection: process.env.SID_WEEKLY_DIRECTION !== 'false',         // V2: require weekly RSI OR MACD to align with trade direction (default ON)
   paperTrading:     process.env.SID_PAPER !== 'false',                       // legacy flag — still honoured for trade-log labelling
   tradingMode:      resolveTradingMode(),                                    // 'dry_run' | 'paper' | 'live' — controls Alpaca execution
+  // V2.1 dynamic-TP parameters ──────────────────────────────────────────────
+  tp1Portion:       parseFloat(process.env.SID_TP1_PORTION)      || 0.50,   // V2.1: fraction of position closed at TP1 (RSI 50)
+  tp2TimeoutDays:   parseInt(process.env.SID_TP2_TIMEOUT_DAYS)   || 30,     // V2.1: max trading days to hold remaining 50% after TP1
+  useDynamicTp:     process.env.SID_DYNAMIC_TP !== 'false',                  // V2.1: enable TP1+TP2 partial exits (default ON). Set false to revert to v2.0 single-exit behaviour.
 };
 
 // ── V2 Approval Tiers (see SID/docs/V2-TELEGRAM-APPROVAL-SPEC.md) ────────────
@@ -37,7 +41,7 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.0'; // V2 method launch (paper trading, 2026-05-16)
+const BOT_VERSION = 'v2.1'; // V2.1: dynamic TP1+TP2 partial exits (paper trading, 2026-05-18)
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
@@ -47,6 +51,40 @@ const BOT_VERSION = 'v2.0'; // V2 method launch (paper trading, 2026-05-16)
 //   v1.5 earnings rule clarified to pre-only (block 14 days BEFORE earnings)
 //   v1.6 PPI blackout + REFINED 47 watchlist (locked at tag sid-v1.6-baseline)
 //   v1.7 VIX >= 30 gate + 80-ticker tier1 expansion (locked at sid-v1-method-baseline)
+//   v2.1 V2.1 DYNAMIC TP LAUNCH (2026-05-18, paper trading):
+//        - Entry rules unchanged from v2.0 (v2-weekly-or remains the entry stack)
+//        - NEW EXIT MODEL — TP1 + TP2 partial exits per instructor S3_P1 / S3_P2:
+//          • TP1 = RSI 50 → close 50% of position. Move stop to break-even on
+//            remaining 50%. Locks in the half-position profit guaranteed by
+//            the v2.0 exit while keeping a runner for the bigger move.
+//          • TP2 = whichever fires first on the remaining 50%:
+//              - Price touches 50-day SMA (instructor's "first MA target")
+//              - Price touches 200-day SMA (instructor's "trend MA target")
+//              - Break-even stop hit (price returns to entry)
+//              - 30-trading-day timeout (close at next-day open)
+//        - Backtest validation on tier1 80-ticker AUTO universe, 5 years
+//          (1% risk per trade, fixed $200 risk in the simulator):
+//            V2.0 baseline: 296 trades, 70.3% WR, PF 2.57, total +$26,750
+//            V2.1 dynamic : 302 trades, 69.5% WR, PF 2.55, total +$28,046
+//          V2.1 BEATS V2 by +$1,296 (+4.8%) over 5 years with essentially the
+//          same trade count. TP2 uplift on winners is +$24,733 (+115% more
+//          than what V2 captures by closing fully at RSI 50). The 14-day-
+//          timeout variant adds another +$403 (+0.1pp WR).
+//          NOTE: an earlier version of the V2.1 backtest reported only 67
+//          trades / +$7,759 — that was a data-window bug (insufficient
+//          indicator warmup) in the backtest's main() loop, not a strategy
+//          issue. Fixed 2026-05-18 to match V2's 10y download (5y warmup +
+//          5y trade window). The live bot's entry detection in this file
+//          was always correct.
+//        - SCHEMA CHANGE — open-positions-sid.json entries gain:
+//            tp1_hit, tp1_date, tp1_price, tp1_shares, tp1_pnl, tp1_idx,
+//            shares_total, shares_remaining, orig_stop
+//          Legacy v2.0 positions are upgraded on first read (tp1_hit=false).
+//        - SCHEMA CHANGE — closed-positions-sid.json adds:
+//            tp1_*, tp2_*, total_pnl, exit_strategy
+//        - Toggle: SID_DYNAMIC_TP=false reverts to v2.0 single-exit at RSI 50.
+//        - DEFERRED to v2.2: Rating engine, short counter-trend gate, Telegram
+//          approval flow for HUMAN tier, dashboard Signal Watch widget.
 //   v2.0 V2 METHOD LAUNCH (2026-05-16, paper trading):
 //        - RSI 70 not 75 (already in bot from v1.3)
 //        - NEW: RSI 45/55 no-go zone at entry (instructor S2_Ep3)
@@ -395,6 +433,32 @@ function calcMACD(closes) {
   return { macdLine, signal };
 }
 
+// Simple Moving Average — used for V2.1 TP2 detection (50d and 200d MAs).
+// Returns an array of the same length as `values`; entries before `period`
+// bars of history are null.
+function calcSMA(values, period) {
+  const result = [];
+  let sum = 0;
+  let count = 0;
+  const window = [];
+  for (const v of values) {
+    if (v === null || v === undefined || isNaN(v)) {
+      result.push(null);
+      // Keep window in sync so we don't drift; treat missing as a reset
+      continue;
+    }
+    window.push(v);
+    sum += v;
+    count++;
+    if (window.length > period) {
+      sum -= window.shift();
+      count--;
+    }
+    result.push(window.length === period ? parseFloat((sum / period).toFixed(6)) : null);
+  }
+  return result;
+}
+
 // ── Weekly Resampling & Direction Check (V2 method) ───────────────────────────
 // Groups daily candles by their week's Monday-key so the IN-PROGRESS week is
 // addressable. The current week's "close" is the most recent daily close
@@ -610,10 +674,42 @@ function calcPositionSize(entry, stopLoss) {
   };
 }
 
-// ── Position Monitor — RSI-50 Exit ────────────────────────────────────────────
-// SID exits entirely when RSI(14) reaches 50 on the daily chart.
-// Walks through daily candles since the position was opened to find the first
-// day where RSI crossed 50. Uses that day's close as the exit price.
+// ── Position Monitor — V2.1 Dynamic TP1 / TP2 Exit ────────────────────────────
+// V2.1 introduces a two-stage exit. Per instructor S3_P1 (long) / S3_P2 (short):
+//
+//   TP1 (RSI 50)
+//     - Close half the position.
+//     - Move stop on the remaining half to break-even (entry price).
+//     - "WR" is now defined as did-TP1-fire-or-not, so a TP1+breakeven-stop
+//       outcome is still a WIN — the half-position profit is banked.
+//
+//   TP2 (whichever of these the remaining 50% hits first)
+//     - Price touches the 50-day SMA (first MA target)
+//     - Price touches the 200-day SMA (trend MA target)
+//     - Break-even stop hit (price returns to entry — the runner round-trips)
+//     - 30-trading-day timeout (close at next-day open)
+//
+// PDT-immune design preserved: the bot does not place broker-side stops. On
+// each daily run it scans post-entry candles and submits market orders for
+// any exits hit — which fill next morning, never same-day.
+//
+// Schema additions to open-positions-sid.json (per position):
+//   tp1_hit            : boolean — has the RSI 50 partial fired yet?
+//   tp1_date           : 'YYYY-MM-DD' — set when TP1 fires
+//   tp1_price          : number — fill (close-of-bar that hit RSI 50)
+//   tp1_shares         : int    — number of shares closed at TP1
+//   tp1_pnl            : number — realised $ from the TP1 partial
+//   tp1_rsi            : number — RSI value at the TP1 bar
+//   shares_total       : int    — original share count (immutable after entry)
+//   shares_remaining   : int    — current runners after TP1 partial close
+//   orig_stop          : number — entry-time stop level (kept for record)
+//
+// Backwards compat: positions opened under v2.0 (no tp1_* fields) are upgraded
+// to the v2.1 schema on first read with tp1_hit=false. They then participate
+// in the V2.1 exit logic from that point forward.
+//
+// Toggle: SID_DYNAMIC_TP=false falls back to v2.0 behaviour (full close at
+// RSI 50, no TP2). Useful for A/B comparisons or emergency revert.
 
 async function checkPositions(executor = null) {
   const openPositions   = loadOpenPositions();
@@ -624,128 +720,387 @@ async function checkPositions(executor = null) {
     return;
   }
 
-  console.log(`\n── SID Position Monitor: ${openPositions.length} open position(s) ──`);
+  console.log(`\n── SID Position Monitor: ${openPositions.length} open position(s) ──  [Dynamic TP ${CONFIG.useDynamicTp ? 'ON' : 'OFF (v2.0 fallback)'}]`);
 
   const stillOpen = [];
+  let numClosed = 0;
 
   for (const pos of openPositions) {
-    process.stdout.write(`  ▶ ${pos.symbol} ${pos.side.toUpperCase()} @ $${pos.entry} (${pos.openDate}) … `);
+    // Upgrade legacy v2.0 positions to V2.1 schema on first read
+    if (typeof pos.tp1_hit === 'undefined') {
+      pos.tp1_hit          = false;
+      pos.orig_stop        = pos.stopLoss;
+      pos.shares_total     = pos.shares;
+      pos.shares_remaining = pos.shares;
+      console.log(`  ▶ ${pos.symbol} — legacy v2.0 position upgraded to v2.1 schema in-place`);
+    }
 
+    const tp1Tag = pos.tp1_hit ? ' [TP1✓]' : '';
+    process.stdout.write(`  ▶ ${pos.symbol} ${pos.side.toUpperCase()} @ $${pos.entry}${tp1Tag} (entry ${pos.openDate}) … `);
+
+    // V2.1 needs ~200 trading-day SMA → fetch 2y of history (was 6mo in v2.0)
     let candles;
     try {
-      candles = await fetchDailyCandles(pos.symbol, '6mo');
+      candles = await fetchDailyCandles(pos.symbol, '2y');
     } catch (err) {
       console.log(`candles unavailable — skipping (${err.message})`);
       stillOpen.push(pos);
       continue;
     }
 
-    // Only use candles from the day AFTER entry (entry day is already locked in)
-    const postEntry = candles.filter(c => c.date > pos.openDate);
-    if (!postEntry.length) {
+    // Where do we start scanning post-position-state? If TP1 already fired,
+    // start AFTER the TP1 date (TP1 partial is already booked). Otherwise
+    // start AFTER entry.
+    const scanFromDate = pos.tp1_hit ? pos.tp1_date : pos.openDate;
+    const newBars = candles.filter(c => c.date > scanFromDate);
+    if (!newBars.length) {
       console.log('no new daily bars yet');
       stillOpen.push(pos);
       continue;
     }
 
-    // Calculate RSI on all candles (need history for accurate RSI on post-entry bars)
-    const closes = candles.map(c => c.close);
-    const rsiArr = calcRSI(closes);
+    const closes  = candles.map(c => c.close);
+    const rsiArr  = calcRSI(closes);
+    const sma50Arr  = CONFIG.useDynamicTp ? calcSMA(closes, 50)  : null;
+    const sma200Arr = CONFIG.useDynamicTp ? calcSMA(closes, 200) : null;
 
-    // Find the first post-entry bar where RSI crosses 50
-    let exitCandle = null;
+    // tp1_date may exist on legacy data — locate its index in *this* run's
+    // candles array (yfinance can shift indices vs prior runs) for accurate
+    // bars-since-TP1 timeout calc.
+    const tp1IdxInCandles = pos.tp1_hit
+      ? candles.findIndex(c => c.date === pos.tp1_date)
+      : -1;
+
+    // Walk forward through post-scan-date candles. Multiple exit events can
+    // fire in a single run if the bot has been quiet (e.g. TP1 day 5, TP2 day
+    // 20). They are processed in chronological order.
+    let positionHandled = false; // set true once we either close fully or fail-out
+
     for (let i = 0; i < candles.length; i++) {
-      if (candles[i].date <= pos.openDate) continue;
+      const c = candles[i];
+      if (c.date <= scanFromDate) continue;
       const rsi = rsiArr[i];
       if (rsi === null) continue;
 
-      if (pos.side === 'long'  && rsi >= 50) { exitCandle = { ...candles[i], rsi }; break; }
-      if (pos.side === 'short' && rsi <= 50) { exitCandle = { ...candles[i], rsi }; break; }
+      // ── Branch A: TP1 not yet hit ─────────────────────────────────────────
+      if (!pos.tp1_hit) {
+        // Original stop check — full stop-out before TP1 = full loss on shares_total
+        const stopHit = pos.side === 'long'
+          ? c.low  <= pos.stopLoss
+          : c.high >= pos.stopLoss;
 
-      // Also check if stop loss was hit first (price breached SL level)
-      if (pos.side === 'long'  && candles[i].low  <= pos.stopLoss) {
-        exitCandle = { ...candles[i], rsi, hitSl: true }; break;
-      }
-      if (pos.side === 'short' && candles[i].high >= pos.stopLoss) {
-        exitCandle = { ...candles[i], rsi, hitSl: true }; break;
-      }
-    }
+        if (stopHit) {
+          const exitPrice   = pos.stopLoss;
+          const realizedPnl = parseFloat((
+            pos.side === 'long'
+              ? (exitPrice - pos.entry) * pos.shares_total
+              : (pos.entry - exitPrice) * pos.shares_total
+          ).toFixed(2));
 
-    if (!exitCandle) {
-      const currentRsi = rsiArr[rsiArr.length - 1];
-      console.log(`still open (RSI ${currentRsi?.toFixed(1) ?? '—'}, waiting for RSI 50)`);
-      stillOpen.push(pos);
-      continue;
-    }
+          if (executor) {
+            try {
+              await executor.closePosition(pos, `V2.1 stop-out before TP1 — stop $${pos.stopLoss} breached ${c.date}`);
+            } catch (err) {
+              console.log(`\n    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
+              writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
+              stillOpen.push(pos);
+              positionHandled = true;
+              break;
+            }
+          }
 
-    // Position closed
-    const exitPrice   = exitCandle.hitSl ? pos.stopLoss : exitCandle.close;
-    const exitLevel   = exitCandle.hitSl ? 'sl' : 'rsi50';
-    const realizedPnl = parseFloat((
-      pos.side === 'long'
-        ? (exitPrice - pos.entry) * pos.shares
-        : (pos.entry - exitPrice) * pos.shares
-    ).toFixed(2));
-    const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
-    const icon    = outcome === 'WIN' ? '✅' : '❌';
+          const acct = updateAccount(realizedPnl);
+          const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
+          const icon = realizedPnl >= 0 ? '✅' : '❌';
 
-    // ── Send exit order to Alpaca if running paper/live ──────────────────────
-    // V2.0+ PDT-immune design: the bot manages stops itself (no Alpaca stop
-    // order at entry). When we detect a stop was hit on a prior candle, we
-    // submit a market close NOW — which fires on the next trading day open,
-    // guaranteeing entry-day and exit-day are different. No same-day round-
-    // trip = no day trade = PDT immune.
-    //
-    // Trade-off: stop fills at next-day open price, not at the exact stop
-    // level. The exit_price logged below uses pos.stopLoss as the INTENDED
-    // stop; the actual fill from Alpaca will reconcile via syncPositions on
-    // the next run. Slippage is usually ±1-2% of the stop distance.
-    if (executor && (exitLevel === 'rsi50' || exitLevel === 'sl')) {
-      const reason = exitLevel === 'rsi50'
-        ? `RSI 50 reached (${exitCandle.rsi?.toFixed(1)})`
-        : `Stop loss breached at $${pos.stopLoss} on ${exitCandle.date} (bot-managed)`;
-      try {
-        await executor.closePosition(pos, reason);
-      } catch (err) {
-        console.log(`    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
-        writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
-        stillOpen.push(pos);
+          closedPositions.push({
+            ...pos,
+            // V2.1 fields
+            tp1_date: c.date,
+            tp1_price: exitPrice,
+            tp1_shares: pos.shares_total,
+            tp1_pnl: realizedPnl,
+            tp1_reason: 'stop',
+            tp1_rsi: rsi,
+            tp2_shares: 0,
+            tp2_pnl: 0,
+            tp2_reason: 'stopped_before_tp1',
+            total_pnl: realizedPnl,
+            exit_strategy: 'v2.1-stop',
+            // v2.0-compat fields the dashboard reads
+            exitLevel: 'sl',
+            exitPrice,
+            exitRsi: rsi,
+            closeDate: c.date,
+            realizedPnl,
+            outcome,
+            accountAfter: acct.accountUsd,
+          });
+
+          tg.alertExitFired({
+            symbol: pos.symbol, side: pos.side, exitPrice,
+            exitReason: 'sl', realizedPnl, accountAfter: acct.accountUsd,
+            mode: pos.mode || CONFIG.tradingMode,
+          }).catch(() => {});
+
+          console.log(`${icon} STOPPED OUT before TP1 — $${exitPrice.toFixed(2)} on ${c.date}`);
+          console.log(`    Realized P&L : ${realizedPnl >= 0 ? '+' : ''}$${realizedPnl}`);
+          console.log(`    Account now  : $${acct.accountUsd.toFixed(2)}`);
+          numClosed++;
+          positionHandled = true;
+          break;
+        }
+
+        // RSI 50 check — TP1 trigger
+        const rsi50Hit = pos.side === 'long' ? rsi >= 50 : rsi <= 50;
+        if (!rsi50Hit) continue;
+
+        // V2.0 fallback: full close at RSI 50 if dynamic TP disabled
+        if (!CONFIG.useDynamicTp) {
+          const exitPrice   = c.close;
+          const realizedPnl = parseFloat((
+            pos.side === 'long'
+              ? (exitPrice - pos.entry) * pos.shares_total
+              : (pos.entry - exitPrice) * pos.shares_total
+          ).toFixed(2));
+
+          if (executor) {
+            try {
+              await executor.closePosition(pos, `V2.0 fallback exit — RSI 50 reached (${rsi.toFixed(1)})`);
+            } catch (err) {
+              console.log(`\n    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
+              writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
+              stillOpen.push(pos);
+              positionHandled = true;
+              break;
+            }
+          }
+
+          const acct = updateAccount(realizedPnl);
+          const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
+          const icon = realizedPnl >= 0 ? '✅' : '❌';
+          closedPositions.push({
+            ...pos,
+            exitLevel: 'rsi50', exitPrice, exitRsi: rsi,
+            closeDate: c.date, realizedPnl, outcome,
+            accountAfter: acct.accountUsd,
+            exit_strategy: 'v2.0-rsi50-full',
+          });
+          tg.alertExitFired({
+            symbol: pos.symbol, side: pos.side, exitPrice,
+            exitReason: 'rsi50', realizedPnl, accountAfter: acct.accountUsd,
+            mode: pos.mode || CONFIG.tradingMode,
+          }).catch(() => {});
+          console.log(`${icon} ${outcome} — RSI 50 reached @ $${exitPrice.toFixed(2)} on ${c.date}`);
+          console.log(`    Realized P&L : ${realizedPnl >= 0 ? '+' : ''}$${realizedPnl}`);
+          numClosed++;
+          positionHandled = true;
+          break;
+        }
+
+        // V2.1 default — partial 50% close at RSI 50
+        const exitPrice  = c.close;
+        const tp1Shares  = Math.max(1, Math.floor(pos.shares_total * CONFIG.tp1Portion));
+        const tp1Pnl     = parseFloat((
+          pos.side === 'long'
+            ? (exitPrice - pos.entry) * tp1Shares
+            : (pos.entry - exitPrice) * tp1Shares
+        ).toFixed(2));
+
+        if (executor) {
+          try {
+            await executor.closePartial(pos, tp1Shares, `V2.1 TP1 — RSI ${rsi.toFixed(1)} reached, closing ${tp1Shares} sh (50%)`);
+          } catch (err) {
+            console.log(`\n    🚫 Alpaca TP1 partial close FAILED: ${err.message} — position stays at full size, will retry next run`);
+            writeLog({ kind: 'tp1_close_fail', symbol: pos.symbol, error: err.message });
+            stillOpen.push(pos);
+            positionHandled = true;
+            break;
+          }
+        }
+
+        // Mutate position in place — KEEPS it open for TP2 scan
+        pos.tp1_hit          = true;
+        pos.tp1_date         = c.date;
+        pos.tp1_price        = exitPrice;
+        pos.tp1_shares       = tp1Shares;
+        pos.tp1_pnl          = tp1Pnl;
+        pos.tp1_reason       = 'rsi50';
+        pos.tp1_rsi          = rsi;
+        pos.shares_remaining = pos.shares_total - tp1Shares;
+        pos.stopLoss         = Math.round(pos.entry); // break-even stop (whole dollar)
+        // Book TP1 partial P&L immediately so account compounds
+        const acctAfterTp1 = updateAccount(tp1Pnl);
+        appendTrade([
+          c.date,
+          (new Date()).toISOString().slice(11, 19),
+          'V2.1/TP1',
+          pos.symbol,
+          `${pos.side}-tp1`,
+          tp1Shares,
+          pos.entry.toFixed(2),
+          pos.stopLoss,
+          (tp1Shares * exitPrice).toFixed(2),
+          tp1Pnl,
+          ((tp1Pnl / acctAfterTp1.accountUsd) * 100).toFixed(2),
+          pos.signalDate,
+          `TP1-${pos.id}`,
+          pos.mode || CONFIG.tradingMode,
+          `${BOT_NAME} v2.1`,
+        ].join(','));
+
+        tg.alertExitFired({
+          symbol: pos.symbol, side: pos.side, exitPrice,
+          exitReason: 'tp1_rsi50', realizedPnl: tp1Pnl,
+          accountAfter: acctAfterTp1.accountUsd,
+          mode: pos.mode || CONFIG.tradingMode,
+        }).catch(() => {});
+
+        console.log(`✓ TP1 PARTIAL — RSI ${rsi.toFixed(1)} on ${c.date}: sold ${tp1Shares}/${pos.shares_total} sh @ $${exitPrice.toFixed(2)}`);
+        console.log(`    TP1 P&L     : +$${tp1Pnl}   Account: $${acctAfterTp1.accountUsd.toFixed(2)}`);
+        console.log(`    Runner      : ${pos.shares_remaining} sh, stop -> $${pos.stopLoss} (break-even)`);
+        // KEEP WALKING — TP2 may fire later in this same scan
         continue;
       }
+
+      // ── Branch B: TP1 already hit — scan for TP2 ─────────────────────────
+      const ma50  = sma50Arr  ? sma50Arr[i]  : null;
+      const ma200 = sma200Arr ? sma200Arr[i] : null;
+
+      let tp2Hit       = false;
+      let tp2Reason    = null;
+      let tp2ExitPrice = null;
+
+      if (pos.side === 'long') {
+        if (c.low <= pos.stopLoss) {
+          tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
+        } else if (ma50 !== null && c.low <= ma50 && ma50 <= c.high) {
+          tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
+        } else if (ma200 !== null && c.low <= ma200 && ma200 <= c.high) {
+          tp2Hit = true; tp2Reason = 'sma200_touch'; tp2ExitPrice = ma200;
+        }
+      } else { // short
+        if (c.high >= pos.stopLoss) {
+          tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
+        } else if (ma50 !== null && c.low <= ma50 && ma50 <= c.high) {
+          tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
+        } else if (ma200 !== null && c.low <= ma200 && ma200 <= c.high) {
+          tp2Hit = true; tp2Reason = 'sma200_touch'; tp2ExitPrice = ma200;
+        }
+      }
+
+      // Timeout check (only if no other exit fired)
+      if (!tp2Hit && tp1IdxInCandles >= 0) {
+        const barsSinceTp1 = i - tp1IdxInCandles;
+        if (barsSinceTp1 >= CONFIG.tp2TimeoutDays) {
+          tp2Hit       = true;
+          tp2Reason    = 'timeout';
+          tp2ExitPrice = c.close;
+        }
+      }
+
+      if (!tp2Hit) continue;
+
+      // TP2 fires — close the remaining 50%
+      const tp2Pnl = parseFloat((
+        pos.side === 'long'
+          ? (tp2ExitPrice - pos.entry) * pos.shares_remaining
+          : (pos.entry - tp2ExitPrice) * pos.shares_remaining
+      ).toFixed(2));
+
+      if (executor) {
+        try {
+          await executor.closePosition(pos, `V2.1 TP2 (${tp2Reason}) on ${c.date}`);
+        } catch (err) {
+          console.log(`\n    🚫 Alpaca TP2 close FAILED: ${err.message} — position stays open, will retry next run`);
+          writeLog({ kind: 'tp2_close_fail', symbol: pos.symbol, error: err.message });
+          stillOpen.push(pos);
+          positionHandled = true;
+          break;
+        }
+      }
+
+      const acctAfterTp2 = updateAccount(tp2Pnl);
+      const totalPnl     = parseFloat(((pos.tp1_pnl || 0) + tp2Pnl).toFixed(2));
+      const outcome      = totalPnl >= 0 ? 'WIN' : 'LOSS';
+      const icon         = totalPnl >= 0 ? '✅' : '❌';
+
+      closedPositions.push({
+        ...pos,
+        tp2_date: c.date,
+        tp2_price: tp2ExitPrice,
+        tp2_shares: pos.shares_remaining,
+        tp2_pnl: tp2Pnl,
+        tp2_reason: tp2Reason,
+        tp2_rsi: rsi,
+        total_pnl: totalPnl,
+        exit_strategy: 'v2.1-tp1+tp2',
+        // v2.0-compat fields the dashboard reads
+        exitLevel: tp2Reason,
+        exitPrice: tp2ExitPrice,
+        exitRsi: rsi,
+        closeDate: c.date,
+        realizedPnl: totalPnl,
+        outcome,
+        accountAfter: acctAfterTp2.accountUsd,
+      });
+
+      appendTrade([
+        c.date,
+        (new Date()).toISOString().slice(11, 19),
+        `V2.1/TP2-${tp2Reason}`,
+        pos.symbol,
+        `${pos.side}-tp2`,
+        pos.shares_remaining,
+        pos.entry.toFixed(2),
+        pos.stopLoss,
+        (pos.shares_remaining * tp2ExitPrice).toFixed(2),
+        tp2Pnl,
+        ((tp2Pnl / acctAfterTp2.accountUsd) * 100).toFixed(2),
+        pos.signalDate,
+        `TP2-${pos.id}`,
+        pos.mode || CONFIG.tradingMode,
+        `${BOT_NAME} v2.1`,
+      ].join(','));
+
+      tg.alertExitFired({
+        symbol: pos.symbol, side: pos.side, exitPrice: tp2ExitPrice,
+        exitReason: `tp2_${tp2Reason}`, realizedPnl: tp2Pnl,
+        accountAfter: acctAfterTp2.accountUsd,
+        mode: pos.mode || CONFIG.tradingMode,
+      }).catch(() => {});
+
+      const labels = {
+        sma50_touch:    '50d SMA touched',
+        sma200_touch:   '200d SMA touched',
+        breakeven_stop: 'break-even stop hit',
+        timeout:        `${CONFIG.tp2TimeoutDays}-day timeout`,
+      };
+      console.log(`${icon} TP2 FULL CLOSE — ${labels[tp2Reason] || tp2Reason} @ $${tp2ExitPrice.toFixed(2)} on ${c.date}`);
+      console.log(`    TP2 P&L     : ${tp2Pnl >= 0 ? '+' : ''}$${tp2Pnl}   Total trade P&L: ${totalPnl >= 0 ? '+' : ''}$${totalPnl}`);
+      console.log(`    Account now : $${acctAfterTp2.accountUsd.toFixed(2)}`);
+      numClosed++;
+      positionHandled = true;
+      break;
     }
 
-    // Update compounding account balance
-    const updatedAccount = updateAccount(realizedPnl);
-    const growthPct      = ((updatedAccount.accountUsd - updatedAccount.startingUsd) / updatedAccount.startingUsd * 100).toFixed(2);
-
-    console.log(`${icon} ${outcome} — ${exitLevel === 'rsi50' ? 'RSI reached 50' : 'SL hit'} @ $${exitPrice.toFixed(2)} on ${exitCandle.date}`);
-    console.log(`    Realized P&L : ${realizedPnl >= 0 ? '+' : ''}$${realizedPnl}`);
-    console.log(`    Account now  : $${updatedAccount.accountUsd.toFixed(2)}  (${growthPct >= 0 ? '+' : ''}${growthPct}% vs starting $${updatedAccount.startingUsd})`);
-
-    closedPositions.push({
-      ...pos,
-      exitLevel,
-      exitPrice,
-      exitRsi:         exitCandle.rsi,
-      closeDate:       exitCandle.date,
-      realizedPnl,
-      outcome,
-      accountAfter:    updatedAccount.accountUsd,
-    });
-
-    // Telegram exit alert (best-effort)
-    tg.alertExitFired({
-      symbol:       pos.symbol,
-      side:         pos.side,
-      exitPrice,
-      exitReason:   exitLevel,
-      realizedPnl,
-      accountAfter: updatedAccount.accountUsd,
-      mode:         pos.mode || CONFIG.tradingMode,
-    }).catch(() => {});
+    if (!positionHandled) {
+      // Still open — report current status
+      const lastRsi    = rsiArr[rsiArr.length - 1];
+      const lastClose  = closes[closes.length - 1];
+      if (pos.tp1_hit) {
+        const lastSma50  = sma50Arr  ? sma50Arr[sma50Arr.length - 1]   : null;
+        const lastSma200 = sma200Arr ? sma200Arr[sma200Arr.length - 1] : null;
+        const sma50Str   = lastSma50  != null ? `$${lastSma50.toFixed(2)}`  : '—';
+        const sma200Str  = lastSma200 != null ? `$${lastSma200.toFixed(2)}` : '—';
+        console.log(`runner open (RSI ${lastRsi?.toFixed(1) ?? '—'}, ${pos.shares_remaining} sh @ last $${lastClose?.toFixed(2)}, SMA50 ${sma50Str}, SMA200 ${sma200Str}, BE stop $${pos.stopLoss})`);
+      } else {
+        console.log(`still open (RSI ${lastRsi?.toFixed(1) ?? '—'}, waiting for RSI 50)`);
+      }
+      stillOpen.push(pos);
+    }
   }
 
-  const numClosed = openPositions.length - stillOpen.length;
   saveOpenPositions(stillOpen);
   saveClosedPositions(closedPositions);
   console.log(`  ── ${numClosed} closed this run, ${stillOpen.length} still open ──`);
@@ -1030,19 +1385,23 @@ async function run() {
     appendTrade(row);
 
     addOpenPosition({
-      id:         orderId,
+      id:               orderId,
       symbol,
-      side:       signal.signal,
-      entry:      signal.entry,
-      stopLoss:   signal.stopLoss,
-      shares:     sizing.shares,
-      totalUsd:   sizing.totalUsd,
-      riskUsd:    sizing.riskUsd,
-      signalDate: signal.signalDate,
-      openDate:   now.toISOString().slice(0, 10),
-      openTime:   now.toISOString().slice(11, 19),
-      mode:       modeLabel,
-      strategy:   `${BOT_NAME} ${BOT_VERSION}`,
+      side:             signal.signal,
+      entry:            signal.entry,
+      stopLoss:         signal.stopLoss,
+      shares:           sizing.shares,       // legacy field — kept for back-compat
+      shares_total:     sizing.shares,        // V2.1: immutable original size
+      shares_remaining: sizing.shares,        // V2.1: drops to 50% after TP1
+      orig_stop:        signal.stopLoss,      // V2.1: kept for record; stopLoss field moves to BE after TP1
+      tp1_hit:          false,                // V2.1: flips true at RSI 50
+      totalUsd:         sizing.totalUsd,
+      riskUsd:          sizing.riskUsd,
+      signalDate:       signal.signalDate,
+      openDate:         now.toISOString().slice(0, 10),
+      openTime:         now.toISOString().slice(11, 19),
+      mode:             modeLabel,
+      strategy:         `${BOT_NAME} ${BOT_VERSION}`,
     });
 
     // Fire Telegram alert (best-effort, never blocks trading)

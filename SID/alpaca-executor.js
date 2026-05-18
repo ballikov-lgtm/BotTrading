@@ -217,6 +217,37 @@ class AlpacaExecutor {
   }
 
   /**
+   * V2.1 — Closes a PARTIAL portion of a position via Alpaca's positions
+   * endpoint with explicit qty. Used for the 50% TP1 partial close at RSI 50.
+   *
+   * Implementation note: Alpaca's DELETE /v2/positions/{symbol}?qty=N submits
+   * a market order to close exactly N shares at next valid trading session.
+   * This preserves the PDT-immune property — partial fill executes on the
+   * next day, not same-day as the entry/scan.
+   *
+   * @param {Object} localPos      — entry from open-positions-sid.json
+   * @param {number} qty           — shares to close (must be < total held)
+   * @param {string} reason        — log-only
+   */
+  async closePartial(localPos, qty, reason) {
+    if (!this.clock?.is_open) {
+      throw new Error(`Market closed — refusing to submit partial close for ${localPos.symbol}`);
+    }
+    if (!(qty > 0)) throw new Error(`Invalid partial qty: ${qty}`);
+
+    const sharesTotal = localPos.shares_total ?? localPos.shares;
+    if (qty >= sharesTotal) {
+      throw new Error(`Partial qty ${qty} >= total ${sharesTotal} — use closePosition() for full closes`);
+    }
+
+    this.log.log(`    [Alpaca:${this.mode}] Closing PARTIAL ${qty}/${sharesTotal} ${localPos.symbol} (${reason})`);
+    const closeOrder = await this.client.closePosition(localPos.symbol, qty);
+    this.log.log(`    [Alpaca:${this.mode}] Partial close order ${closeOrder.id} submitted (status: ${closeOrder.status})`);
+
+    return { closeOrderId: closeOrder.id, qty };
+  }
+
+  /**
    * Closes an existing position via market order. Used when SID's RSI 50 exit
    * fires. Also cancels any outstanding stop order tied to this position.
    *
