@@ -40,9 +40,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
+          # cache: pip needs an explicit dependency manifest to key its cache.
+          # Without this, setup-python aborts with:
+          #   "No file matched to [**/requirements.txt or **/pyproject.toml]".
+          cache-dependency-path: SID/requirements.txt
 
-      - name: Install yfinance + pandas
-        run: pip install --quiet yfinance pandas
+      - name: Install Python deps
+        run: pip install --quiet -r SID/requirements.txt
 
       - name: Pull live SID trade logs from logs branch
         run: |

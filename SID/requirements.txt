@@ -1,0 +1,8 @@
+# Python dependencies for SID scripts run in GitHub Actions
+# (sid-dashboard.yml uses these to refresh scanner-sid.json from Yahoo Finance).
+#
+# Looser version pins on purpose — yfinance ships frequent fixes for upstream
+# API changes, so we want CI to pick up patches automatically. Pinning a major
+# version protects against breaking changes.
+yfinance>=0.2,<1
+pandas>=2,<3
