@@ -759,36 +759,47 @@ const html = `<!DOCTYPE html>
   }
 
   /* ── PERFORMANCE TOGGLE (BACKTEST / LIVE) ─────────────── */
+  /* Lives in its OWN row below the panel title so it always has room
+     on narrow mobile columns. Previously it sat inline in .panel-title
+     which clipped on the right edge — see lessons in SID/CLAUDE.md. */
+  .perf-toggle-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
   .perf-toggle-group {
     display: inline-flex;
-    margin-left: auto;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 999px;      /* pill shape */
     overflow: hidden;
     font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1.5px;
+    background: rgba(0, 0, 0, 0.4);
   }
   .perf-toggle-group button {
     background: transparent;
     color: var(--text-dim);
     border: none;
-    padding: 4px 10px;
+    padding: 6px 18px;
     cursor: pointer;
     font-family: inherit;
     font-size: inherit;
     letter-spacing: inherit;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    min-width: 80px;
+    text-align: center;
   }
   .perf-toggle-group button:hover {
     color: var(--text);
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(0, 255, 255, 0.06);
   }
   .perf-toggle-group button.active {
     background: var(--cyan);
     color: #000;
     font-weight: 700;
     text-shadow: none;
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.45);
   }
   .perf-toggle-group button + button {
     border-left: 1px solid var(--border);
@@ -798,20 +809,14 @@ const html = `<!DOCTYPE html>
     font-size: 10px;
     color: var(--text-dim);
     letter-spacing: 1px;
-    margin-top: 8px;
+    margin-top: 10px;
     text-align: center;
+    line-height: 1.5;
   }
 
   /* Swap visibility based on body[data-perf-view] */
   body[data-perf-view="backtest"] .perf-only-live    { display: none !important; }
   body[data-perf-view="live"]     .perf-only-backtest { display: none !important; }
-
-  /* Panel-title needs to be a flex container for the toggle group */
-  .panel-title-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
 
   /* ── DONUT ────────────────────────────────────────────── */
   .donut-wrap {
@@ -1252,8 +1257,8 @@ ${PAPER_TRADING_MODE ? `
       </div>
       <div>
         <div class="panel">
-          <div class="panel-title panel-title-row">
-            <span>PERFORMANCE</span>
+          <div class="panel-title">PERFORMANCE</div>
+          <div class="perf-toggle-wrap">
             <div class="perf-toggle-group" role="group" aria-label="Performance view">
               <button type="button" data-perf-target="backtest">BACKTEST</button>
               <button type="button" data-perf-target="live">LIVE</button>
