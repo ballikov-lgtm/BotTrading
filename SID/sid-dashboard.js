@@ -29,16 +29,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.0';
-// v2.0 launched 2026-05-16 — V2 method on 113-ticker universe (5y).
-// Position-sized at 1% risk (instructor S3_Ep4 default).
-// Backtest: $10K → $43,328 (+333%), CAGR 34.7%, max DD 7.95%, 64.9% WR.
-// Currently PAPER TRADING — switching to live once Alpaca account confirmed.
-const HEADLINE_BACKTEST_WR = 64.9;
-const HEADLINE_BACKTEST_PNL = 29755;  // 5y net P&L at fixed $200 risk
-const HEADLINE_BACKTEST_CAGR = 34.7;  // Compounded annual @ 1% risk position sizing
-const HEADLINE_MAX_DD = 7.95;
-const PAPER_TRADING_MODE = true;       // Banner flag — flip to false after Alpaca live
+const STRATEGY_VERSION = '2.1';
+// v2.1 launched 2026-05-18 — V2 entry rules + TP1/TP2 partial exits with 30d
+// runner timeout. Backtests on tier1 80-ticker AUTO universe (matches the
+// universe the live bot auto-fires) over 5 years to 2026-05-18:
+//   Fixed $200 risk: 302 trades, 69.5% WR, PF 2.55, +$28,046 total P&L
+//   1% compounding : 429 trades on 113-ticker full universe, 63.9% WR,
+//                    $10K → $46,109 (+361%), CAGR 35.76%
+// Currently PAPER TRADING — switch to live after live paper performance
+// crosses LIVE_TRADE_THRESHOLD (see below).
+
+// Headline backtest numbers for V2.1 (used as default until enough live data)
+const HEADLINE_BACKTEST_WR     = 69.5;   // V2.1 AUTO-tier 5y WR (matches what bot trades)
+const HEADLINE_BACKTEST_PNL    = 28046;  // 5y net P&L at fixed $200 risk, AUTO tier
+const HEADLINE_BACKTEST_TRADES = 302;    // AUTO-tier trade count for the same window
+const HEADLINE_BACKTEST_WINS   = 210;    // 69.5% of 302
+const HEADLINE_BACKTEST_LOSSES = 92;     // 302 - 210
+const HEADLINE_BACKTEST_CAGR   = 35.76;  // 1% compounding @ $10K → $46,109
+const HEADLINE_MAX_DD          = 7.95;   // From V2 baseline — V2.1 max DD not yet measured separately
+const PAPER_TRADING_MODE       = true;   // Banner flag — flip to false after Alpaca live
+
+// Performance pie/tiles default to BACKTEST data until live closed-trade count
+// reaches this threshold, then auto-switch to LIVE. User can still toggle
+// either direction at any time (persisted in localStorage).
+const LIVE_TRADE_THRESHOLD = 10;
 
 // ── Data loading (all optional) ──────────────────────────────────────────
 function loadJSON(relPath, fallback) {
@@ -97,7 +111,9 @@ const fmtUSD = n => (n >= 0 ? '+' : '-') + '$' + Math.abs(n).toFixed(2);
 const fmtPct = n => n.toFixed(1) + '%';
 
 // ── SVG donut chart ──────────────────────────────────────────────────────
-function donutChart(segments, size = 220) {
+// `centerLabel` is the big number printed in the middle (e.g. "69.5%").
+// `centerSubtitle` is the small caption below it ("BACKTEST WR" / "LIVE WR").
+function donutChart(segments, centerLabel, centerSubtitle = 'WIN RATE', size = 220) {
   const cx = size / 2;
   const cy = size / 2;
   const r = size * 0.4;
@@ -122,8 +138,8 @@ function donutChart(segments, size = 220) {
   return `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
     ${arcs}
     <circle cx="${cx}" cy="${cy}" r="${inner - 2}" fill="#000"/>
-    <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">${fmtPct(liveStats.winRate || HEADLINE_BACKTEST_WR)}</text>
-    <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">WIN RATE</text>
+    <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">${centerLabel}</text>
+    <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">${centerSubtitle}</text>
   </svg>`;
 }
 
@@ -407,23 +423,28 @@ function statTile(label, value, color, subtitle = '') {
   </div>`;
 }
 
-// ── Pie segments ────────────────────────────────────────────────────────
-let donutSegments = [];
-if (liveStats.total > 0) {
-  donutSegments = [
-    { value: liveStats.wins,   color: '#39ff14', label: 'WINS' },
-    { value: liveStats.losses, color: '#ff0044', label: 'LOSSES' },
-  ];
-} else if (backtest) {
-  const wTotal = backtest.results.reduce((s,r)=>s+r.all.wins,0);
-  const lTotal = backtest.results.reduce((s,r)=>s+(r.all.total - r.all.wins),0);
-  donutSegments = [
-    { value: wTotal, color: '#39ff14', label: 'BACKTEST WINS' },
-    { value: lTotal, color: '#ff0044', label: 'BACKTEST LOSSES' },
-  ];
-} else {
-  donutSegments = [{ value: 1, color: '#1a4040', label: 'NO DATA' }];
-}
+// ── Pie segments (two views: BACKTEST + LIVE) ───────────────────────────
+// Both segment sets are rendered into the HTML so a client-side toggle can
+// switch between them without a workflow rebuild. The active view is chosen
+// in JS based on (a) localStorage user preference, (b) LIVE_TRADE_THRESHOLD
+// auto-switch when liveStats.total >= 10.
+
+const backtestSegments = [
+  { value: HEADLINE_BACKTEST_WINS,   color: '#39ff14', label: 'BACKTEST WINS' },
+  { value: HEADLINE_BACKTEST_LOSSES, color: '#ff0044', label: 'BACKTEST LOSSES' },
+];
+
+const liveSegments = liveStats.total > 0
+  ? [
+      { value: liveStats.wins,   color: '#39ff14', label: 'LIVE WINS' },
+      { value: liveStats.losses, color: '#ff0044', label: 'LIVE LOSSES' },
+    ]
+  : [{ value: 1, color: '#1a4040', label: 'NO LIVE TRADES YET' }];
+
+// Default view: backtest until live closed-trade count >= LIVE_TRADE_THRESHOLD.
+// The client-side toggle JS reads this initial setting and may override based
+// on localStorage.
+const DEFAULT_PERF_VIEW = liveStats.total >= LIVE_TRADE_THRESHOLD ? 'live' : 'backtest';
 
 // ── Generated timestamp ─────────────────────────────────────────────────
 const generated = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
@@ -735,6 +756,61 @@ const html = `<!DOCTYPE html>
     letter-spacing: 2px;
     border: 1px dashed var(--border);
     border-radius: 4px;
+  }
+
+  /* ── PERFORMANCE TOGGLE (BACKTEST / LIVE) ─────────────── */
+  .perf-toggle-group {
+    display: inline-flex;
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+  }
+  .perf-toggle-group button {
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+    transition: background 0.15s, color 0.15s;
+  }
+  .perf-toggle-group button:hover {
+    color: var(--text);
+    background: rgba(0, 255, 255, 0.05);
+  }
+  .perf-toggle-group button.active {
+    background: var(--cyan);
+    color: #000;
+    font-weight: 700;
+    text-shadow: none;
+  }
+  .perf-toggle-group button + button {
+    border-left: 1px solid var(--border);
+  }
+  .perf-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* Swap visibility based on body[data-perf-view] */
+  body[data-perf-view="backtest"] .perf-only-live    { display: none !important; }
+  body[data-perf-view="live"]     .perf-only-backtest { display: none !important; }
+
+  /* Panel-title needs to be a flex container for the toggle group */
+  .panel-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   /* ── DONUT ────────────────────────────────────────────── */
@@ -1062,11 +1138,11 @@ const html = `<!DOCTYPE html>
   }
 </style>
 </head>
-<body>
+<body data-perf-view="${DEFAULT_PERF_VIEW}" data-live-trades="${liveStats.total}" data-live-threshold="${LIVE_TRADE_THRESHOLD}">
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2 METHOD LAUNCH 2026-05-16 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.1 DYNAMIC TP LAUNCH 2026-05-18 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1074,7 +1150,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2 METHOD · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · ${HEADLINE_BACKTEST_CAGR}% CAGR · ${HEADLINE_MAX_DD}% MAX DD</div>
+      <div class="brand-sub">V2.1 DYNAMIC TP · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · ${HEADLINE_BACKTEST_CAGR}% CAGR · ${HEADLINE_MAX_DD}% MAX DD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1097,18 +1173,53 @@ ${PAPER_TRADING_MODE ? `
     <span class="badge">BETA</span>
     <div class="msg">
       <strong>SID v${STRATEGY_VERSION} is under active development.</strong> Currently in paper-trading validation phase.
-      Features in progress: Telegram alerts · sentiment integration · Alpaca live trading · v2 scanner enhancements.
-      Backtest results (77% WR) are over a 12-month bullish window; live performance will differ.
+      Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
+      V2.1 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+      Performance pie defaults to BACKTEST data until ${LIVE_TRADE_THRESHOLD} live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
   </div>
 
-  <!-- STAT TILES -->
+  <!-- STAT TILES — WIN RATE, NET P&L, and TRADES show backtest/live based on toggle -->
   <div class="stat-grid">
     ${statTile('OPEN POSITIONS', String(open.length || 0), 'var(--cyan)', 'live')}
-    ${statTile('CLOSED TRADES', String(liveStats.total), 'var(--magenta)', 'lifetime')}
-    ${statTile('WIN RATE', liveStats.total ? fmtPct(liveStats.winRate) : fmtPct(HEADLINE_BACKTEST_WR), 'var(--green)', liveStats.total ? 'live' : 'backtest baseline')}
-    ${statTile('NET P&L', liveStats.total ? fmtUSD(liveStats.netPnl) : '+$' + HEADLINE_BACKTEST_PNL, 'var(--green)', liveStats.total ? 'realized' : 'backtest 12mo')}
+
+    <div class="stat-tile" style="--accent:var(--magenta)">
+      <div class="stat-label">TRADES</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">${HEADLINE_BACKTEST_TRADES}</span>
+        <span class="perf-only-live">${liveStats.total}</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y backtest</span>
+        <span class="perf-only-live">live closed</span>
+      </div>
+    </div>
+
+    <div class="stat-tile" style="--accent:var(--green)">
+      <div class="stat-label">WIN RATE</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">${fmtPct(HEADLINE_BACKTEST_WR)}</span>
+        <span class="perf-only-live">${liveStats.total ? fmtPct(liveStats.winRate) : '—'}</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y backtest</span>
+        <span class="perf-only-live">${liveStats.total ? 'live' : 'awaiting trades'}</span>
+      </div>
+    </div>
+
+    <div class="stat-tile" style="--accent:var(--green)">
+      <div class="stat-label">NET P&L</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">+$${HEADLINE_BACKTEST_PNL.toLocaleString()}</span>
+        <span class="perf-only-live">${liveStats.total ? fmtUSD(liveStats.netPnl) : '$0.00'}</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y @ $200 risk</span>
+        <span class="perf-only-live">${liveStats.total ? 'realized' : 'no trades yet'}</span>
+      </div>
+    </div>
+
     ${statTile('AUTO_TRADE', String(byTier.AUTO_TRADE?.length || 0), 'var(--green)', 'auto-executing')}
     ${statTile('MONITOR', String(byTier.MONITOR?.length || 0), 'var(--amber)', 'manual review')}
   </div>
@@ -1141,11 +1252,33 @@ ${PAPER_TRADING_MODE ? `
       </div>
       <div>
         <div class="panel">
-          <div class="panel-title">PERFORMANCE</div>
-          <div class="donut-wrap">
-            ${donutChart(donutSegments)}
-            <div class="donut-legend">
-              ${donutSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
+          <div class="panel-title panel-title-row">
+            <span>PERFORMANCE</span>
+            <div class="perf-toggle-group" role="group" aria-label="Performance view">
+              <button type="button" data-perf-target="backtest">BACKTEST</button>
+              <button type="button" data-perf-target="live">LIVE</button>
+            </div>
+          </div>
+          <div class="perf-only-backtest">
+            <div class="donut-wrap">
+              ${donutChart(backtestSegments, fmtPct(HEADLINE_BACKTEST_WR), 'BACKTEST WR')}
+              <div class="donut-legend">
+                ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
+              </div>
+            </div>
+            <div class="perf-note">V2.1 DYNAMIC TP · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+          </div>
+          <div class="perf-only-live">
+            <div class="donut-wrap">
+              ${donutChart(liveSegments, liveStats.total ? fmtPct(liveStats.winRate) : '—', 'LIVE WR')}
+              <div class="donut-legend">
+                ${liveSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
+              </div>
+            </div>
+            <div class="perf-note" id="perf-live-note">
+              ${liveStats.total >= LIVE_TRADE_THRESHOLD
+                ? `LIVE PAPER · ${liveStats.total} CLOSED TRADES`
+                : `LIVE PAPER · ${liveStats.total}/${LIVE_TRADE_THRESHOLD} TRADES BEFORE AUTO-SWITCH`}
             </div>
           </div>
         </div>
@@ -1192,7 +1325,7 @@ ${PAPER_TRADING_MODE ? `
 
   <!-- DISCLAIMER -->
   <div class="disclaimer">
-    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 77% win rate is over a 26-trade sample in a 12-month bullish window; live performance will differ. All trades carry risk of total loss. Position sizing is at 2% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
+    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The ${HEADLINE_BACKTEST_WR}% win rate is from a 5-year simulated backtest (${HEADLINE_BACKTEST_TRADES} trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
   <footer>SID v${STRATEGY_VERSION} // PRIVATE TERMINAL // GENERATED ${esc(generated)}</footer>
@@ -1232,6 +1365,38 @@ ${PAPER_TRADING_MODE ? `
       localStorage.setItem('sid-theme', isLight ? 'light' : 'dark');
     });
   }
+
+  // PERFORMANCE view toggle (BACKTEST <-> LIVE)
+  // Server picks the initial value via data-perf-view on <body>. User clicks
+  // override it and persist to localStorage. When live trades < threshold the
+  // server defaults to backtest; once it crosses the threshold the default
+  // flips to live. The user's manual choice always wins.
+  (function setupPerfToggle() {
+    const body         = document.body;
+    const liveTrades   = parseInt(body.dataset.liveTrades || '0', 10);
+    const threshold    = parseInt(body.dataset.liveThreshold || '10', 10);
+    const serverDefault = body.dataset.perfView || 'backtest';
+    const stored        = localStorage.getItem('sid-perf-view');
+    // Stored value wins; otherwise use the server's default (which already
+    // reflects the threshold). Validate it's one of the two known values.
+    const initial = (stored === 'backtest' || stored === 'live') ? stored : serverDefault;
+    setPerfView(initial);
+
+    document.querySelectorAll('[data-perf-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.perfTarget;
+        setPerfView(target);
+        localStorage.setItem('sid-perf-view', target);
+      });
+    });
+
+    function setPerfView(view) {
+      body.dataset.perfView = view;
+      document.querySelectorAll('[data-perf-target]').forEach(b => {
+        b.classList.toggle('active', b.dataset.perfTarget === view);
+      });
+    }
+  })();
 
   // Market hours clock (US Eastern, 09:30–16:00 ET, Mon–Fri)
   // Uses Intl.DateTimeFormat for reliable ET conversion regardless of viewer's TZ
