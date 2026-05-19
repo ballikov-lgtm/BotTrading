@@ -256,6 +256,118 @@ Don't confuse them when grepping git log.
 
 ---
 
+## How to push a Pine Script to TradingView
+
+This has been mistaken multiple times — write it down once and follow it.
+
+### Step 0: Decide which MCP to use
+
+| MCP | When | Tools | TV access |
+|---|---|---|---|
+| **`mcp__tradingview__*`** (TV Desktop) | TV Desktop is running with `--remote-debugging-port=9222` | `pine_*`, `chart_*`, `tv_health_check`, etc. | ✅ FULL access |
+| **`mcp__Claude_in_Chrome__*`** | TV Desktop NOT available | `navigate`, `computer`, etc. | ❌ **HARDCODED BLOCKED** on `tradingview.com` |
+
+**Always try the TV Desktop MCP first.** Even if the user says "TV Desktop doesn't work," run `mcp__tradingview__tv_health_check` once — it may already be connected (it was on 2026-05-19 when the user said it didn't work). Don't waste a turn on the Chrome MCP only to discover tradingview.com is blocked.
+
+### Step 1: Health check
+
+```
+mcp__tradingview__tv_health_check
+```
+
+A `success: true` with `cdp_connected: true` and a `target_url: https://www.tradingview.com/chart/...` means TV Desktop is reachable. Note the `chart_symbol` and `chart_resolution` so you know what ticker/timeframe the strategy will land on.
+
+### Step 2: List existing scripts (so you don't overwrite anything)
+
+```
+mcp__tradingview__pine_list_scripts
+```
+
+Look for existing SID strategies. New scripts get a new id; existing ones can be opened by name.
+
+### Step 3: Open the Pine Editor
+
+**Critical:** `pine_new` fails with `"Could not open Pine Editor"` if the editor panel isn't already open in TV. Force it open by calling `pine_open` on ANY existing script first:
+
+```
+mcp__tradingview__pine_open  { name: "SID Strategy v1.4" }   # or any other script
+```
+
+Then immediately create a new strategy slot:
+
+```
+mcp__tradingview__pine_new  { type: "strategy" }
+```
+
+If you're updating an existing script in place (rather than creating new), skip `pine_new` and just leave the existing script open from step 3.
+
+### Step 4: Inject the source
+
+```
+mcp__tradingview__pine_set_source  { source: "<full Pine code as a single string>" }
+```
+
+- 416-line / 24KB files fit fine as a single parameter
+- Pine v6 Unicode (• → ↑ ✓) compiles fine but I sanitize to ASCII (— → ---, → → ->) to dodge any encoding hiccups in the MCP transport. Comments only — never sanitize Pine syntax.
+- The MCP responds with `lines_set: <count>` — verify it matches your expected line count
+
+### Step 5: Compile + save (one tool does both)
+
+```
+mcp__tradingview__pine_smart_compile
+```
+
+Returns `has_errors: false` on success. **This action also clicks the Pine Save button**, so the script is persisted to the user's TV account in one call. If `has_errors: true`, fetch the error list:
+
+```
+mcp__tradingview__pine_get_errors
+```
+
+Fix the source, run `pine_set_source` again, then `pine_smart_compile` again.
+
+### Step 6: Verify
+
+```
+mcp__tradingview__pine_list_scripts          # new script appears with fresh id + modified timestamp
+mcp__tradingview__chart_get_state            # confirms strategy added to chart (in `studies` array)
+mcp__tradingview__capture_screenshot { region: "chart" }   # visual confirm
+```
+
+### Step 7: If the Pine Editor closes between calls
+
+After save/compile, the Pine Editor panel sometimes closes. Subsequent `pine_set_source` or `pine_new` calls then fail with `"Could not open Pine Editor"`. Re-open with `pine_open` on the same script name (which now exists since you just saved it), then continue.
+
+### Pitfall: TV auto-renders trade markers that look like spaghetti
+
+TradingView's `strategy()` declarations auto-draw orange "TP" / "Long" / "Short" labels at every historical trade-fill bar. On a 5-year backtest with 50+ trades these stack into chart chaos. **The Pine script cannot suppress these** — they're a chart property, not a script setting.
+
+To clean it up, instruct the user to:
+1. Right-click the strategy name in the chart's indicator list (top-left of chart)
+2. Settings → "Properties" tab
+3. Uncheck **"Signal Labels"** and **"Display Marks On Bars"**
+
+Document this in any Pine script with `strategy()` so you don't forget on the next push.
+
+### Pitfall: `bgcolor()` paints every matching bar across all history
+
+If the strategy fired 50 trades over 5 years, `bgcolor(triggerLong ? ... : na)` will paint 50 entry bands across the chart. Looks like a Christmas tree on long histories.
+
+**Solution:** add an `inVisualWindow = bar_index > last_bar_index - i_visualLookback` gate (default 60 bars ≈ 3 months). Apply to all `bgcolor()` and conditional `label.new()` calls. Strategy logic still runs over all history (backtest stays accurate) — only the visuals are limited to recent bars. Used in `sid-strategy-v2.1.pine` lines 64-65.
+
+### Pitfall: stop-order replacement after partial close
+
+When you do `strategy.close("Long", qty_percent=50)` for TP1 then want to move stop to break-even, **cancel the original stop first** before placing the new one with a different id:
+
+```pine
+strategy.close("Long", qty_percent=50, comment="TP1")
+strategy.cancel("Stop L")                                    // cancel original 100% stop
+strategy.exit("BE L", from_entry="Long", stop=entryPrice)    // new BE stop on remaining 50%
+```
+
+Without `strategy.cancel`, the original stop persists and may double-fire. See `sid-strategy-v2.1.pine` `tp1FireLong` / `tp1FireShort` blocks.
+
+---
+
 ## See also
 
 - Root project hub → [`../CLAUDE.md`](../CLAUDE.md)

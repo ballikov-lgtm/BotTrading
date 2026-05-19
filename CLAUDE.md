@@ -127,6 +127,19 @@ Different workflows write different commit messages — don't confuse them when 
 ### Dashboard is shared between strategies (additive-only rule)
 The dashboard HTML files serve both SID and Ironclad on different subpaths. **New features for one strategy must be additive-only — never modify another strategy's sections.**
 
+### TradingView automation — always try TV Desktop MCP first
+
+There are TWO MCPs that can touch TradingView, and they are not interchangeable:
+
+| MCP | Tools prefix | Mechanism | TV access |
+|---|---|---|---|
+| TV Desktop | `mcp__tradingview__*` | Chrome DevTools Protocol port (9222) into TV Desktop | ✅ Full Pine editor + chart control |
+| Chrome-in-Chrome | `mcp__Claude_in_Chrome__*` | Anthropic Chrome extension into the user's Chrome | ❌ **HARDCODED BLOCKS `tradingview.com`** at safety-policy level |
+
+Even if the user says "TV Desktop doesn't work," **always run `mcp__tradingview__tv_health_check` first** — it may already be connected. The Chrome MCP will refuse `tradingview.com` no matter what permission the user clicks. We wasted two turns on this on 2026-05-19 before checking.
+
+For the full Pine-push workflow (open editor, inject source, compile, save, verify, suppress TV's auto trade markers, recent-bars visual gate) see `SID/CLAUDE.md` § "How to push a Pine Script to TradingView".
+
 ### Sizing methodology — always note which
 Three methodologies coexist:
 - **Fixed dollar risk** ($200/trade) — raw backtest JSON/CSV

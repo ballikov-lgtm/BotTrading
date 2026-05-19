@@ -2,16 +2,21 @@
 // =============================================================================
 // SID Strategy v2.1 — Dynamic TP1+TP2 partial exits
 // =============================================================================
-// Mirrors the live SID bot's v2.1 logic exactly. Visual markup uses VERTICAL
-// COLOURED BANDS at each key event so you can see at a glance, while flicking
-// through tickers, which signals have fired:
+// Mirrors the live SID bot's v2.1 logic. Visuals limited to the LAST N BARS
+// (default 60) so the chart stays readable on long histories — strategy logic
+// still runs over all history so the backtest is accurate; only the bgcolor
+// bands + labels are gated to the recent window.
 //
-//   • CYAN band      — LONG armed (RSI(14) closed < 30)
-//   • MAGENTA band   — SHORT armed (RSI(14) closed > 70)
-//   • LIME band      — LONG entry triggered (all v2.1 filters passed)
-//   • RED band       — SHORT entry triggered
-//   • YELLOW band    — TP1 fired (RSI 50 hit; 50% closed)
-//   • ORANGE band    — TP2 fired (SMA50 / SMA200 / break-even / timeout)
+// Visual band colours:
+//   • CYAN     — LONG armed (RSI(14) closed < 30)
+//   • MAGENTA  — SHORT armed (RSI(14) closed > 70)
+//   • LIME     — LONG entry triggered (all v2.1 filters passed)
+//   • RED      — SHORT entry triggered
+//   • YELLOW   — TP1 fired (RSI 50; 50% closed)
+//   • GRAY     — TP2 break-even hit
+//   • ORANGE   — TP2 SMA50 touched
+//   • PURPLE   — TP2 SMA200 touched
+//   • MAROON   — TP2 30-day timeout
 //
 // CORE ENTRY RULES (matches bot-sid.js v2.1):
 //   1. Arm:      Daily RSI(14) closes < 30 (LONG) or > 70 (SHORT). Sticky for
@@ -28,19 +33,18 @@
 //                ceil(highest_high) for short.
 //
 // V2.1 EXIT RULES (NEW vs v1.7):
-//   • TP1: Daily RSI reaches 50 → close 50% of position at the close. Move
-//          stop on remaining 50% to entry price (break-even).
+//   • TP1: Daily RSI reaches 50 → close 50% of position. Move stop on
+//          remaining 50% to entry price (break-even).
 //   • TP2: Remaining 50% closes on whichever fires first:
 //          - Price touches 50-day SMA  (intra-bar low <= sma50 <= high)
 //          - Price touches 200-day SMA (intra-bar low <= sma200 <= high)
 //          - Break-even stop hit
-//          - 30 trading-day timeout since TP1 (force close at market close)
+//          - 30 trading-day timeout since TP1
 //
 // VERSION HISTORY:
-//   v1.0–v1.7 — see SID/pine/sid-strategy.pine (preserved as reference)
-//   v2.0      — V2 method launch: RSI 75->70, RSI 45/55 no-go zone, weekly
-//               RSI/MACD direction OR mode, 80-ticker AUTO universe.
-//   v2.1      — Dynamic TP1+TP2 partial exits. Same v2.0 entry stack.
+//   v1.0-v1.7 — see SID/pine/sid-strategy.pine (preserved as reference)
+//   v2.0      — V2 method: RSI 75->70, no-go zone, weekly RSI/MACD OR mode.
+//   v2.1      — Dynamic TP1+TP2 partial exits + recent-bars visual gate.
 // =============================================================================
 
 strategy(
@@ -59,64 +63,62 @@ strategy(
    )
 
 // ── INPUTS ──────────────────────────────────────────────────────────────────
-g_strat  = "Strategy parameters (V2.1 defaults match the live bot)"
-g_filter = "Optional confirmation filters"
+g_strat  = "Strategy parameters"
+g_filter = "Optional filters"
 g_tp     = "V2.1 Dynamic TP exits"
 g_risk   = "Risk and sizing"
 g_visual = "Visual markup"
 
 i_rsiOversold     = input.int(30,  "RSI(14) oversold (LONG arm)",   minval=10, maxval=40, group=g_strat)
-i_rsiOverbought   = input.int(70,  "RSI(14) overbought (SHORT arm)", minval=60, maxval=85, group=g_strat,
-   tooltip="V2 lowered this from 75 (v1.x) to 70. Catches the rollover earlier on a sustained run.")
-i_rsi3Period      = input.int(3,   "RSI(3) period (extreme confirmation)", minval=2, maxval=5, group=g_strat)
-i_rsiNoGoLong     = input.int(45,  "RSI no-go upper bound for LONGs",  minval=35, maxval=49, group=g_strat,
-   tooltip="V2 NEW: reject long entry if RSI drifted >= this (too close to RSI-50 TP).")
-i_rsiNoGoShort    = input.int(55,  "RSI no-go lower bound for SHORTs", minval=51, maxval=65, group=g_strat,
-   tooltip="V2 NEW: reject short entry if RSI drifted <= this.")
-i_rsiTp1Exit      = input.int(50,  "TP1 RSI exit level", minval=40, maxval=60, group=g_tp,
-   tooltip="Closes 50% of the position when daily RSI reaches this value.")
-i_tp1Portion      = input.int(50,  "TP1 portion (% of position closed)", minval=10, maxval=90, group=g_tp)
-i_tp2TimeoutBars  = input.int(30,  "TP2 timeout (trading days after TP1)", minval=5, maxval=120, group=g_tp,
-   tooltip="Maximum bars to hold the runner after TP1. Forces market close at this many bars past TP1.")
-i_armTimeout      = input.int(3,   "Arm timeout (bars to wait for trigger)", minval=1, maxval=10, group=g_strat)
+i_rsiOverbought   = input.int(70,  "RSI(14) overbought (SHORT arm)", minval=60, maxval=85, group=g_strat)
+i_rsi3Period      = input.int(3,   "RSI(3) period", minval=2, maxval=5, group=g_strat)
+i_rsiNoGoLong     = input.int(45,  "RSI no-go upper bound for LONGs",  minval=35, maxval=49, group=g_strat)
+i_rsiNoGoShort    = input.int(55,  "RSI no-go lower bound for SHORTs", minval=51, maxval=65, group=g_strat)
+i_rsiTp1Exit      = input.int(50,  "TP1 RSI exit level", minval=40, maxval=60, group=g_tp)
+i_tp1Portion      = input.int(50,  "TP1 portion (%)", minval=10, maxval=90, group=g_tp)
+i_tp2TimeoutBars  = input.int(30,  "TP2 timeout (bars after TP1)", minval=5, maxval=120, group=g_tp)
+i_armTimeout      = input.int(3,   "Arm timeout (bars)", minval=1, maxval=10, group=g_strat)
 
-i_useRsi3            = input.bool(true, "Require RSI(3) extreme confirmation",                group=g_filter)
-i_useWeeklyDirection = input.bool(true, "Require weekly RSI OR weekly MACD aligned",          group=g_filter,
-   tooltip="V2 NEW (OR mode): require weekly RSI rising OR weekly MACD rising for longs (mirror for shorts).")
-i_useEarnings        = input.bool(true, "14-day PRE-earnings blackout",                       group=g_filter)
-i_earningsDays       = input.int(14,    "Earnings blackout window (calendar days)", minval=1, maxval=30, group=g_filter)
+i_useRsi3            = input.bool(true, "Require RSI(3) extreme confirmation", group=g_filter)
+i_useWeeklyDirection = input.bool(true, "Require weekly RSI OR weekly MACD aligned", group=g_filter)
+i_useEarnings        = input.bool(true, "14-day PRE-earnings blackout", group=g_filter)
+i_earningsDays       = input.int(14, "Earnings blackout window (days)", minval=1, maxval=30, group=g_filter)
 
 i_accountSize     = input.float(10000.0, "Account size for sizing ($)", minval=1, group=g_risk)
-i_riskPct         = input.float(1.0,     "Risk per trade (% of account)", minval=0.1, maxval=5.0, step=0.1, group=g_risk)
+i_riskPct         = input.float(1.0, "Risk per trade (% of account)", minval=0.1, maxval=5.0, step=0.1, group=g_risk)
 
-i_showSignalBands = input.bool(true,  "Show vertical bands at arm + entry events", group=g_visual)
-i_showTpBands     = input.bool(true,  "Show vertical bands at TP1 + TP2 events",   group=g_visual)
-i_showSmaTargets  = input.bool(true,  "Plot 50-day + 200-day SMAs (TP2 targets)",  group=g_visual)
-i_showRsiPanel    = input.bool(false, "Plot daily RSI(14) on chart (yellow)",      group=g_visual)
-i_showInfoTable   = input.bool(true,  "Show info table",                            group=g_visual)
-i_showStopLine    = input.bool(true,  "Show stop-loss horizontal line while in trade", group=g_visual)
-i_showEntryLine   = input.bool(true,  "Show entry-price horizontal line while in trade", group=g_visual)
+// Recent-bars-only visual gate — strategy logic still runs over all history,
+// only the bgcolor() and label.new() calls are gated to the recent window.
+// Bumped from "show on all bars" because 5y of history paints ~50 bands
+// stacking into chart spaghetti.
+i_visualLookback  = input.int(60, "Visuals: only show signals in last N bars", minval=10, maxval=2000, group=g_visual,
+   tooltip="Bands/labels only paint on the last N bars. Strategy logic still runs over all history.")
+i_showSignalBands = input.bool(true, "Show vertical bands at arm + entry events", group=g_visual)
+i_showTpBands     = input.bool(true, "Show vertical bands at TP1 + TP2 events", group=g_visual)
+i_showLabels      = input.bool(false, "Show text labels at each event (off by default)", group=g_visual)
+i_showSmaTargets  = input.bool(true, "Plot 50-day + 200-day SMAs", group=g_visual)
+i_showInfoTable   = input.bool(true, "Show info table", group=g_visual)
+i_showStopLine    = input.bool(true, "Show stop/BE line while in trade", group=g_visual)
+i_showEntryLine   = input.bool(true, "Show entry-price line while in trade", group=g_visual)
 
-// ── INDICATORS (daily resolution — works on daily chart natively) ───────────
+inVisualWindow = bar_index > last_bar_index - i_visualLookback
+
+// ── INDICATORS ──────────────────────────────────────────────────────────────
 dailyRSI    = ta.rsi(close, 14)
 dailyRSI3   = ta.rsi(close, i_rsi3Period)
 [macdLine, macdSignal, macdHist] = ta.macd(close, 12, 26, 9)
 sma50  = ta.sma(close, 50)
 sma200 = ta.sma(close, 200)
 
-// Weekly RSI + MACD using request.security on the W timeframe.
-// lookahead=barmerge.lookahead_off prevents look-ahead bias.
 weeklyRSI14 = request.security(syminfo.tickerid, "W", ta.rsi(close, 14), lookahead=barmerge.lookahead_off)
 [weeklyMacdLine, _, _] = request.security(syminfo.tickerid, "W", ta.macd(close, 12, 26, 9), lookahead=barmerge.lookahead_off)
 weeklyRsiRising  = not na(weeklyRSI14) and not na(weeklyRSI14[1]) and weeklyRSI14  > weeklyRSI14[1]
 weeklyMacdRising = not na(weeklyMacdLine) and not na(weeklyMacdLine[1]) and weeklyMacdLine > weeklyMacdLine[1]
 
-// Earnings blackout (Pine native earnings.future_time)
 secondsToNextEarnings = na(earnings.future_time) ? na : (earnings.future_time - time) / 1000.0
 daysToNextEarnings    = na(secondsToNextEarnings) ? na : secondsToNextEarnings / 86400.0
 earningsBlackout      = i_useEarnings and not na(daysToNextEarnings) and daysToNextEarnings >= 0 and daysToNextEarnings <= i_earningsDays
 
-// Direction slopes
 rsiRising   = not na(dailyRSI[1])  and dailyRSI  > dailyRSI[1]
 rsiFalling  = not na(dailyRSI[1])  and dailyRSI  < dailyRSI[1]
 macdRising  = not na(macdLine[1])  and macdLine  > macdLine[1]
@@ -128,7 +130,6 @@ var int    armBarIdx    = na
 var float  armSignalLow = na
 var float  armSignalHigh = na
 var int    barsSinceArm = 0
-var float  armRsiAtSignal = na
 
 isOversold   = dailyRSI < i_rsiOversold
 isOverbought = dailyRSI > i_rsiOverbought
@@ -144,7 +145,6 @@ if shouldArmLong
     armSignalLow   := low
     armSignalHigh  := high
     barsSinceArm   := 0
-    armRsiAtSignal := dailyRSI
 
 if shouldArmShort
     armDir         := "SHORT"
@@ -152,23 +152,19 @@ if shouldArmShort
     armSignalLow   := low
     armSignalHigh  := high
     barsSinceArm   := 0
-    armRsiAtSignal := dailyRSI
 
-// Track window while armed (post-arm bars)
 if not na(armDir) and bar_index > armBarIdx
     barsSinceArm  := barsSinceArm + 1
     armSignalLow  := math.min(armSignalLow,  low)
     armSignalHigh := math.max(armSignalHigh, high)
 
-// Invalidate arm on timeout or earnings entering window
 if not na(armDir) and (barsSinceArm > i_armTimeout or earningsBlackout)
     armDir         := na
     armSignalLow   := na
     armSignalHigh  := na
     barsSinceArm   := 0
-    armRsiAtSignal := na
 
-// ── TRIGGER CONDITIONS (v2.1 stack) ─────────────────────────────────────────
+// ── TRIGGER CONDITIONS ──────────────────────────────────────────────────────
 nogoOkLong    = dailyRSI < i_rsiNoGoLong
 nogoOkShort   = dailyRSI > i_rsiNoGoShort
 weeklyOkLong  = not i_useWeeklyDirection or weeklyRsiRising or weeklyMacdRising
@@ -187,26 +183,20 @@ sharesLong       = not na(riskPerShareLong)  and riskPerShareLong  > 0 ? math.fl
 sharesShort      = not na(riskPerShareShort) and riskPerShareShort > 0 ? math.floor(riskAmount / riskPerShareShort) : 0
 
 // ── EXECUTION + TP1/TP2 STATE ───────────────────────────────────────────────
-var int    entryBarIdx     = na
-var float  entryPrice      = na
-var float  stopLevel       = na
-var bool   tp1Hit          = false
-var int    tp1BarIdx       = na
-var float  tp1Price        = na
-var bool   tp2Hit          = false
-var int    tp2BarIdx       = na
-var string tp2Reason       = na
-var string tradeDir        = na
+var float  entryPrice = na
+var float  stopLevel  = na
+var bool   tp1Hit     = false
+var int    tp1BarIdx  = na
+var float  tp1Price   = na
+var bool   tp2Hit     = false
 
 if triggerLong and sharesLong > 0 and strategy.position_size == 0
     strategy.entry("Long", strategy.long, qty=sharesLong)
     strategy.exit("Stop L", from_entry="Long", stop=stopLongLevel)
-    entryBarIdx := bar_index
     entryPrice  := close
     stopLevel   := stopLongLevel
     tp1Hit      := false
     tp2Hit      := false
-    tradeDir    := "LONG"
     armDir      := na
     armSignalLow  := na
     armSignalHigh := na
@@ -215,25 +205,23 @@ if triggerLong and sharesLong > 0 and strategy.position_size == 0
 if triggerShort and sharesShort > 0 and strategy.position_size == 0
     strategy.entry("Short", strategy.short, qty=sharesShort)
     strategy.exit("Stop S", from_entry="Short", stop=stopShortLevel)
-    entryBarIdx := bar_index
     entryPrice  := close
     stopLevel   := stopShortLevel
     tp1Hit      := false
     tp2Hit      := false
-    tradeDir    := "SHORT"
     armDir      := na
     armSignalLow  := na
     armSignalHigh := na
     barsSinceArm := 0
 
-// ── TP1: Daily RSI reaches 50 (close i_tp1Portion% and move stop to BE) ─────
 tp1FireLong  = strategy.position_size > 0 and not tp1Hit and dailyRSI >= i_rsiTp1Exit
 tp1FireShort = strategy.position_size < 0 and not tp1Hit and dailyRSI <= i_rsiTp1Exit
 
 if tp1FireLong
-    strategy.close("Long", qty_percent=i_tp1Portion, comment="TP1 RSI" + str.tostring(i_rsiTp1Exit))
+    strategy.close("Long", qty_percent=i_tp1Portion, comment="TP1")
     // Cancel original stop + place break-even stop on the remainder.
-    // Using a distinct id ("BE L") avoids any ambiguity with the original "Stop L".
+    // strategy.cancel() before strategy.exit() with new id avoids the
+    // original stop persisting on the remaining shares.
     strategy.cancel("Stop L")
     strategy.exit("BE L", from_entry="Long", stop=entryPrice)
     tp1Hit    := true
@@ -242,7 +230,7 @@ if tp1FireLong
     stopLevel := entryPrice
 
 if tp1FireShort
-    strategy.close("Short", qty_percent=i_tp1Portion, comment="TP1 RSI" + str.tostring(i_rsiTp1Exit))
+    strategy.close("Short", qty_percent=i_tp1Portion, comment="TP1")
     strategy.cancel("Stop S")
     strategy.exit("BE S", from_entry="Short", stop=entryPrice)
     tp1Hit    := true
@@ -250,115 +238,78 @@ if tp1FireShort
     tp1Price  := close
     stopLevel := entryPrice
 
-// ── TP2: SMA50 / SMA200 touch / break-even / 30-day timeout ─────────────────
-// Only checks AFTER TP1 has fired and we still hold the runner half.
 inLong   = strategy.position_size > 0
 inShort  = strategy.position_size < 0
 barsSinceTp1 = tp1Hit and not na(tp1BarIdx) ? bar_index - tp1BarIdx : na
 
-// Long runner — SMA touches mean price travelled DOWN to the SMA from above
 tp2LongSma50    = inLong and tp1Hit and not na(sma50)  and low <= sma50  and sma50  <= high
 tp2LongSma200   = inLong and tp1Hit and not na(sma200) and low <= sma200 and sma200 <= high
 tp2LongBe       = inLong and tp1Hit and not na(stopLevel) and low  <= stopLevel
 tp2LongTimeout  = inLong and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 >= i_tp2TimeoutBars
 
-// Short runner — SMA touches mean price travelled UP to the SMA from below
 tp2ShortSma50   = inShort and tp1Hit and not na(sma50)  and low <= sma50  and sma50  <= high
 tp2ShortSma200  = inShort and tp1Hit and not na(sma200) and low <= sma200 and sma200 <= high
 tp2ShortBe      = inShort and tp1Hit and not na(stopLevel) and high >= stopLevel
 tp2ShortTimeout = inShort and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 >= i_tp2TimeoutBars
 
-// First TP2 reason that fires wins (priority: BE > SMA50 > SMA200 > timeout)
 if tp2LongBe
     strategy.close("Long", comment="TP2 BE")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "BE"
 else if tp2LongSma50
     strategy.close("Long", comment="TP2 SMA50")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "SMA50"
 else if tp2LongSma200
     strategy.close("Long", comment="TP2 SMA200")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "SMA200"
 else if tp2LongTimeout
     strategy.close("Long", comment="TP2 Timeout")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "Timeout"
 
 if tp2ShortBe
     strategy.close("Short", comment="TP2 BE")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "BE"
 else if tp2ShortSma50
     strategy.close("Short", comment="TP2 SMA50")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "SMA50"
 else if tp2ShortSma200
     strategy.close("Short", comment="TP2 SMA200")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "SMA200"
 else if tp2ShortTimeout
     strategy.close("Short", comment="TP2 Timeout")
     tp2Hit := true
-    tp2BarIdx := bar_index
-    tp2Reason := "Timeout"
 
-// Reset trade state when fully out
-if strategy.position_size == 0 and (tp2Hit or barstate.isconfirmed)
-    if tp2Hit
-        // Reset for next trade
-        tradeDir := na
+// ── VISUAL MARKUP (gated by inVisualWindow) ─────────────────────────────────
+showSignalBands = i_showSignalBands and inVisualWindow
+showTpBands     = i_showTpBands     and inVisualWindow
+showLabels      = i_showLabels      and inVisualWindow
 
-// ── VISUAL MARKUP ───────────────────────────────────────────────────────────
-// Vertical coloured bands at every key event so they're visible while
-// flicking through tickers. bgcolor() is the cleanest way to draw a full-
-// height vertical mark in Pine — the band spans the full chart height
-// from top to bottom for the entire bar that the event fires on.
+bgcolor(showSignalBands and shouldArmLong  ? color.new(color.aqua,    70) : na, title="LONG armed")
+bgcolor(showSignalBands and shouldArmShort ? color.new(color.fuchsia, 70) : na, title="SHORT armed")
+bgcolor(showSignalBands and triggerLong  and sharesLong  > 0 and strategy.position_size[1] == 0 ? color.new(color.lime, 60) : na, title="LONG entry")
+bgcolor(showSignalBands and triggerShort and sharesShort > 0 and strategy.position_size[1] == 0 ? color.new(color.red,  60) : na, title="SHORT entry")
 
-bgcolor(i_showSignalBands and shouldArmLong  ? color.new(color.aqua,    65) : na, title="LONG armed")
-bgcolor(i_showSignalBands and shouldArmShort ? color.new(color.fuchsia, 65) : na, title="SHORT armed")
-bgcolor(i_showSignalBands and triggerLong  and sharesLong  > 0 and strategy.position_size[1] == 0 ? color.new(color.lime, 55) : na, title="LONG entry")
-bgcolor(i_showSignalBands and triggerShort and sharesShort > 0 and strategy.position_size[1] == 0 ? color.new(color.red,  55) : na, title="SHORT entry")
+bgcolor(showTpBands and (tp1FireLong or tp1FireShort) ? color.new(color.yellow, 65) : na, title="TP1 RSI50 (50% close)")
+bgcolor(showTpBands and (tp2LongBe      or tp2ShortBe)      ? color.new(color.gray,   60) : na, title="TP2 break-even")
+bgcolor(showTpBands and (tp2LongSma50   or tp2ShortSma50)   ? color.new(color.orange, 60) : na, title="TP2 SMA50 touch")
+bgcolor(showTpBands and (tp2LongSma200  or tp2ShortSma200)  ? color.new(color.purple, 60) : na, title="TP2 SMA200 touch")
+bgcolor(showTpBands and (tp2LongTimeout or tp2ShortTimeout) ? color.new(color.maroon, 60) : na, title="TP2 timeout")
 
-bgcolor(i_showTpBands and (tp1FireLong or tp1FireShort) ? color.new(color.yellow, 60) : na, title="TP1 RSI50 (50% close)")
-bgcolor(i_showTpBands and (tp2LongBe      or tp2ShortBe)      ? color.new(color.gray,   55) : na, title="TP2 break-even")
-bgcolor(i_showTpBands and (tp2LongSma50   or tp2ShortSma50)   ? color.new(color.orange, 55) : na, title="TP2 SMA50 touch")
-bgcolor(i_showTpBands and (tp2LongSma200  or tp2ShortSma200)  ? color.new(color.purple, 55) : na, title="TP2 SMA200 touch")
-bgcolor(i_showTpBands and (tp2LongTimeout or tp2ShortTimeout) ? color.new(color.maroon, 55) : na, title="TP2 timeout")
-
-// SMA50 and SMA200 plots — the v2.1 TP2 targets
 plot(i_showSmaTargets ? sma50  : na, title="SMA(50)",  color=color.new(color.orange, 20), linewidth=2)
 plot(i_showSmaTargets ? sma200 : na, title="SMA(200)", color=color.new(color.purple, 20), linewidth=2)
 
-// Optional RSI overlay (top of chart, scaled)
-hline(50, "RSI 50 (TP1)", color=color.new(color.yellow, 50), linestyle=hline.style_dashed)
-
-// Entry price + stop loss horizontal lines while in trade
 plot(i_showEntryLine and strategy.position_size != 0 ? strategy.position_avg_price : na, "Entry price", color=color.new(color.aqua, 30), style=plot.style_linebr, linewidth=2)
 plot(i_showStopLine  and strategy.position_size != 0 ? stopLevel                   : na, "Stop / BE",   color=color.new(tp1Hit ? color.gray : color.red, 30), style=plot.style_linebr, linewidth=2)
 
-// Labels at each major event so hover-text explains what happened
-if shouldArmLong and i_showSignalBands
+if shouldArmLong and showLabels
     label.new(bar_index, low, "LONG ARM\nRSI " + str.tostring(dailyRSI, "#.#"), color=color.new(color.aqua, 30), textcolor=color.black, style=label.style_label_up, size=size.tiny)
-if shouldArmShort and i_showSignalBands
+if shouldArmShort and showLabels
     label.new(bar_index, high, "SHORT ARM\nRSI " + str.tostring(dailyRSI, "#.#"), color=color.new(color.fuchsia, 30), textcolor=color.white, style=label.style_label_down, size=size.tiny)
-if triggerLong and sharesLong > 0 and strategy.position_size[1] == 0 and i_showSignalBands
-    label.new(bar_index, low, "LONG ENTRY\n$" + str.tostring(close, "#.##") + "\nSTOP $" + str.tostring(stopLongLevel, "#"), color=color.new(color.lime, 20), textcolor=color.black, style=label.style_label_up, size=size.small)
-if triggerShort and sharesShort > 0 and strategy.position_size[1] == 0 and i_showSignalBands
-    label.new(bar_index, high, "SHORT ENTRY\n$" + str.tostring(close, "#.##") + "\nSTOP $" + str.tostring(stopShortLevel, "#"), color=color.new(color.red, 20), textcolor=color.white, style=label.style_label_down, size=size.small)
-if (tp1FireLong or tp1FireShort) and i_showTpBands
-    label.new(bar_index, close, "TP1 (50%)\nRSI " + str.tostring(dailyRSI, "#.#"), color=color.new(color.yellow, 20), textcolor=color.black, style=label.style_label_left, size=size.small)
-if (tp2LongBe or tp2ShortBe or tp2LongSma50 or tp2ShortSma50 or tp2LongSma200 or tp2ShortSma200 or tp2LongTimeout or tp2ShortTimeout) and i_showTpBands
-    tp2LabelText = "TP2 — " + (tp2LongBe or tp2ShortBe ? "BE" : tp2LongSma50 or tp2ShortSma50 ? "SMA50" : tp2LongSma200 or tp2ShortSma200 ? "SMA200" : "Timeout")
-    label.new(bar_index, close, tp2LabelText, color=color.new(color.orange, 20), textcolor=color.black, style=label.style_label_left, size=size.small)
+if triggerLong and sharesLong > 0 and strategy.position_size[1] == 0 and showLabels
+    label.new(bar_index, low, "LONG ENTRY\n$" + str.tostring(close, "#.##"), color=color.new(color.lime, 20), textcolor=color.black, style=label.style_label_up, size=size.small)
+if triggerShort and sharesShort > 0 and strategy.position_size[1] == 0 and showLabels
+    label.new(bar_index, high, "SHORT ENTRY\n$" + str.tostring(close, "#.##"), color=color.new(color.red, 20), textcolor=color.white, style=label.style_label_down, size=size.small)
+if (tp1FireLong or tp1FireShort) and showLabels
+    label.new(bar_index, close, "TP1 50%", color=color.new(color.yellow, 20), textcolor=color.black, style=label.style_label_left, size=size.small)
 
 // ── INFO TABLE ──────────────────────────────────────────────────────────────
 if i_showInfoTable and barstate.islast
@@ -366,51 +317,36 @@ if i_showInfoTable and barstate.islast
 
     state = strategy.position_size != 0 ? (strategy.position_size > 0 ? "IN LONG" + (tp1Hit ? " (runner)" : "") : "IN SHORT" + (tp1Hit ? " (runner)" : "")) : (na(armDir) ? "IDLE" : "ARMED " + armDir + " (" + str.tostring(barsSinceArm) + "/" + str.tostring(i_armTimeout) + ")")
     stateCol = strategy.position_size != 0 ? color.lime : (na(armDir) ? color.gray : color.yellow)
-
     rsiCol  = dailyRSI < i_rsiOversold ? color.lime : dailyRSI > i_rsiOverbought ? color.red : (dailyRSI >= i_rsiNoGoLong and dailyRSI <= i_rsiNoGoShort ? color.gray : color.white)
     rsi3Col = na(dailyRSI3) ? color.gray : (dailyRSI3 < i_rsiOversold ? color.lime : dailyRSI3 > i_rsiOverbought ? color.red : color.white)
-    wkRsiCol  = weeklyRsiRising  ? color.lime : color.red
-    wkMacdCol = weeklyMacdRising ? color.lime : color.red
-    nogoLongTxt  = nogoOkLong  ? "✓"  : "✗"
-    nogoShortTxt = nogoOkShort ? "✓"  : "✗"
 
-    table.cell(info, 0, 0, "SID v2.1", text_color=color.aqua, bgcolor=color.new(color.black, 30), text_size=size.small)
+    table.cell(info, 0, 0, "SID v2.1", text_color=color.aqua, text_size=size.small)
     table.cell(info, 1, 0, syminfo.ticker, text_color=color.white, text_size=size.small)
-
     table.cell(info, 0, 1, "State",  text_color=color.white)
     table.cell(info, 1, 1, state, text_color=stateCol)
-
     table.cell(info, 0, 2, "RSI(14)", text_color=color.white)
     table.cell(info, 1, 2, str.tostring(dailyRSI, "#.#"), text_color=rsiCol)
-
     table.cell(info, 0, 3, "RSI(3)", text_color=color.white)
     table.cell(info, 1, 3, str.tostring(dailyRSI3, "#.#"), text_color=rsi3Col)
-
-    table.cell(info, 0, 4, "MACD line", text_color=color.white)
-    table.cell(info, 1, 4, (macdRising ? "↑" : macdFalling ? "↓" : "→") + " " + str.tostring(macdLine, "#.##"), text_color=macdRising ? color.lime : color.red)
-
+    table.cell(info, 0, 4, "MACD", text_color=color.white)
+    table.cell(info, 1, 4, (macdRising ? "up" : macdFalling ? "dn" : "-") + " " + str.tostring(macdLine, "#.##"), text_color=macdRising ? color.lime : color.red)
     table.cell(info, 0, 5, "Wk RSI dir", text_color=color.white)
-    table.cell(info, 1, 5, weeklyRsiRising ? "↑" : "↓", text_color=wkRsiCol)
-
+    table.cell(info, 1, 5, weeklyRsiRising ? "up" : "dn", text_color=weeklyRsiRising ? color.lime : color.red)
     table.cell(info, 0, 6, "Wk MACD dir", text_color=color.white)
-    table.cell(info, 1, 6, weeklyMacdRising ? "↑" : "↓", text_color=wkMacdCol)
-
+    table.cell(info, 1, 6, weeklyMacdRising ? "up" : "dn", text_color=weeklyMacdRising ? color.lime : color.red)
     table.cell(info, 0, 7, "Nogo long < 45", text_color=color.white)
-    table.cell(info, 1, 7, nogoLongTxt + " (" + str.tostring(dailyRSI, "#.#") + ")", text_color=nogoOkLong ? color.lime : color.red)
-
+    table.cell(info, 1, 7, (nogoOkLong ? "OK" : "X") + " (" + str.tostring(dailyRSI, "#.#") + ")", text_color=nogoOkLong ? color.lime : color.red)
     table.cell(info, 0, 8, "Nogo short > 55", text_color=color.white)
-    table.cell(info, 1, 8, nogoShortTxt + " (" + str.tostring(dailyRSI, "#.#") + ")", text_color=nogoOkShort ? color.lime : color.red)
-
+    table.cell(info, 1, 8, (nogoOkShort ? "OK" : "X") + " (" + str.tostring(dailyRSI, "#.#") + ")", text_color=nogoOkShort ? color.lime : color.red)
     table.cell(info, 0, 9, "Earnings", text_color=color.white)
     table.cell(info, 1, 9, earningsBlackout ? "BLACKOUT" : (na(daysToNextEarnings) ? "n/a" : str.tostring(daysToNextEarnings, "#") + "d away"), text_color=earningsBlackout ? color.red : color.lime)
-
     if strategy.position_size != 0
         table.cell(info, 0, 10, "Entry", text_color=color.white)
         table.cell(info, 1, 10, "$" + str.tostring(strategy.position_avg_price, "#.##"), text_color=color.aqua)
         table.cell(info, 0, 11, "Stop / BE", text_color=color.white)
         table.cell(info, 1, 11, "$" + str.tostring(stopLevel, "#.##"), text_color=tp1Hit ? color.gray : color.red)
-        table.cell(info, 0, 12, "TP1 (RSI50)", text_color=color.white)
-        table.cell(info, 1, 12, tp1Hit ? ("✓ @ $" + str.tostring(tp1Price, "#.##")) : "pending", text_color=tp1Hit ? color.lime : color.gray)
+        table.cell(info, 0, 12, "TP1", text_color=color.white)
+        table.cell(info, 1, 12, tp1Hit ? "HIT" : "pending", text_color=tp1Hit ? color.lime : color.gray)
         if tp1Hit
             table.cell(info, 0, 13, "Days since TP1", text_color=color.white)
             table.cell(info, 1, 13, str.tostring(barsSinceTp1) + "/" + str.tostring(i_tp2TimeoutBars), text_color=color.white)
