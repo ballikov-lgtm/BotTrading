@@ -166,3 +166,100 @@ The following live in the parent `Trading Setup/` folder and are shared with Iro
 | `railway-runner.js` | Ironclad bot runner on Railway — do not touch |
 | `.github/workflows/ironclad.yml` | Ironclad workflow — do not touch |
 | `closed-positions-ironclad.json` | Ironclad trade history — do not touch |
+
+---
+
+## Stumbling Blocks & Lessons Learned
+
+These are the gotchas paid for in past sessions. Read them before starting work on SID — they save you hours.
+
+### V2.1 backtest warmup bug (2026-05-18)
+The V2.1 backtest's `main()` initially downloaded only 5y of price data. Wilder RSI and weekly resamples weren't fully converged at the start of the trade window, silently rejecting **~75% of ARM/TRIGGER signals** in years 1-3.
+
+**Symptom:** 67 trades instead of the V2 baseline's 296. Caused a false panic that V2.1 was destroying trade flow.
+
+**Fix:** download `HISTORY_WARMUP_DAYS + BACKTEST_YEARS` of price data, run the full backtest, then filter trades to `entry_date >= trade_window_start` before aggregating. Matches `backtest-sid-v2.py`'s main() pattern.
+
+**Smoke test before trusting any new V2.x backtest:** compare per-ticker trade counts against the V2 baseline report. If V2.1 has < 90% of V2's trade count on tickers V2 trades, the warmup is probably wrong again.
+
+### Worktree vs parent SID folder (recurring)
+- `Trading Setup/SID/` = stale v1.0 snapshot
+- `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` = LIVE main branch
+
+If you create files at the parent path expecting them to deploy, they won't. The live bot reads from the worktree (which is on `main`). Use `git worktree list` from the repo root to verify.
+
+### Two sizing methodologies coexist — always note which
+- **Fixed dollar risk** (e.g. $200/trade) — what the raw backtest JSON/CSV reports use. Easier to compare across variants.
+- **1% compounding from $10K** — what the instructor V2 Excel uses, and what the live bot does. Compounding produces wildly different totals (e.g. V2.1 = $28k fixed-risk vs $36k compounding over 5y).
+
+Always cite the methodology when quoting a P&L number. Mismatched comparisons caused a panic on 2026-05-18 when V2.1 (fixed) looked behind V2 (compounding) until we ran the apples-to-apples Excel.
+
+### Three sizing-methodology recommendations
+- Reports for the instructor → use 1% compounding (matches their V2 Excel)
+- Variant comparisons in the strategy vault → use fixed $200 (consistency across the vault)
+- Account-growth projections / mobile dashboard → use compounding (it's what the live bot actually does)
+
+### V2 Excel methodology has NO position cap
+The live bot has a 10% position cap (`maxPositionPct: 0.10`). The instructor's V2 Excel does NOT use it — it sizes purely by 1% risk. When building reports designed to be compared to the V2 Excel, **omit the position cap** so the comparison is apples-to-apples. Document elsewhere (in this CLAUDE.md) what the live bot actually does.
+
+### Strategy Test Vault is the canonical home for variants
+`SID/strategy-test-vault/` is the catalogue. Every variant lives in its own folder with a README + JSON/CSV. When you test something new (e.g. a 14d TP2 timeout), add a vault folder for it even if it loses — the vault is also a record of what's been tried and rejected.
+
+Currently in the vault: `v2.0-baseline-rsi50-full/`, `v2.1-default-30d-timeout/` (LIVE), `v2.1-tp2-timeout-14d/`, `v2.1-hybrid-algorithmic-bullish/` (rejected), `v2.1-risk-doubled-2pct/` (scaling reference).
+
+### V2.1 schema migrations
+`open-positions-sid.json` entries gained `tp1_hit`, `tp1_date`, `tp1_price`, `tp1_shares`, `tp1_pnl`, `tp1_rsi`, `shares_total`, `shares_remaining`, `orig_stop` in v2.1. Legacy v2.0 positions auto-upgrade on first read (`tp1_hit = false`).
+
+`closed-positions-sid.json` entries gain `tp1_*`, `tp2_*`, `total_pnl`, `exit_strategy`. v2.0-compat fields (`exitLevel`, `exitPrice`, etc.) are still written for dashboard back-compat.
+
+### Rollback paths
+- `SID_DYNAMIC_TP=false` in `sid.yml` env → bot reverts to v2.0 single-exit at RSI 50 without a code change
+- Revert commit `4308a1b` → drops V2.1 entirely. Be aware that `4308a1b` includes the strategy vault and Excel builder — reverting it removes those too. Use `git revert --no-commit 4308a1b` and selectively `git restore --staged <files>` if you only want to roll back behaviour.
+
+### Dashboard performance toggle (2026-05-19)
+Donut + WIN RATE/TRADES/NET P&L tiles support BACKTEST ↔ LIVE toggle. Default = BACKTEST until `closed-positions-sid.json` reaches `LIVE_TRADE_THRESHOLD = 10` closed trades, then auto-flips to LIVE. User manual override persists in `localStorage` under `sid-perf-view`.
+
+**To change the threshold,** edit `LIVE_TRADE_THRESHOLD` in `sid-dashboard.js` line ~58. The JS reads it from `<body data-live-threshold="...">` so the value flows through naturally.
+
+### GitHub Actions Python cache bug — keep an eye out
+`actions/setup-python@v5` with `cache: pip` requires `requirements.txt` OR `pyproject.toml` to exist AND `cache-dependency-path: <path>` to point at it. Both are present today (`SID/requirements.txt` + the workflow yaml). If the dashboard ever fails with "No file in /home/runner/work/... matched to [**/requirements.txt or **/pyproject.toml]", check those didn't get deleted.
+
+### Push protocol (cross-cutting but bites SID often)
+The SID bot and dashboard auto-commit every run. Any time you have a local commit to push, it'll be rejected as non-fast-forward.
+
+Always: `git fetch origin main` → `git pull --rebase --autostash origin main` → `git push origin main`
+
+Never push to main without explicit user approval. The auto-mode classifier will block silent pushes.
+
+### Crypto-proxy stocks need BTC weekly trend (rule to encode in v2.2)
+Stocks like MSTR are BTC proxies — their daily RSI can hit oversold while BTC itself is at structural support. In those cases the trade works because of BTC's weekly trend, not the stock's. Captured during Project 5.0 (B9 MSTR Feb 2026, +37% post-entry). Should be encoded into the rating engine as a per-ticker "crypto-proxy" tag with BTC weekly trend check.
+
+### PLTR Nov 2025 — pre-cross alignment beats post-cross
+On B7 PLTR (short setup), waiting for the full MACD cross meant entering at $175 with stop $208 (risk/share = $33). Entering on the alignment-only bar a day earlier was $190 with same stop (risk/share = $17). Same trade direction, half the risk per share.
+
+**Rule to consider for v2.2 rating engine:** weight "MACD aligned in trade direction (no cross yet)" equal to or higher than "MACD has fully crossed". The Pine indicator port should visually flag both options so the trader can see both entries.
+
+### Earnings 14-day blackout is PRE-ONLY
+The bot only blocks trading in the 14 days BEFORE earnings. The day AFTER earnings is permitted and is often a high-confidence entry because the announcement risk has just been removed.
+
+### AUTO vs HUMAN tier
+80 tickers in `v2_auto_approved_80` auto-fire. 33 tickers in `v2_human_approval_33` (high-vol / crypto / new IPO) are LOG-ONLY in v2.1 — Telegram approval flow deferred to v2.2. If a HUMAN-tier signal fires, the bot logs it but does not enter.
+
+### Mystery commits explained
+- "Dashboard update YYYY-MM-DD HH:MM UTC" → from `research.yml` → Ironclad's dashboard at `docs/index.html`
+- "SID dashboard update YYYY-MM-DD HH:MM UTC" → from `sid-dashboard.yml` → SID dashboard at `docs/sid/index.html`
+- "SID run YYYY-MM-DD HH:MM UTC" → from `sid.yml` → SID bot state commit
+- "Bot run YYYY-MM-DD HH:MM UTC" → from `trade.yml` → VWAP scalper state commit
+- "Ironclad run YYYY-MM-DD HH:MM UTC" → from `ironclad.yml` → manual Ironclad backup runs
+
+Don't confuse them when grepping git log.
+
+---
+
+## See also
+
+- Root project hub → [`../CLAUDE.md`](../CLAUDE.md)
+- Ironclad context → [`../IRONCLAD-MEMORY.md`](../IRONCLAD-MEMORY.md)
+- VWAP context → [`../VWAP-MEMORY.md`](../VWAP-MEMORY.md)
+- Strategy vault → [`strategy-test-vault/README.md`](strategy-test-vault/README.md)
+- Excel report → [`strategy-test-vault/v2.1-default-30d-timeout/SID V2.1 Method Back Testing.xlsx`](strategy-test-vault/v2.1-default-30d-timeout/)
