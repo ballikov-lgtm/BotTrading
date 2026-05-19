@@ -343,10 +343,52 @@ TradingView's `strategy()` declarations auto-draw orange "TP" / "Long" / "Short"
 
 To clean it up, instruct the user to:
 1. Right-click the strategy name in the chart's indicator list (top-left of chart)
-2. Settings → "Properties" tab
-3. Uncheck **"Signal Labels"** and **"Display Marks On Bars"**
+2. Settings → **Style** tab (NOT Properties)
+3. Uncheck **"Signal Labels"**
 
-Document this in any Pine script with `strategy()` so you don't forget on the next push.
+(There is NO "Display Marks On Bars" checkbox — that was an earlier incorrect note. Unchecking "Signal Labels" alone suppresses the auto trade-marker stacking.)
+
+### Pitfall: `pine_new` DURING ERROR RECOVERY creates duplicate scripts
+
+When `pine_set_source` or `pine_smart_compile` fails with `"Could not open Pine Editor"`, the recovery instinct is to call `pine_new`. **This creates a NEW script slot** — it does NOT re-open the existing editor on the current script. After 4 retry-rounds you end up with `SID Strategy v2.1`, `SID Strategy v2.1 1`, `SID Strategy v2.1 2`, … `v2.1 4` cluttering the user's account, with TV potentially loading multiple of them onto the chart and producing duplicate-rendering chaos.
+
+**Correct error-recovery sequence:**
+1. Call `pine_open` on ANY existing script (e.g. "SID Strategy v1.4") to force the editor panel open
+2. Then call `pine_open` on the CURRENT script ("SID Strategy v2.1") to switch to it
+3. Then retry `pine_set_source`
+
+Never call `pine_new` to "recover" — it's only for genuinely creating a brand-new script.
+
+If duplicates are already in the account, the TV MCP has no `pine_delete` tool — the user must manually right-click each duplicate in their saved-scripts list and Delete. Apologise and explain rather than leaving them.
+
+### Pitfall: arm logic on a strategy that uses `RSI in extreme zone` re-fires every bar
+
+If your Pine arm condition is `isOverbought = dailyRSI > 70` and `shouldArmShort = na(armDir) and isOverbought and ...`, then once an arm expires (timeout), the very next bar re-arms if RSI is still above 70. On sustained trends this produces a vertical line every 5 bars — chart chaos.
+
+**Fix:** require CROSSING into the zone:
+```pine
+crossingOverbought = isOverbought and (na(dailyRSI[1]) or dailyRSI[1] <= i_rsiOverbought)
+shouldArmShort     = na(armDir) and crossingOverbought and ...
+```
+
+Plus add a re-arm cooldown variable to prevent tight re-arming after expired arms:
+```pine
+shortCooldownOk = na(lastShortArmBar) or bar_index - lastShortArmBar >= i_reArmCooldown
+shouldArmShort  = ... and shortCooldownOk
+```
+
+This matches the instructor's lesson convention of "one signal day per episode." See `sid-strategy-v2.1.pine` § ARM STATE MACHINE.
+
+### Pitfall: TP2 conditions re-fire every bar after threshold is met
+
+Same class of bug as the arm one. If `tp2LongTimeout = inLong and tp1Hit and barsSinceTp1 >= i_tp2TimeoutBars`, then after the threshold is met the condition stays true on subsequent bars (unless the position actually closed). Each bar draws another label, stacking "TP2 Timeout 30 / 31 / 32 / …" across the chart.
+
+**Fix:** gate every TP2 condition by `not tp2Hit` so each fires exactly once per trade:
+```pine
+tp2LongTimeout = inLong and tp1Hit and not tp2Hit and ... and barsSinceTp1 >= i_tp2TimeoutBars
+```
+
+Also explicitly reset `tp1BarIdx := na`, `tp1Price := na`, `tp2Hit := false` inside the new-entry block so stale state from previous trades cannot carry over.
 
 ### Pitfall: `bgcolor()` paints every matching bar across all history
 
