@@ -306,36 +306,47 @@
   }
 
   /* ── PERFORMANCE TOGGLE (BACKTEST / LIVE) ─────────────── */
+  /* Lives in its OWN row below the panel title so it always has room
+     on narrow mobile columns. Previously it sat inline in .panel-title
+     which clipped on the right edge — see lessons in SID/CLAUDE.md. */
+  .perf-toggle-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
   .perf-toggle-group {
     display: inline-flex;
-    margin-left: auto;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: 999px;      /* pill shape */
     overflow: hidden;
     font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 1.5px;
+    background: rgba(0, 0, 0, 0.4);
   }
   .perf-toggle-group button {
     background: transparent;
     color: var(--text-dim);
     border: none;
-    padding: 4px 10px;
+    padding: 6px 18px;
     cursor: pointer;
     font-family: inherit;
     font-size: inherit;
     letter-spacing: inherit;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    min-width: 80px;
+    text-align: center;
   }
   .perf-toggle-group button:hover {
     color: var(--text);
-    background: rgba(0, 255, 255, 0.05);
+    background: rgba(0, 255, 255, 0.06);
   }
   .perf-toggle-group button.active {
     background: var(--cyan);
     color: #000;
     font-weight: 700;
     text-shadow: none;
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.45);
   }
   .perf-toggle-group button + button {
     border-left: 1px solid var(--border);
@@ -345,20 +356,14 @@
     font-size: 10px;
     color: var(--text-dim);
     letter-spacing: 1px;
-    margin-top: 8px;
+    margin-top: 10px;
     text-align: center;
+    line-height: 1.5;
   }
 
   /* Swap visibility based on body[data-perf-view] */
   body[data-perf-view="backtest"] .perf-only-live    { display: none !important; }
   body[data-perf-view="live"]     .perf-only-backtest { display: none !important; }
-
-  /* Panel-title needs to be a flex container for the toggle group */
-  .panel-title-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
 
   /* ── DONUT ────────────────────────────────────────────── */
   .donut-wrap {
@@ -710,7 +715,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 02:17:44</span>
+        <span>SYS · 03:02:15</span>
       </div>
     </div>
   </header>
@@ -957,8 +962,8 @@
       </div>
       <div>
         <div class="panel">
-          <div class="panel-title panel-title-row">
-            <span>PERFORMANCE</span>
+          <div class="panel-title">PERFORMANCE</div>
+          <div class="perf-toggle-wrap">
             <div class="perf-toggle-group" role="group" aria-label="Performance view">
               <button type="button" data-perf-target="backtest">BACKTEST</button>
               <button type="button" data-perf-target="live">LIVE</button>
@@ -1636,7 +1641,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 69.5% win rate is from a 5-year simulated backtest (302 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-19 02:17:44 UTC</footer>
+  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-19 03:02:15 UTC</footer>
 
 </div>
 
