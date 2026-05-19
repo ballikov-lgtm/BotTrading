@@ -1,146 +1,198 @@
-# Trading Setup — Project Hub
+# Trading Setup — Project Hub (Strategy Index)
 
-This file is the **entry point for every Claude session in this repo**. It lists every strategy, where their deep context lives, and the hard rules that keep them from breaking each other.
+This file is a **searchable index of every strategy in this codebase**. Its job is to point Claude at the right deep-context memory file — NOT to contain strategy details itself.
 
-When the user mentions any strategy, dashboard, bot, or live trade — **check the relevant strategy memory file before answering**. Don't infer from filenames.
-
----
-
-## Strategies in this repo
-
-| Strategy | Bot file | Style | Assets | Exchange | Runs on | Deep context |
-|----------|----------|-------|--------|----------|---------|---------------|
-| **SID** | `SID/bot-sid.js` | Daily swing | US stocks & ETFs | Alpaca (paper) | GitHub Actions (`sid.yml`) | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
-| **Ironclad** | `bot-ironclad.js` | Multi-timeframe swing | Crypto + stocks + commodities | BitGet (3× futures) | Railway via `railway-runner.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
-| **VWAP Scalper** | `bot.js` | Intraday scalp | Crypto | BitGet | GitHub Actions (`trade.yml`) | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
-
-**Outside this repo (do not modify from this session):**
-- The user has referenced a separate crypto strategy that lives outside this codebase. If they mention it, ask where it lives — don't guess.
+**How a new session uses this file:**
+1. User asks about a strategy by name, type, condition, or status
+2. Look up matches in the [Strategy Index](#strategy-index) and the [Find by attribute](#find-by-attribute) lookup
+3. Open the matching memory file from the "Deep context" column
+4. **Read the deep context before answering** — don't infer from filenames or memory
 
 ---
 
-## Hard segregation rules — what each strategy owns
+## Strategy Index
 
-This is the boundary. **Anything in column 1 may NOT be touched when working on strategies in column 2.** Workflows enforce these (each `git add` is by exact filename), and the per-strategy CLAUDE/MEMORY files reiterate them.
+| Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
+|----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
+| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.1) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
+| **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **LIVE** | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
+| **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 
-| Strategy | Files it owns | Folders it owns |
-|----------|---------------|------------------|
-| SID | `SID/*` (all files in the SID folder), `docs/sid/index.html`, `.github/workflows/sid.yml`, `.github/workflows/sid-dashboard.yml`, `SID/requirements.txt` | `SID/`, `docs/sid/` |
-| Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `rules-ironclad.json`, `trades-ironclad.csv`, `closed-positions-ironclad.json`, `open-positions-ironclad.json`, `cooldown-ironclad.json`, `hype-state.json`, `ironclad-log.json`, `railway-runner.js`, `audit.js`, `monitor.js`, `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` | None — lives at repo root |
-| VWAP Scalper | `bot.js`, `rules.json`, `trades.csv`, `safety-check-log.json`, `.github/workflows/trade.yml` | None — lives at repo root |
-| Research (cross-cutting) | `research.js`, `research-signals.json`, `docs/index.html`, `closed-positions-vwap.json` | `docs/` (Ironclad dashboard) |
+**Status legend:**
+- **ALPHA** — in-development, not deployed
+- **LIVE PAPER** — deployed and running with paper-money / simulated execution
+- **LIVE** — running with real money
+- **ARCHIVED** — retired, kept for reference only
 
-**Shared infrastructure** (touchable from any session but always with care):
-- `package.json` / `node_modules/` — shared npm deps
-- `.env.example` — env-var documentation
-- `README.md`, `IRONCLAD-README.md`, `SID-README.md` — human-facing readmes (separate from agent memory files)
-- `.gitignore`, `.github/dependabot.yml` (if present)
+**Outside this repo (mentioned by user, not modifiable from this session):**
+- A separate crypto strategy that lives outside this codebase. If the user mentions it, **ask where it lives** — don't guess.
 
 ---
 
-## "User mentioned X — go check Y" routing guide
+## Find by attribute
 
-When the user says... | Read first... | Then check...
+When the user references a *type* of strategy rather than naming one, use this lookup to find the right memory file(s) to consult.
+
+| User says... | Matching strategies | Why |
 |---|---|---|
-"the bot" / "today's run" / "live trades" | Ask which one (SID/Ironclad/VWAP) | The relevant memory file
-"the dashboard" | The user probably means **SID's** if they just installed it | `SID/CLAUDE.md` § Dashboard
-"the toggle" / "performance pie" | `SID/CLAUDE.md` § Dashboard toggle | `SID/sid-dashboard.js`
-"the backtest" | Almost always SID | `SID/CLAUDE.md` § Backtests + `SID/strategy-test-vault/`
-"V2.1" / "TP1" / "TP2" | SID | `SID/CLAUDE.md` § V2.1 method
-"the instructor" | SID — instructor refers to the SID strategy author | `SID/CLAUDE.md`
-"the strategy test vault" | SID | `SID/strategy-test-vault/README.md`
-"Railway" / "Bitget" / "futures" | Ironclad | `IRONCLAD-MEMORY.md`
-"scalper" / "intraday crypto" | VWAP | `VWAP-MEMORY.md`
-"Ironclad's positions" | Ironclad | `IRONCLAD-MEMORY.md`
-"crypto positions" | Could be either VWAP or Ironclad — ask | Both memory files
-"research dashboard" / `docs/index.html` | Ironclad's research pipeline | `IRONCLAD-MEMORY.md` § Research workflow
+| "a swing strategy" / "swing rules" | SID, Ironclad | Both hold positions days-weeks |
+| "a scalp" / "intraday" / "scalping logic" | VWAP Scalper | 4h holds |
+| "how we handle pullbacks" | SID, Ironclad | SID = daily RSI<30 pullback; Ironclad = 15m pullback within daily trend |
+| "a crypto strategy" | VWAP, Ironclad | Both trade BitGet |
+| "a stocks strategy" / "US equities" | SID, Ironclad (stocks mode) | |
+| "a ranging-market strategy" | VWAP | Explicitly skips trending |
+| "a trending-market strategy" | Ironclad | Explicitly requires daily trend |
+| "daily timeframe rules" | SID, Ironclad | |
+| "intraday rules" | VWAP, Ironclad (15m entry side) | |
+| "live status" / "running now" | Ironclad (LIVE), SID + VWAP (LIVE PAPER) | |
+| "backtest vault" / "tested variants" | SID — see `SID/strategy-test-vault/` | Others use ad-hoc records |
+| "oversold entry" / "RSI extreme" | SID (RSI<30 daily) | Mean-reversion play |
+| "trend break entry" | Ironclad (15m break of swing low/high) | Trend-following |
+| "VWAP" / "RSI(3)" / "EMA(8)" | VWAP Scalper | Indicator stack lives there |
+| "TP1 / TP2 / dynamic exits" | SID v2.1 | See SID/CLAUDE.md § V2.1 method |
+| "Railway" / "Cloudflare" / "futures account" | Ironclad | Only one on Railway |
+| "Alpaca" / "PDT-immune" | SID | Only one on Alpaca |
+
+When two strategies match, **read both memory files** and report what each does separately.
 
 ---
 
-## Cross-cutting stumbling blocks (lessons paid for in past sessions)
+## Memory-update convention
 
-### Worktree vs parent SID folder
-There are TWO `SID/` folders on disk:
+**When you finish meaningful work on a strategy, append session lessons to that strategy's memory file BEFORE closing out.**
 
-| Path | What it is | Use? |
+Memory files are append-mostly journals. They should capture:
+- **What changed** — bot version bump, schema migration, config update, rule change
+- **What broke** — and how it was fixed (so a future session doesn't re-hit it)
+- **What was tested** — and the result, including negative results (so they aren't re-tried)
+- **What is non-negotiable** — rules the user has explicitly locked
+- **What is queued** — next steps, pending tasks, blocked items
+
+**Where to write:**
+- Strategy-specific lessons → that strategy's memory file
+- Cross-cutting lessons (push protocol, GitHub Actions, dashboard infra, shared state files) → this root file
+- Personal/cross-session facts (user preferences, environmental quirks) → `~/.claude/projects/.../memory/MEMORY.md`
+
+**Don't summarise from session-to-session. Write it down.** The whole point of this architecture is that institutional memory persists.
+
+---
+
+## Hard segregation rules (compact)
+
+Each strategy owns specific files. Full lists live in each strategy's memory file — this is the cross-strategy summary so any session knows the boundaries.
+
+| Strategy | Owned area |
+|----------|------------|
+| SID | `SID/` folder, `docs/sid/`, `.github/workflows/sid*.yml`, `SID/requirements.txt` |
+| Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `audit.js`, `monitor.js`, `railway-runner.js`, `rules-ironclad.json`, `*-ironclad.json/csv`, `hype-state.json`, `docs/index.html` (research dashboard), `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` |
+| VWAP Scalper | `bot.js`, `rules.json`, `trades.csv`, `safety-check-log.json`, `.github/workflows/trade.yml` |
+| Shared infra | `package.json`, `node_modules/`, `.env.example`, `README.md` (human-facing readmes are not memory files) |
+
+**When in doubt, check the owning strategy's memory file before touching a file.**
+
+---
+
+## Cross-cutting stumbling blocks (universal — apply to any strategy)
+
+These are the lessons that aren't strategy-specific. Read them once per session start.
+
+### Push protocol
+Bot/dashboard workflows auto-commit constantly. Local commits get rejected as non-fast-forward unless you rebase first.
+
+Always: `git fetch origin main` → `git pull --rebase --autostash origin main` → `git push origin main`
+
+**Never push to `main` without explicit user approval.** The auto-mode classifier blocks silent pushes.
+
+### Worktree vs parent folder (SID-specific but symptomatic of the pattern)
+The SID worktree lives at `.claude/worktrees/silly-robinson-abcf6c/SID/`. The parent `Trading Setup/SID/` folder is a stale snapshot. **Run `git worktree list` from the repo root to verify which paths are live.**
+
+### GitHub Actions Python cache trap
+`actions/setup-python@v5` with `cache: pip` requires:
+1. `requirements.txt` or `pyproject.toml` to exist in the repo
+2. `cache-dependency-path: <path>` pointing to it
+
+Without both, the action fails with `No file in /home/runner/work/... matched to [**/requirements.txt or **/pyproject.toml]`. Cost the SID dashboard 6 days of downtime on 2026-05-18.
+
+### Dashboard commit-message glossary
+Different workflows write different commit messages — don't confuse them when grepping git log:
+
+| Commit message prefix | Workflow | Updates |
 |---|---|---|
-| `Trading Setup/SID/` (parent) | Stale snapshot — older v1.0 code | ❌ Never edit |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | LIVE main branch — current v2.1 deployment | ✅ All SID work goes here |
+| `Dashboard update YYYY-MM-DD ...` | `research.yml` | `docs/index.html` (Ironclad dashboard) |
+| `SID dashboard update YYYY-MM-DD ...` | `sid-dashboard.yml` | `docs/sid/index.html` |
+| `SID run YYYY-MM-DD ...` | `sid.yml` | SID state files |
+| `Bot run YYYY-MM-DD ...` | `trade.yml` | VWAP state files |
+| `Ironclad run YYYY-MM-DD ...` | `ironclad.yml` | Ironclad state (manual runs only) |
 
-Run `git worktree list` from the repo root to verify the worktree path. The deployed bot version is in the worktree's `bot-sid.js`.
+### Dashboard is shared between strategies (additive-only rule)
+The dashboard HTML files serve both SID and Ironclad on different subpaths. **New features for one strategy must be additive-only — never modify another strategy's sections.**
 
-### Push protocol — always pull-rebase first
-Bot and dashboard workflows auto-commit constantly (`SID run …`, `Bot run …`, `Dashboard update …`). Any local commit will be rejected as non-fast-forward unless you rebase first.
-
-**Correct sequence:**
-1. `git fetch origin main`
-2. `git pull --rebase --autostash origin main`
-3. `git push origin main`
-
-Never push to `main` without explicit user approval. The auto-mode classifier will block silent pushes, and rightly so. Open a PR or ask for sign-off.
-
-### GitHub Actions `setup-python@v5` + `cache: pip` requires a manifest
-If you use `cache: pip`, you must also have `requirements.txt` or `pyproject.toml` in the repo AND set `cache-dependency-path: <path>`. Without the manifest, the action fails with `No file in /home/runner/work/... matched to [**/requirements.txt or **/pyproject.toml]`. Cost the SID dashboard 6 days of downtime before being caught (2026-05-18).
-
-### Dashboard commits come from TWO different workflows
-- `research.yml` → "Dashboard update YYYY-MM-DD HH:MM UTC" commits → updates `docs/index.html` (Ironclad's research dashboard)
-- `sid-dashboard.yml` → "SID dashboard update YYYY-MM-DD HH:MM UTC" commits → updates `docs/sid/index.html` (SID dashboard)
-
-If you see "Dashboard update" commits on `main` while the SID dashboard looks stale, it's the Ironclad one — check `sid-dashboard.yml` runs for the SID side.
-
-### Dashboard is shared between SID + Ironclad (additive-only rule)
-The dashboard HTML (`docs/index.html` for Ironclad, `docs/sid/index.html` for SID) serves both strategies. **New SID features must be additive-only — never modify existing Ironclad sections.** Each strategy publishes to its own subpath.
-
-### Three sizing methodologies coexist — always note which
-- **Fixed dollar risk** (e.g. $200/trade) — raw backtest JSON/CSV reports
-- **1% compounding** — instructor Excel reports, V2 baseline Excel
+### Sizing methodology — always note which
+Three methodologies coexist:
+- **Fixed dollar risk** ($200/trade) — raw backtest JSON/CSV
+- **1% compounding** — instructor reports, V2 Excel
 - **2% compounding** — older deprecated style
 
-Same trade set produces dramatically different totals across these. When citing a P&L number, always say which sizing it's under.
+Same trade set, wildly different totals. Always cite the methodology when quoting P&L.
 
 ---
 
-## GitHub Actions inventory
+## GitHub Actions inventory (which workflow does what)
 
-| Workflow | Cadence | Triggers | What it does | Belongs to |
-|----------|---------|----------|--------------|------------|
-| `sid.yml` | Daily 14:35 UTC weekdays | schedule + manual | Runs SID bot once per market open | SID |
-| `sid-dashboard.yml` | 3× daily (13:00 / 17:30 / 21:15 UTC weekdays) | schedule + manual | Scans + rebuilds SID dashboard | SID |
-| `research.yml` | 2× daily (08:00 / 17:00 UTC) | schedule + manual | Runs research, rebuilds Ironclad dashboard | Ironclad |
-| `ironclad.yml` | Manual only | workflow_dispatch | Backup Ironclad bot run (Railway is primary) | Ironclad |
-| `trade.yml` | Schedule (see file) | schedule + manual | Runs VWAP Scalper bot | VWAP |
+| Workflow | Cadence | Trigger | Strategy | What it does |
+|----------|---------|---------|----------|--------------|
+| `sid.yml` | Daily 14:35 UTC weekdays | schedule + manual | SID | Runs SID bot at market open |
+| `sid-dashboard.yml` | 3× daily | schedule + manual | SID | Scans + rebuilds `docs/sid/index.html` |
+| `research.yml` | 2× daily | schedule + manual | Ironclad | Runs research, rebuilds `docs/index.html` |
+| `ironclad.yml` | Manual only | workflow_dispatch | Ironclad | Backup bot run (Railway is primary; Cloudflare blocks GH IPs from BitGet) |
+| `trade.yml` | Multi-cadence | schedule + manual | VWAP | Runs VWAP scalper |
 
 ---
 
-## Live runtimes — where does each bot run?
+## Live runtimes
 
-- **SID** → GitHub Actions runner (Ubuntu 24.04). Daily, fully automated.
-- **Ironclad** → Railway (continuous). `railway-runner.js` polls every 15 minutes, runs `bot-ironclad.js`, pushes state to the `logs` git branch. Railway watches the `main` branch for code updates.
+- **SID** → GitHub Actions runner. Daily, fully automated. Alpaca paper.
+- **Ironclad** → **Railway** (continuous 15-min loop). `railway-runner.js` is the driver. State pushed to `logs` branch.
 - **VWAP Scalper** → GitHub Actions runner. Schedule per `trade.yml`.
 
-**Reminder:** Ironclad's GitHub Actions workflow (`ironclad.yml`) is set to `workflow_dispatch` only because Cloudflare blocked GitHub Actions IPs from reaching BitGet. Railway hosts the live bot. **Do not "fix" the manual-only flag.**
+---
+
+## Adding a new strategy
+
+1. **Pick a layout:**
+   - Subfolder (recommended) → `<NAME>/CLAUDE.md` inside it (Claude auto-loads)
+   - Root-level → `<NAME>-MEMORY.md` alongside this hub (referenced from index)
+2. **Add a row to the [Strategy Index](#strategy-index)** with all attributes filled in:
+   - Style (SWING / SCALP / POSITION / etc.)
+   - Timeframe
+   - Assets
+   - Best in market
+   - Exchange
+   - Status (ALPHA / LIVE PAPER / LIVE / ARCHIVED)
+   - Bot file
+   - Deep context link
+3. **Add entries to the [Find by attribute](#find-by-attribute) lookup** for any unique tags (new style, new asset, new market type)
+4. **Add a row to the segregation rules table** with the owned files
+5. **Add a row to the GitHub Actions inventory** if it ships a workflow
+6. **Seed the memory file** with: strategy summary, owned files, deployment, common gotchas, cross-references to root CLAUDE.md and any sibling memory files
+
+The root CLAUDE.md is **the single source of truth** for "what strategies exist and where their context lives." Keep it accurate; the deep details go in the per-strategy files.
 
 ---
 
 ## User-level memory (cross-session personal facts)
 
-The user keeps cross-session notes at:
 ```
 ~/.claude/projects/C--Users-balli-OneDrive-Documents-Claude-Base-Trading-Setup/memory/MEMORY.md
 ```
 
-That file has the user's preferences, environmental quirks (Hamachi/NordVPN conflict, SendGrid trial expiry), and high-level rules (SID instructor's strategy is non-negotiable, dashboard is shared between strategies). Check it for any "why does the user always say X?" question. **Don't duplicate its content here** — point to it.
+User preferences, environmental quirks (Hamachi/NordVPN conflict, SendGrid trial expiry), and high-level rules (SID instructor's strategy is non-negotiable, dashboard is shared between strategies). Check it for any "why does the user always say X?" question. **Don't duplicate its content here** — point to it.
 
 ---
 
-## Conventions for adding a new strategy
+## See also
 
-When a new strategy is added to this repo:
-1. Decide if it lives in its own subfolder (recommended) or at the repo root (legacy).
-2. If subfolder: create `<STRATEGY>/CLAUDE.md` — Claude Code auto-loads it.
-3. If root-level: create `<STRATEGY>-MEMORY.md` and **add a row to the strategy roster table above** so it's discoverable.
-4. Update the segregation rules table — what files does it own?
-5. Update the routing guide — what user phrases should route here?
-6. Add to the GitHub Actions inventory if it ships a workflow.
-
-The root file (this one) is the **single source of truth** for "what strategies exist and where their context lives." Keep it accurate.
+- SID deep context → [`SID/CLAUDE.md`](SID/CLAUDE.md)
+- Ironclad deep context → [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md)
+- VWAP Scalper deep context → [`VWAP-MEMORY.md`](VWAP-MEMORY.md)
+- Human-facing READMEs → `README.md`, `IRONCLAD-README.md`, `SID/SID-README.md`
