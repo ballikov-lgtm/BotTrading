@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.0 TERMINAL</title>
+<title>SID // v2.1 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -303,6 +303,61 @@
     letter-spacing: 2px;
     border: 1px dashed var(--border);
     border-radius: 4px;
+  }
+
+  /* ── PERFORMANCE TOGGLE (BACKTEST / LIVE) ─────────────── */
+  .perf-toggle-group {
+    display: inline-flex;
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+  }
+  .perf-toggle-group button {
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+    transition: background 0.15s, color 0.15s;
+  }
+  .perf-toggle-group button:hover {
+    color: var(--text);
+    background: rgba(0, 255, 255, 0.05);
+  }
+  .perf-toggle-group button.active {
+    background: var(--cyan);
+    color: #000;
+    font-weight: 700;
+    text-shadow: none;
+  }
+  .perf-toggle-group button + button {
+    border-left: 1px solid var(--border);
+  }
+  .perf-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  /* Swap visibility based on body[data-perf-view] */
+  body[data-perf-view="backtest"] .perf-only-live    { display: none !important; }
+  body[data-perf-view="live"]     .perf-only-backtest { display: none !important; }
+
+  /* Panel-title needs to be a flex container for the toggle group */
+  .panel-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   /* ── DONUT ────────────────────────────────────────────── */
@@ -630,19 +685,19 @@
   }
 </style>
 </head>
-<body>
+<body data-perf-view="backtest" data-live-trades="0" data-live-threshold="10">
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2 METHOD LAUNCH 2026-05-16 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.1 DYNAMIC TP LAUNCH 2026-05-18 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.0 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2 METHOD · 64.9% BACKTEST WR · 34.7% CAGR · 7.95% MAX DD</div>
+      <div class="brand">SID // v2.1 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.1 DYNAMIC TP · 69.5% BACKTEST WR · 35.76% CAGR · 7.95% MAX DD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -655,7 +710,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 23:31:55</span>
+        <span>SYS · 02:17:44</span>
       </div>
     </div>
   </header>
@@ -664,35 +719,58 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.0 is under active development.</strong> Currently in paper-trading validation phase.
-      Features in progress: Telegram alerts · sentiment integration · Alpaca live trading · v2 scanner enhancements.
-      Backtest results (77% WR) are over a 12-month bullish window; live performance will differ.
+      <strong>SID v2.1 is under active development.</strong> Currently in paper-trading validation phase.
+      Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
+      V2.1 backtest results (69.5% WR, 302 trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+      Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
   </div>
 
-  <!-- STAT TILES -->
+  <!-- STAT TILES — WIN RATE, NET P&L, and TRADES show backtest/live based on toggle -->
   <div class="stat-grid">
     <div class="stat-tile" style="--accent:var(--cyan)">
     <div class="stat-label">OPEN POSITIONS</div>
     <div class="stat-value">0</div>
     <div class="stat-sub">live</div>
   </div>
+
     <div class="stat-tile" style="--accent:var(--magenta)">
-    <div class="stat-label">CLOSED TRADES</div>
-    <div class="stat-value">0</div>
-    <div class="stat-sub">lifetime</div>
-  </div>
+      <div class="stat-label">TRADES</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">302</span>
+        <span class="perf-only-live">0</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y backtest</span>
+        <span class="perf-only-live">live closed</span>
+      </div>
+    </div>
+
     <div class="stat-tile" style="--accent:var(--green)">
-    <div class="stat-label">WIN RATE</div>
-    <div class="stat-value">64.9%</div>
-    <div class="stat-sub">backtest baseline</div>
-  </div>
+      <div class="stat-label">WIN RATE</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">69.5%</span>
+        <span class="perf-only-live">—</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y backtest</span>
+        <span class="perf-only-live">awaiting trades</span>
+      </div>
+    </div>
+
     <div class="stat-tile" style="--accent:var(--green)">
-    <div class="stat-label">NET P&L</div>
-    <div class="stat-value">+$29755</div>
-    <div class="stat-sub">backtest 12mo</div>
-  </div>
+      <div class="stat-label">NET P&L</div>
+      <div class="stat-value">
+        <span class="perf-only-backtest">+$28,046</span>
+        <span class="perf-only-live">$0.00</span>
+      </div>
+      <div class="stat-sub">
+        <span class="perf-only-backtest">5y @ $200 risk</span>
+        <span class="perf-only-live">no trades yet</span>
+      </div>
+    </div>
+
     <div class="stat-tile" style="--accent:var(--green)">
     <div class="stat-label">AUTO_TRADE</div>
     <div class="stat-value">80</div>
@@ -879,16 +957,41 @@
       </div>
       <div>
         <div class="panel">
-          <div class="panel-title">PERFORMANCE</div>
-          <div class="donut-wrap">
-            <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    <path d="M 110 22 A 88 88 0 1 1 22.641619079371253 99.39277213753155 L 55.83780382921017 103.42351872526956 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 22.641619079371253 99.39277213753155 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 55.83780382921017 103.42351872526956 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
+          <div class="panel-title panel-title-row">
+            <span>PERFORMANCE</span>
+            <div class="perf-toggle-group" role="group" aria-label="Performance view">
+              <button type="button" data-perf-target="backtest">BACKTEST</button>
+              <button type="button" data-perf-target="live">LIVE</button>
+            </div>
+          </div>
+          <div class="perf-only-backtest">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    <path d="M 110 22 A 88 88 0 1 1 27.13448916066399 139.61937057629495 L 58.62338327961167 128.36400975730288 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 27.13448916066399 139.61937057629495 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 58.62338327961167 128.36400975730288 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
     <circle cx="110" cy="110" r="52.56" fill="#000"/>
-    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">64.9%</text>
-    <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">WIN RATE</text>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">69.5%</text>
+    <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">BACKTEST WR</text>
   </svg>
-            <div class="donut-legend">
-              <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">20</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">6</span></div>
+              <div class="donut-legend">
+                <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">210</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">92</span></div>
+              </div>
+            </div>
+            <div class="perf-note">V2.1 DYNAMIC TP · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+          </div>
+          <div class="perf-only-live">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    <path d="M 110 22 A 88 88 0 1 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#1a4040" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #1a4040)"/>
+    <circle cx="110" cy="110" r="52.56" fill="#000"/>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">—</text>
+    <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">LIVE WR</text>
+  </svg>
+              <div class="donut-legend">
+                <div class="legend-item"><span><span class="legend-swatch" style="background:#1a4040;color:#1a4040"></span>NO LIVE TRADES YET</span><span style="color:#1a4040">1</span></div>
+              </div>
+            </div>
+            <div class="perf-note" id="perf-live-note">
+              LIVE PAPER · 0/10 TRADES BEFORE AUTO-SWITCH
             </div>
           </div>
         </div>
@@ -1530,10 +1633,10 @@
 
   <!-- DISCLAIMER -->
   <div class="disclaimer">
-    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 77% win rate is over a 26-trade sample in a 12-month bullish window; live performance will differ. All trades carry risk of total loss. Position sizing is at 2% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
+    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 69.5% win rate is from a 5-year simulated backtest (302 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.0 // PRIVATE TERMINAL // GENERATED 2026-05-18 23:31:55 UTC</footer>
+  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-19 02:17:44 UTC</footer>
 
 </div>
 
@@ -1570,6 +1673,38 @@
       localStorage.setItem('sid-theme', isLight ? 'light' : 'dark');
     });
   }
+
+  // PERFORMANCE view toggle (BACKTEST <-> LIVE)
+  // Server picks the initial value via data-perf-view on <body>. User clicks
+  // override it and persist to localStorage. When live trades < threshold the
+  // server defaults to backtest; once it crosses the threshold the default
+  // flips to live. The user's manual choice always wins.
+  (function setupPerfToggle() {
+    const body         = document.body;
+    const liveTrades   = parseInt(body.dataset.liveTrades || '0', 10);
+    const threshold    = parseInt(body.dataset.liveThreshold || '10', 10);
+    const serverDefault = body.dataset.perfView || 'backtest';
+    const stored        = localStorage.getItem('sid-perf-view');
+    // Stored value wins; otherwise use the server's default (which already
+    // reflects the threshold). Validate it's one of the two known values.
+    const initial = (stored === 'backtest' || stored === 'live') ? stored : serverDefault;
+    setPerfView(initial);
+
+    document.querySelectorAll('[data-perf-target]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.perfTarget;
+        setPerfView(target);
+        localStorage.setItem('sid-perf-view', target);
+      });
+    });
+
+    function setPerfView(view) {
+      body.dataset.perfView = view;
+      document.querySelectorAll('[data-perf-target]').forEach(b => {
+        b.classList.toggle('active', b.dataset.perfTarget === view);
+      });
+    }
+  })();
 
   // Market hours clock (US Eastern, 09:30–16:00 ET, Mon–Fri)
   // Uses Intl.DateTimeFormat for reliable ET conversion regardless of viewer's TZ
