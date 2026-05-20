@@ -568,5 +568,24 @@
     "closeDate": "2026-05-17",
     "closeTime": "23:30:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1779227838659",
+    "symbol": "JUPUSDT",
+    "side": "short",
+    "entry": 0.2,
+    "stopLoss": 0.2006,
+    "takeProfit": 0.1888,
+    "qty": 25.523226,
+    "totalUsd": 5,
+    "openDate": "2026-05-19",
+    "openTime": "21:57:18",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.045,
+    "exitLevel": "sl",
+    "exitPrice": 0.2006,
+    "closeDate": "2026-05-20",
+    "closeTime": "07:00:00",
+    "outcome": "LOSS"
   }
 ]
