@@ -29,6 +29,25 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 
 ---
 
+## Specialist agents (delegate to these)
+
+The repo ships with four Claude Code subagents at [`.claude/agents/`](.claude/agents/). The main session (the orchestrator) should **delegate domain work to these** rather than handling everything itself — each agent runs in isolated context and won't pollute the main conversation.
+
+| Agent | Use for | Mode |
+|---|---|---|
+| `sid-specialist` | All SID work — RSI mean-reversion on US stocks/ETFs via Alpaca | Read + write |
+| `ironclad-specialist` | All Ironclad work — multi-timeframe trend bot on BitGet futures (PAUSED) | Read + write |
+| `vwap-specialist` | All VWAP work — 4h crypto scalp on BitGet, ranging-market only | Read + write |
+| `strategy-validator` | Cross-strategy audits, segregation checks, correctness drift | **Read-only** |
+
+**Delegation rule:** When user asks about a strategy by name, route to that strategy's specialist. When they ask for an audit / "is this still correct" / cross-strategy check → `strategy-validator`. Each specialist reads its own domain memory file before acting and refuses to touch other strategies' files.
+
+The roster + how-they-work is documented in [`.claude/agents/README.md`](.claude/agents/README.md). Run `/agents` in any Claude Code session to see them registered.
+
+**Deferred to later phases:** `research-agent`, `design-agent`, `sipps-specialist`, `life-admin` — see `~/.claude/plans/hi-there-so-i-m-linked-pancake.md`.
+
+---
+
 ## Find by attribute
 
 When the user references a *type* of strategy rather than naming one, use this lookup to find the right memory file(s) to consult.
