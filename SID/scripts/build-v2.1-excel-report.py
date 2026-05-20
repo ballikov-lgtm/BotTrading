@@ -369,6 +369,80 @@ def sheet_all_trades(wb, sized_df):
         ws.cell(row=i, column=24).number_format = '+#,##0.00;-#,##0.00;0.00'
         ws.cell(row=i, column=26).number_format = '#,##0.00'
 
+    # ─── FILTER-AWARE SUBTOTAL ROW + AUTOFILTER ────────────────────────────
+    # Matches the V2 Excel report behaviour: enable a filter on the header
+    # row, and add a TOTAL row at the bottom that uses SUBTOTAL() formulas so
+    # the sums and counts update when the user filters by Tier / Ticker / etc.
+    # This was a known regression vs V2 (2026-05-21).
+    data_start = 5                     # first trade row (after title + subtitle + blank + header)
+    data_end   = data_start + len(sized_df) - 1
+    total_row  = data_end + 1
+
+    # Per-column SUBTOTAL sums (function code 9 = SUM, respects filter hides)
+    # Letter mapping for reference:
+    #   A=Trade# B=Ticker C=Side D=EntryDate E=Entry$ F=Stop$ G=Shares
+    #   H=Position$ I=AcctBefore J=Risk% K=Risk$ L=Risk/Share M=Tier
+    #   N=TP1Date O=TP1$ P=TP1Reason Q=TP1Shares R=TP1PnL
+    #   S=TP2Date T=TP2$ U=TP2Reason V=TP2Shares W=TP2PnL
+    #   X=TotalPnL Y=Outcome Z=AcctAfter
+    ws.cell(row=total_row, column=1).value = 'TOTAL (filtered)'
+    sum_cols = {
+        7:  ('#,##0',                            f'=SUBTOTAL(9,G{data_start}:G{data_end})'),   # Shares
+        8:  ('#,##0.00',                         f'=SUBTOTAL(9,H{data_start}:H{data_end})'),   # Position $
+        11: ('#,##0.00',                         f'=SUBTOTAL(9,K{data_start}:K{data_end})'),   # Risk $
+        17: ('#,##0',                            f'=SUBTOTAL(9,Q{data_start}:Q{data_end})'),   # TP1 Shares
+        18: ('+#,##0.00;-#,##0.00;0.00',         f'=SUBTOTAL(9,R{data_start}:R{data_end})'),   # TP1 P&L
+        22: ('#,##0',                            f'=SUBTOTAL(9,V{data_start}:V{data_end})'),   # TP2 Shares
+        23: ('+#,##0.00;-#,##0.00;0.00',         f'=SUBTOTAL(9,W{data_start}:W{data_end})'),   # TP2 P&L
+        24: ('+#,##0.00;-#,##0.00;0.00',         f'=SUBTOTAL(9,X{data_start}:X{data_end})'),   # Total P&L
+    }
+    for col, (fmt, formula) in sum_cols.items():
+        c = ws.cell(row=total_row, column=col)
+        c.value = formula
+        c.number_format = fmt
+    for c in range(1, 27):
+        cell = ws.cell(row=total_row, column=c)
+        cell.font = Font(bold=True)
+        cell.fill = SUBTOTAL_FILL
+
+    # Derived stats row (filter-aware Win Rate + Avg P&L)
+    # SUBTOTAL(3, OFFSET(...)) returns 1 per visible row, 0 per hidden row.
+    # SUMPRODUCT against (Outcome="WIN") counts visible WINs only.
+    stats_row = total_row + 1
+    ws.cell(row=stats_row, column=1).value = 'FILTER STATS:'
+    ws.cell(row=stats_row, column=1).font = Font(bold=True, italic=True, color='1F4E78')
+
+    ws.cell(row=stats_row, column=2).value = 'Trades:'
+    ws.cell(row=stats_row, column=3).value = f'=SUBTOTAL(2,A{data_start}:A{data_end})'
+
+    ws.cell(row=stats_row, column=4).value = 'Wins:'
+    ws.cell(row=stats_row, column=5).value = (
+        f'=SUMPRODUCT(SUBTOTAL(3,OFFSET(Y{data_start},'
+        f'ROW(Y{data_start}:Y{data_end})-ROW(Y{data_start}),0,1))*'
+        f'(Y{data_start}:Y{data_end}="WIN"))'
+    )
+
+    ws.cell(row=stats_row, column=6).value = 'Win Rate %:'
+    ws.cell(row=stats_row, column=7).value = f'=IFERROR(E{stats_row}/C{stats_row}*100,0)'
+    ws.cell(row=stats_row, column=7).number_format = '0.0'
+
+    ws.cell(row=stats_row, column=8).value = 'Avg P&L:'
+    ws.cell(row=stats_row, column=9).value = f'=IFERROR(SUBTOTAL(9,X{data_start}:X{data_end})/C{stats_row},0)'
+    ws.cell(row=stats_row, column=9).number_format = '+#,##0.00;-#,##0.00;0.00'
+
+    ws.cell(row=stats_row, column=10).value = 'Net P&L $:'
+    ws.cell(row=stats_row, column=11).value = f'=SUBTOTAL(9,X{data_start}:X{data_end})'
+    ws.cell(row=stats_row, column=11).number_format = '+#,##0.00;-#,##0.00;0.00'
+
+    for c in range(1, 12):
+        ws.cell(row=stats_row, column=c).fill = SUBTOTAL_FILL
+
+    # Enable AutoFilter on the data range so the user can filter by any column.
+    # Standard usage: click any header → filter dropdown appears → select
+    # values (e.g. Tier=AUTO, Ticker=AAPL, Outcome=WIN) → SUBTOTAL + SUMPRODUCT
+    # formulas above recompute against the visible rows only.
+    ws.auto_filter.ref = f'A4:Z{data_end}'
+
     autosize(ws, {'A': 8, 'B': 8, 'C': 7, 'D': 12, 'N': 12, 'S': 12, 'P': 15, 'U': 18, 'O': 9, 'Y': 9})
     ws.freeze_panes = 'A5'
     return ws
@@ -407,22 +481,32 @@ def sheet_per_ticker(wb, sized_df):
         elif r.PnL < 0:
             for c in range(1, 9): ws.cell(row=i, column=c).fill = LOSS_FILL
 
-    # Totals row
-    last = ws.max_row + 1
-    ws.cell(row=last, column=1).value = 'TOTAL'
-    ws.cell(row=last, column=2).value = int(grp['Trades'].sum())
-    ws.cell(row=last, column=3).value = int(grp['Wins'].sum())
-    ws.cell(row=last, column=4).value = int(grp['Losses'].sum())
-    ws.cell(row=last, column=5).value = (grp['Wins'].sum() / grp['Trades'].sum() * 100)
-    ws.cell(row=last, column=6).value = float(grp['PnL'].sum())
-    ws.cell(row=last, column=7).value = float(grp['PnL'].sum() / grp['Trades'].sum())
-    ws.cell(row=last, column=8).value = round(sized_df['bars_held'].mean(), 1)
-    for c in range(1, 9):
-        ws.cell(row=last, column=c).font = Font(bold=True)
-        ws.cell(row=last, column=c).fill = SUBTOTAL_FILL
+    # Filter-aware TOTAL row using SUBTOTAL() formulas so the user can
+    # filter by ticker (or sort by P&L / WR) and see live subtotals.
+    # Column layout: A=Ticker B=Trades C=Wins D=Losses E=WinRate% F=NetPnL G=AvgPnL H=AvgBarsHeld
+    data_start = 4                       # first ticker row
+    data_end   = ws.max_row              # last ticker row before totals
+    last       = data_end + 1            # totals row
+
+    ws.cell(row=last, column=1).value = 'TOTAL (filtered)'
+    ws.cell(row=last, column=2).value = f'=SUBTOTAL(9,B{data_start}:B{data_end})'   # Trades
+    ws.cell(row=last, column=3).value = f'=SUBTOTAL(9,C{data_start}:C{data_end})'   # Wins
+    ws.cell(row=last, column=4).value = f'=SUBTOTAL(9,D{data_start}:D{data_end})'   # Losses
+    ws.cell(row=last, column=5).value = f'=IFERROR(C{last}/B{last}*100,0)'           # WR%
+    ws.cell(row=last, column=6).value = f'=SUBTOTAL(9,F{data_start}:F{data_end})'   # Net P&L
+    ws.cell(row=last, column=7).value = f'=IFERROR(F{last}/B{last},0)'              # Avg P&L
+    ws.cell(row=last, column=8).value = f'=IFERROR(SUBTOTAL(1,H{data_start}:H{data_end}),0)'  # Avg bars (SUBTOTAL function 1 = AVERAGE)
+
     ws.cell(row=last, column=5).number_format = '0.0'
     ws.cell(row=last, column=6).number_format = '+#,##0.00;-#,##0.00;0.00'
     ws.cell(row=last, column=7).number_format = '+#,##0.00;-#,##0.00;0.00'
+    ws.cell(row=last, column=8).number_format = '0.0'
+    for c in range(1, 9):
+        ws.cell(row=last, column=c).font = Font(bold=True)
+        ws.cell(row=last, column=c).fill = SUBTOTAL_FILL
+
+    # Enable AutoFilter so the user can filter by ticker / sort by P&L / WR
+    ws.auto_filter.ref = f'A3:H{data_end}'
 
     autosize(ws, {'A': 10})
     ws.freeze_panes = 'A4'

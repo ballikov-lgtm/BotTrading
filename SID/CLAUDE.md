@@ -379,6 +379,27 @@ shouldArmShort  = ... and shortCooldownOk
 
 This matches the instructor's lesson convention of "one signal day per episode." See `sid-strategy-v2.1.pine` § ARM STATE MACHINE.
 
+### Pitfall: Excel report MUST include AutoFilter + filter-aware SUBTOTAL row
+
+The user's V2 Excel report had a TOTAL row at the bottom of "All Trades" that updated when filters were applied (e.g. filter by Tier=AUTO → see AUTO-only totals). The V2.1 Excel builder lost this feature in an early version and the user re-discovered the gap on 2026-05-21.
+
+**Required features on every Excel rebuild** (already in `SID/scripts/build-v2.1-excel-report.py`):
+
+1. **AutoFilter on the data range** of "All Trades" and "Per-Ticker Summary":
+   ```python
+   ws.auto_filter.ref = f'A4:Z{data_end}'
+   ```
+2. **TOTAL row using `SUBTOTAL()` formulas** (function code 9 = SUM, respects filter hides):
+   ```python
+   ws.cell(row=total_row, column=8).value = f'=SUBTOTAL(9,H{data_start}:H{data_end})'
+   ```
+3. **FILTER STATS row** with filter-aware Win Rate using `SUMPRODUCT(SUBTOTAL(3, OFFSET(...)) * (Y="WIN"))`:
+   - `SUBTOTAL(3, OFFSET(...))` returns 1 per visible row, 0 per hidden
+   - Multiplied by `(Outcome="WIN")` → counts visible wins only
+   - Divide by `SUBTOTAL(2, trade_num_col)` for the rate
+
+When user filters by Tier (AUTO/HUMAN), Ticker, Outcome, etc., **both** the TOTAL row and FILTER STATS row recompute against the visible rows only. This is the V2 Excel methodology — never regress it again.
+
 ### Pitfall: TP2 conditions re-fire every bar after threshold is met
 
 Same class of bug as the arm one. If `tp2LongTimeout = inLong and tp1Hit and barsSinceTp1 >= i_tp2TimeoutBars`, then after the threshold is met the condition stays true on subsequent bars (unless the position actually closed). Each bar draws another label, stacking "TP2 Timeout 30 / 31 / 32 / …" across the chart.
