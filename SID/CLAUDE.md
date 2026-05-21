@@ -410,6 +410,39 @@ The V2 weekly-direction filter at `bot-sid.js:491` requires `weekly.length >= 30
 
 **Rule:** any path that calls `weeklyDirection()` must ensure the daily input series resamples to ≥30 weekly bars. Default `'6mo'` is unsafe. Use `'1y'` minimum, `'2y'` for safety + symmetry with checkPositions.
 
+### Pitfall: Pine `strategy.close()` blocked by pending `strategy.exit()` on same entry
+
+Confirmed 2026-05-21 on UNH and GOOG charts. Symptom: strategy entered LONG decades ago, hit TP1, position should have closed via TP2 (timeout / SMA50 / SMA200) but DID NOT. Position stays "IN runner" indefinitely. Info table shows e.g. "Entry $0.55, Days since TP1: 2619/30" — meaning 2619 bars past the 30-bar timeout threshold. This locks the strategy slot, preventing all new entries (`strategy.position_size == 0` check fails forever after), so no signal lines fire on subsequent bars.
+
+**Root cause:** After TP1 fires, we set up a break-even stop:
+```pine
+strategy.exit("BE L", from_entry="Long", stop=entryPrice)
+```
+The "BE L" exit hangs as a pending order on the "Long" entry. When TP2 timeout/SMA fires and we call:
+```pine
+strategy.close("Long", comment="TP2 Timeout")
+```
+Pine v6 doesn't actually close the position — the pending "BE L" exit blocks it. `tp2Hit` flips to `true` but `strategy.position_size` stays > 0. Stuck forever.
+
+**Fix:** every TP2 branch that calls `strategy.close()` must first `strategy.cancel()` the BE exit:
+```pine
+else if tp2LongTimeout
+    strategy.cancel("BE L")             // ← essential
+    strategy.close("Long", comment="TP2 Timeout")
+    tp2Hit := true
+```
+
+Plus a **safety force-close** for any other stuck-state edge case:
+```pine
+if (inLong or inShort) and barsSinceEntry > i_safetyMaxBars  // default 90
+    strategy.cancel("Stop L"); strategy.cancel("Stop S")
+    strategy.cancel("BE L");   strategy.cancel("BE S")
+    strategy.close_all(comment="Safety: held N bars")
+    tp2Hit := true
+```
+
+Confirmed working in commit Pine v2.1.5 — GOOG now correctly shows a fresh "SHORT ENTRY $397.17 STOP $400" line on the most recent bar instead of being locked by a 2014 stuck runner.
+
 ### Pitfall: TP2 conditions re-fire every bar after threshold is met
 
 Same class of bug as the arm one. If `tp2LongTimeout = inLong and tp1Hit and barsSinceTp1 >= i_tp2TimeoutBars`, then after the threshold is met the condition stays true on subsequent bars (unless the position actually closed). Each bar draws another label, stacking "TP2 Timeout 30 / 31 / 32 / …" across the chart.
