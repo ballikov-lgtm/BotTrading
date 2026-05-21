@@ -410,6 +410,37 @@ The V2 weekly-direction filter at `bot-sid.js:491` requires `weekly.length >= 30
 
 **Rule:** any path that calls `weeklyDirection()` must ensure the daily input series resamples to ≥30 weekly bars. Default `'6mo'` is unsafe. Use `'1y'` minimum, `'2y'` for safety + symmetry with checkPositions.
 
+### Pitfall: Pine safety force-close must use TWO checks for legacy stuck positions
+
+Closely related to the next pitfall. When you add a new safety force-close to a Pine strategy that depends on a NEW variable (e.g. `entryBarIdx`), positions that were ALREADY OPEN when the new code loaded have that variable as `na`. So the safety check `barsSinceEntry > N` evaluates false (because `barsSinceEntry = na`). The pre-existing stuck position stays stuck forever even though the safety net was added.
+
+Confirmed on UNH 4H 2026-05-21: a position from ~2007 stayed "IN LONG runner Days since TP1: 12797/30" even after we deployed a 90-bar safety. Reason: `entryBarIdx` was `na` for that legacy position.
+
+**Solution: TRIPLE-LAYER safety net** so no position can persist past the threshold:
+
+```pine
+// (a) Initialize entryBarIdx if it's na while we're in a position
+if (inLong or inShort) and na(entryBarIdx)
+    entryBarIdx := bar_index
+
+// (b) Safety A — original check, now reliable because (a) initialized the var
+if (inLong or inShort) and not na(barsSinceEntry) and barsSinceEntry > i_safetyMaxBars
+    strategy.cancel("Stop L"); strategy.cancel("Stop S")
+    strategy.cancel("BE L"); strategy.cancel("BE S")
+    strategy.close_all(comment="Safety A: held N bars")
+    tp2Hit := true
+
+// (c) Safety C — independent check on barsSinceTp1 (tp1BarIdx exists for
+//     legacy positions because it was in the code earlier than entryBarIdx).
+if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_safetyMaxBars
+    strategy.cancel("Stop L"); strategy.cancel("Stop S")
+    strategy.cancel("BE L"); strategy.cancel("BE S")
+    strategy.close_all(comment="Safety C: N bars since TP1")
+    tp2Hit := true
+```
+
+After deploying this, the UNH 4H stuck position cleared and the info table went from "IN LONG (runner) Entry $13.34" to clean "IDLE".
+
 ### Pitfall: Pine `strategy.close()` blocked by pending `strategy.exit()` on same entry
 
 Confirmed 2026-05-21 on UNH and GOOG charts. Symptom: strategy entered LONG decades ago, hit TP1, position should have closed via TP2 (timeout / SMA50 / SMA200) but DID NOT. Position stays "IN runner" indefinitely. Info table shows e.g. "Entry $0.55, Days since TP1: 2619/30" — meaning 2619 bars past the 30-bar timeout threshold. This locks the strategy slot, preventing all new entries (`strategy.position_size == 0` check fails forever after), so no signal lines fire on subsequent bars.
