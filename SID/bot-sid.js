@@ -1244,9 +1244,15 @@ async function run() {
     process.stdout.write(`  ${symbol.padEnd(6)} → `);
 
     // Fetch daily candles
+    // BUG-FIX 2026-05-21: was `fetchDailyCandles(symbol)` (default '6mo'),
+    // which resamples to ~26-28 weekly bars — below the weekly-direction
+    // check's required 30. Many AUTO-tier tickers (NVDA, COST, GOOG, INTC,
+    // MCD, UNH, LMT, RTX, LCID) were being rejected with "insufficient
+    // weekly history" before their signal could be evaluated.
+    // `2y` matches what checkPositions() already uses on line 744.
     let candles;
     try {
-      candles = await fetchDailyCandles(symbol);
+      candles = await fetchDailyCandles(symbol, '2y');
       await new Promise(r => setTimeout(r, 300)); // Polite rate limit for Yahoo
     } catch (err) {
       console.log(`Data unavailable (${err.message})`);

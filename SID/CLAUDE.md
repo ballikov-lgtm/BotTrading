@@ -400,6 +400,16 @@ The user's V2 Excel report had a TOTAL row at the bottom of "All Trades" that up
 
 When user filters by Tier (AUTO/HUMAN), Ticker, Outcome, etc., **both** the TOTAL row and FILTER STATS row recompute against the visible rows only. This is the V2 Excel methodology — never regress it again.
 
+### Pitfall: scan path needs 2y daily lookback (not 6mo) for weekly check
+
+The V2 weekly-direction filter at `bot-sid.js:491` requires `weekly.length >= 30` (30 weekly bars). The default fetch range for `fetchDailyCandles()` is `'6mo'`, which gives ~125-130 daily bars → ~26-28 weekly bars after resampling — JUST BELOW the threshold.
+
+**Symptom:** big-cap tickers with decades of history (NVDA, COST, GOOG, INTC, MCD, UNH, LMT, RTX, LCID) silently rejected with "V2 weekly direction: insufficient weekly history (need 30+ weeks)". On 2026-05-21 the user noticed the bot hadn't fired a single trade in 5 days despite the heatmap showing many ripe overbought tickers. 9 of 80 AUTO-tier tickers were being rejected at this check before signals could be evaluated.
+
+**Fix:** scan path explicitly passes `'2y'` to `fetchDailyCandles(symbol, '2y')` so weekly resampling has ~50 bars (well above the 30 minimum). `checkPositions()` was already using `'2y'` for SMA200 needs — the scan path just never inherited that fix.
+
+**Rule:** any path that calls `weeklyDirection()` must ensure the daily input series resamples to ≥30 weekly bars. Default `'6mo'` is unsafe. Use `'1y'` minimum, `'2y'` for safety + symmetry with checkPositions.
+
 ### Pitfall: TP2 conditions re-fire every bar after threshold is met
 
 Same class of bug as the arm one. If `tp2LongTimeout = inLong and tp1Hit and barsSinceTp1 >= i_tp2TimeoutBars`, then after the threshold is met the condition stays true on subsequent bars (unless the position actually closed). Each bar draws another label, stacking "TP2 Timeout 30 / 31 / 32 / …" across the chart.
