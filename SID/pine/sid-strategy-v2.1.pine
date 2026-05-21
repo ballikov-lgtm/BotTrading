@@ -282,14 +282,38 @@ else if tp2ShortTimeout
     tp2Hit := true
 
 // -- SAFETY FORCE-CLOSE ------------------------------------------------------
-// Catches any stuck-position edge case. If a position has been held more than
-// i_safetyMaxBars (default 90 = 3x the TP2 timeout), force-close everything.
+// FIX 2026-05-21b: legacy stuck positions opened BEFORE the entryBarIdx
+// variable existed (e.g. on the 4H UNH chart showing IN LONG runner from
+// 2007 with Days since TP1: 12797/30). For those, entryBarIdx is `na`,
+// so the original `barsSinceEntry > i_safetyMaxBars` check never fires.
+//
+// Solution: three safety nets so no stuck position can persist.
+//
+// (a) If we're in a position but entryBarIdx is na, initialize it NOW.
+//     Then the next 90 bars give the strategy a chance to exit cleanly
+//     via the normal TP2 logic. If still open after 90, safety (b) fires.
+if (inLong or inShort) and na(entryBarIdx)
+    entryBarIdx := bar_index
+
+// (b) Safety on barsSinceEntry — original check, now reliable since (a)
+//     initializes entryBarIdx for legacy positions.
 if (inLong or inShort) and not na(barsSinceEntry) and barsSinceEntry > i_safetyMaxBars
     strategy.cancel("Stop L")
     strategy.cancel("Stop S")
     strategy.cancel("BE L")
     strategy.cancel("BE S")
-    strategy.close_all(comment="Safety: held " + str.tostring(barsSinceEntry) + " bars")
+    strategy.close_all(comment="Safety A: held " + str.tostring(barsSinceEntry) + " bars")
+    tp2Hit := true
+
+// (c) Extra safety on barsSinceTp1 — catches any position where TP1 has
+//     fired but TP2 hasn't closed it within i_safetyMaxBars bars. This is
+//     the belt-and-braces check that catches the 4H UNH "12797/30" case.
+if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_safetyMaxBars
+    strategy.cancel("Stop L")
+    strategy.cancel("Stop S")
+    strategy.cancel("BE L")
+    strategy.cancel("BE S")
+    strategy.close_all(comment="Safety C: " + str.tostring(barsSinceTp1) + " bars since TP1")
     tp2Hit := true
 
 // Reset state when position is closed (any way)
