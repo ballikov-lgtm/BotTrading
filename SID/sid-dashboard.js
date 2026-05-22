@@ -65,9 +65,41 @@ const closed         = loadJSON('SID/closed-positions-sid.json', []);
 const open           = loadJSON('SID/open-positions-sid.json', []);
 const classification = loadJSON('SID/asset-classification.json', null);
 const backtest       = loadJSON('SID/backtest-report_rsi75_lo_rsi3_weekly.json', null);
+const manualTrades   = loadJSON('SID/manual-trades-log.json', []);
+const strategyUpdates = loadJSON('SID/strategy-updates.json', []);
 
 // Normalize closed positions — sometimes array, sometimes object
 const closedArr = Array.isArray(closed) ? closed : (Array.isArray(closed.positions) ? closed.positions : []);
+
+// Normalize manual trades into the same shape as open-positions so they render
+// alongside the bot's positions. Tagged with _manual so cards show a badge.
+const manualTradesArr = Array.isArray(manualTrades) ? manualTrades : [];
+const manualNormalized = manualTradesArr.map(t => ({
+  id:               t.entry_order_id || `manual-${t.ticker}-${t.timestamp || ''}`,
+  symbol:           t.ticker,
+  side:             t.side,
+  entry:            t.entry_fill_price,
+  stopLoss:         t.sl_price,
+  shares:           t.shares_total,
+  shares_total:     t.shares_total,
+  shares_remaining: t.shares_total,
+  tp1_hit:          false,
+  totalUsd:         (t.shares_total || 0) * (t.entry_fill_price || 0),
+  riskUsd:          Math.abs((t.entry_fill_price || 0) - (t.sl_price || 0)) * (t.shares_total || 0),
+  signalDate:       (t.timestamp || '').slice(0, 10),
+  openDate:         (t.timestamp || '').slice(0, 10),
+  openTime:         (t.timestamp || '').slice(11, 19),
+  mode:             t.mode || 'paper',
+  strategy:         'SID hybrid (manual)',
+  _manual:          true,
+  _tp1_price:       t.tp1_price,
+  _note:            t.note,
+}));
+
+// Combine bot + manual trades into a single live-positions list, sorted by openDate desc
+const allLivePositions = [...(open || []), ...manualNormalized].sort((a, b) => {
+  return String(b.openDate || '').localeCompare(String(a.openDate || ''));
+});
 
 // ── Aggregations ─────────────────────────────────────────────────────────
 function aggClosed(rows) {
@@ -268,11 +300,18 @@ function renderOpenPositionsCards(rows) {
         <text x="${xCurrent}" y="${cy-10}" text-anchor="middle" font-size="9" fill="${pnlColor}" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px ${pnlColor})">$${current.toFixed(2)}</text>
       </svg>`;
 
-    return `<div class="position-card">
+    const manualBadge = r._manual
+      ? `<span class="pos-tag-manual" title="${esc(r._note || 'Manual hybrid trade')}">MANUAL · S&amp;D</span>`
+      : '';
+    const tp1Line = r._manual && r._tp1_price
+      ? `<span>TP1 <strong>$${Number(r._tp1_price).toFixed(2)}</strong></span>`
+      : '';
+    return `<div class="position-card${r._manual ? ' position-card-manual' : ''}">
       <div class="pos-head">
         <div>
           <span class="pos-symbol">${esc(r.symbol || '—')}</span>
           <span class="pos-side" style="color:${sideColor};text-shadow:0 0 6px ${sideColor}">${sideArrow} ${(r.side || '?').toUpperCase()}</span>
+          ${manualBadge}
         </div>
         <div class="pos-pnl" style="color:${pnlColor};text-shadow:0 0 8px ${pnlColor}">${inProfit ? '+' : ''}${pnlPct.toFixed(2)}%</div>
       </div>
@@ -280,6 +319,7 @@ function renderOpenPositionsCards(rows) {
       <div class="pos-meta">
         <span>QTY <strong>${r.shares ?? '—'}</strong></span>
         <span>RISK <strong>$${(r.riskUsd ?? 0).toFixed(2)}</strong></span>
+        ${tp1Line}
         <span>TO STOP <strong>${stopDistPct.toFixed(1)}%</strong></span>
         <span>DAYS <strong>${daysOpen}</strong></span>
         <span>OPEN <strong>${esc(r.openDate || '—')}</strong></span>
@@ -288,6 +328,32 @@ function renderOpenPositionsCards(rows) {
   }).join('');
 
   return `<div class="position-grid">${cards}</div>`;
+}
+
+// ── Render: strategy updates / change log ────────────────────────────────
+function renderStrategyUpdates(rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    return `<div class="hud-empty">// NO UPDATES LOGGED YET //</div>`;
+  }
+  const sorted = [...rows].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const catColor = {
+    fix:     '#39ff14',  // green
+    infra:   '#00ffff',  // cyan
+    trade:   '#ff1493',  // magenta
+    release: '#ffaa00',  // amber
+  };
+  const items = sorted.map(u => {
+    const c = catColor[u.category] || '#888';
+    return `<li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">${esc(u.date || '')}</span>
+        <span class="update-cat" style="color:${c};border-color:${c}">${esc((u.category || '?').toUpperCase())}</span>
+      </div>
+      <div class="update-title">${esc(u.title || '')}</div>
+      <div class="update-summary">${esc(u.summary || '')}</div>
+    </li>`;
+  }).join('');
+  return `<ul class="update-list">${items}</ul>`;
 }
 
 // ── Render: history rows ─────────────────────────────────────────────────
@@ -1141,6 +1207,101 @@ const html = `<!DOCTYPE html>
   body.light-mode .panel-title {
     text-shadow: 0 0 1px var(--cyan);  /* lighter glow in light mode */
   }
+
+  /* ── MANUAL TRADE BADGE on position cards ───────────────── */
+  .pos-tag-manual {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: rgba(255,170,0,0.08);
+    border: 1px solid #ffaa00;
+    color: #ffaa00;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    border-radius: 2px;
+    vertical-align: middle;
+    text-shadow: 0 0 4px #ffaa0066;
+  }
+  .position-card-manual {
+    border-left: 2px solid #ffaa00;
+  }
+  body.light-mode .pos-tag-manual {
+    background: rgba(237,108,2,0.08);
+    border-color: #ed6c02;
+    color: #ed6c02;
+    text-shadow: none;
+  }
+  body.light-mode .position-card-manual {
+    border-left-color: #ed6c02;
+  }
+
+  /* ── UPDATES TAB — scrolling list of strategy changes ────── */
+  .update-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 640px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+  }
+  body.light-mode .update-list {
+    background: rgba(255,255,255,0.6);
+  }
+  .update-list::-webkit-scrollbar { width: 8px; }
+  .update-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  .update-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--cyan), var(--magenta));
+    border-radius: 4px;
+  }
+  .update-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .update-item:hover {
+    background: rgba(0,255,255,0.04);
+  }
+  body.light-mode .update-item:hover {
+    background: rgba(0,131,143,0.06);
+  }
+  .update-item:last-child { border-bottom: none; }
+  .update-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .update-date {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .update-cat {
+    display: inline-block;
+    padding: 1px 7px;
+    border: 1px solid #888;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 4px currentColor;
+  }
+  body.light-mode .update-cat { text-shadow: none; }
+  .update-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .update-summary {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body data-perf-view="${DEFAULT_PERF_VIEW}" data-live-trades="${liveStats.total}" data-live-threshold="${LIVE_TRADE_THRESHOLD}">
@@ -1234,14 +1395,15 @@ ${PAPER_TRADING_MODE ? `
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES${strategyUpdates.length ? ` <span style="color:var(--magenta);font-size:9px;">(${strategyUpdates.length})</span>` : ''}</button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
-    <!-- Open positions full-width at the top -->
+    <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">OPEN POSITIONS // CURRENTLY HELD (${open.length})</div>
-      ${renderOpenPositionsCards(open)}
+      <div class="panel-title">LIVE TRADES // ${allLivePositions.length} OPEN (${open.length} bot · ${manualNormalized.length} manual)</div>
+      ${renderOpenPositionsCards(allLivePositions)}
     </div>
 
     <div class="two-col">
@@ -1325,6 +1487,20 @@ ${PAPER_TRADING_MODE ? `
         <span><span style="display:inline-block;width:10px;height:10px;background:var(--cyan);box-shadow:0 0 6px var(--cyan);margin-right:6px"></span>INSUFFICIENT_DATA · pending</span>
         <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);box-shadow:0 0 6px var(--red);margin-right:6px"></span>EXCLUDED · hidden by default</span>
       </div>
+    </div>
+  </div>
+
+  <!-- TAB: UPDATES — strategy change log, most recent first -->
+  <div id="tab-updates" class="tab-pane">
+    <div class="panel">
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (${strategyUpdates.length})</div>
+      <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
+        <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#ff1493;margin-right:4px"></span>TRADE · execution event</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
+      </div>
+      ${renderStrategyUpdates(strategyUpdates)}
     </div>
   </div>
 

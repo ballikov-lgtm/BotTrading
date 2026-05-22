@@ -1,0 +1,74 @@
+[
+  {
+    "date": "2026-05-22",
+    "category": "fix",
+    "title": "manual-trade.js: OCO + safety fallback pattern",
+    "summary": "Original pattern (TP1 limit + standalone SL) was rejected by Alpaca with 'insufficient qty' because TP1 held half the shares. Now uses OCO bracket for the TP1 half + standalone stop for the runner. Safety fallback places full-position stop if OCO fails. Telegram alerts added."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "fix",
+    "title": "Pine tp2*Be branches now explicitly close",
+    "summary": "BE stop after TP1 was ghosting on Pine v6, leaving positions stuck IN-RUNNER forever (tp2Hit=true blocked all other exits — irrecoverable deadlock). Mirror the SMA50/200/Timeout pattern: cancel BE + strategy.close + flag."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "infra",
+    "title": "GHA cron one-shot pattern replaces local scheduler",
+    "summary": "Manual trades now fire from GitHub runners via cron with date-guards, not via Claude Code's local scheduled-tasks (which required PC to be on). Cloud-first architecture restored."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "infra",
+    "title": "Pine pitfall catalog established",
+    "summary": "Root CLAUDE.md now hosts a cross-strategy Pine bug catalog (10 entries) with back-refs to detailed write-ups in each strategy's memory. Memory-update convention requires any new Pine fix to append a row here."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "trade",
+    "title": "First live paper trade: GOOG short fired",
+    "summary": "Regular bot run picked up GOOG short (26sh @ $381.84, stop $405). 9-day signal-to-entry episode with the May 18 $404.47 high becoming the stop. PDT-immune by design — bot manages stops internally."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "trade",
+    "title": "MCD hybrid S&D one-off trade",
+    "summary": "Off-strategy paper test using supply-and-demand levels (entry $281.67, TP1 $310.75, SL $272). Uses Alpaca-side OCO + standalone stop, not bot-managed. Pipeline-verification trade — proves cloud→Alpaca path works."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "fix",
+    "title": "Pine info table now renders on 1D",
+    "summary": "barstate.islast was not firing on UNH 1D (worked on 4h). Broadened gate to barstate.islast OR barstate.islastconfirmedhistory OR bar_index >= last_bar_index - 1. Confirmed via data_get_pine_tables MCP query."
+  },
+  {
+    "date": "2026-05-22",
+    "category": "fix",
+    "title": "Pine three-layer safety force-close",
+    "summary": "Stuck-runner positions opened before the entryBarIdx variable existed had it as na, so the 90-bar safety check never fired. Now triple-layer: init entryBarIdx if na + safety on barsSinceEntry + safety on barsSinceTp1."
+  },
+  {
+    "date": "2026-05-21",
+    "category": "fix",
+    "title": "bot-sid.js scan path: 6mo → 2y daily lookback",
+    "summary": "Default fetchDailyCandles range was 6mo (~125-130 daily bars → ~26-28 weekly bars after resample, below the 30-bar minimum for the weekly check). 9 AUTO-tier tickers were silently rejected with 'insufficient weekly history'. Fix: explicit '2y' on the scan path."
+  },
+  {
+    "date": "2026-05-21",
+    "category": "fix",
+    "title": "Pine strategy.close() blocked by pending strategy.exit()",
+    "summary": "After TP1 set a BE stop via strategy.exit, the BE order hung on the entry and blocked all subsequent strategy.close() calls — positions stuck IN RUNNER from decades ago, locking the strategy slot. Fix: cancel BE exit BEFORE every strategy.close() in TP2 branches."
+  },
+  {
+    "date": "2026-05-18",
+    "category": "release",
+    "title": "V2.1 Dynamic TP1+TP2 launch (paper)",
+    "summary": "Two-stage exit: TP1 closes 50% at RSI 50 and moves stop to break-even; TP2 closes runner on BE / SMA50 / SMA200 / 30-bar timeout. Backtest: 302 trades, 69.5% WR, PF 2.55, +$28k over 5y at fixed $200 risk. v2.0 single-exit toggle preserved (SID_DYNAMIC_TP=false)."
+  },
+  {
+    "date": "2026-05-18",
+    "category": "infra",
+    "title": "V2.1 backtest warmup bug fixed",
+    "summary": "main() was downloading only 5y of price data — Wilder RSI and weekly resamples weren't seasoned at the start of the trade window, silently rejecting ~75% of signals in years 1-3. Now downloads HISTORY_WARMUP_DAYS + BACKTEST_YEARS, filters trades after warmup ends."
+  }
+]

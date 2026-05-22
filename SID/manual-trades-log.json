@@ -1,0 +1,20 @@
+[
+  {
+    "timestamp": "2026-05-22T16:03:53.412Z",
+    "note": "SID hybrid S&D trade (one-shot cron 2026-05-22) — recovered post-crash",
+    "ticker": "MCD",
+    "side": "long",
+    "shares_total": 8,
+    "tp1_qty": 4,
+    "runner_qty": 4,
+    "tp1_price": 310.75,
+    "sl_price": 272,
+    "entry_fill_price": 281.67,
+    "entry_order_id": "44591e91-ff37-426a-a1c6-6ee07d774bae",
+    "oco_order_id": "cbad9bbd-fc10-4acc-b716-e8ce4edab526",
+    "runner_stop_id": "4a0cb0ac-daf9-4de1-a737-85d5180a3b09",
+    "client_order_id_prefix": "HYBRID-MCD-1779465831299",
+    "mode": "paper",
+    "recovered_via": "sid-recovery-mcd-2026-05-22.yml"
+  }
+]

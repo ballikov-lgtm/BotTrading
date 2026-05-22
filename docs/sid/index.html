@@ -688,6 +688,101 @@
   body.light-mode .panel-title {
     text-shadow: 0 0 1px var(--cyan);  /* lighter glow in light mode */
   }
+
+  /* ── MANUAL TRADE BADGE on position cards ───────────────── */
+  .pos-tag-manual {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 8px;
+    background: rgba(255,170,0,0.08);
+    border: 1px solid #ffaa00;
+    color: #ffaa00;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    border-radius: 2px;
+    vertical-align: middle;
+    text-shadow: 0 0 4px #ffaa0066;
+  }
+  .position-card-manual {
+    border-left: 2px solid #ffaa00;
+  }
+  body.light-mode .pos-tag-manual {
+    background: rgba(237,108,2,0.08);
+    border-color: #ed6c02;
+    color: #ed6c02;
+    text-shadow: none;
+  }
+  body.light-mode .position-card-manual {
+    border-left-color: #ed6c02;
+  }
+
+  /* ── UPDATES TAB — scrolling list of strategy changes ────── */
+  .update-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 640px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.25);
+  }
+  body.light-mode .update-list {
+    background: rgba(255,255,255,0.6);
+  }
+  .update-list::-webkit-scrollbar { width: 8px; }
+  .update-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  .update-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--cyan), var(--magenta));
+    border-radius: 4px;
+  }
+  .update-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .update-item:hover {
+    background: rgba(0,255,255,0.04);
+  }
+  body.light-mode .update-item:hover {
+    background: rgba(0,131,143,0.06);
+  }
+  .update-item:last-child { border-bottom: none; }
+  .update-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .update-date {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .update-cat {
+    display: inline-block;
+    padding: 1px 7px;
+    border: 1px solid #888;
+    border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 4px currentColor;
+  }
+  body.light-mode .update-cat { text-shadow: none; }
+  .update-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .update-summary {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body data-perf-view="backtest" data-live-trades="0" data-live-threshold="10">
@@ -715,23 +810,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-<<<<<<< Updated upstream
-        <span>SYS · 22:39:24</span>
-=======
-<<<<<<< Updated upstream
-        <span>SYS · 22:07:09</span>
-=======
-<<<<<<< Updated upstream
-        <span>SYS · 22:47:00</span>
-=======
-<<<<<<< Updated upstream
-        <span>SYS · 22:01:04</span>
-=======
-        <span>SYS · 03:00:54</span>
->>>>>>> Stashed changes
->>>>>>> Stashed changes
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+        <span>SYS · 23:52:33</span>
       </div>
     </div>
   </header>
@@ -752,7 +831,7 @@
   <div class="stat-grid">
     <div class="stat-tile" style="--accent:var(--cyan)">
     <div class="stat-label">OPEN POSITIONS</div>
-    <div class="stat-value">0</div>
+    <div class="stat-value">1</div>
     <div class="stat-sub">live</div>
   </div>
 
@@ -809,14 +888,95 @@
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(12)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
-    <!-- Open positions full-width at the top -->
+    <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">OPEN POSITIONS // CURRENTLY HELD (0)</div>
-      <div class="hud-empty">// NO OPEN POSITIONS // STANDING BY //</div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN (1 bot · 1 manual)</div>
+      <div class="position-grid"><div class="position-card">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">GOOG</span>
+          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
+          
+        </div>
+        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-3.01%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-b9b591df-ae20-49c4-822b-9af6c6712cbd" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-b9b591df-ae20-49c4-822b-9af6c6712cbd)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="235.7236868285574" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="235.7236868285574" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$393.32</text>
+      </svg>
+      <div class="pos-meta">
+        <span>QTY <strong>26</strong></span>
+        <span>RISK <strong>$602.16</strong></span>
+        
+        <span>TO STOP <strong>3.0%</strong></span>
+        <span>DAYS <strong>0</strong></span>
+        <span>OPEN <strong>2026-05-22</strong></span>
+      </div>
+    </div><div class="position-card position-card-manual">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">MCD</span>
+          <span class="pos-side" style="color:#39ff14;text-shadow:0 0 6px #39ff14">▲ LONG</span>
+          <span class="pos-tag-manual" title="SID hybrid S&amp;D trade (one-shot cron 2026-05-22) — recovered post-crash">MANUAL · S&amp;D</span>
+        </div>
+        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-1.87%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-44591e91-ff37-426a-a1c6-6ee07d774bae" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="25%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="25%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="100%" stop-color="#39ff14" stop-opacity="0.05"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-44591e91-ff37-426a-a1c6-6ee07d774bae)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="12" y1="18" x2="12" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="12" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="76" y1="16" x2="76" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="76" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="41.05490563598754" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="41.05490563598754" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$276.39</text>
+      </svg>
+      <div class="pos-meta">
+        <span>QTY <strong>8</strong></span>
+        <span>RISK <strong>$77.36</strong></span>
+        <span>TP1 <strong>$310.75</strong></span>
+        <span>TO STOP <strong>1.6%</strong></span>
+        <span>DAYS <strong>0</strong></span>
+        <span>OPEN <strong>2026-05-22</strong></span>
+      </div>
+    </div></div>
     </div>
 
     <div class="two-col">
@@ -1652,28 +1812,110 @@
     </div>
   </div>
 
+  <!-- TAB: UPDATES — strategy change log, most recent first -->
+  <div id="tab-updates" class="tab-pane">
+    <div class="panel">
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (12)</div>
+      <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
+        <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#ff1493;margin-right:4px"></span>TRADE · execution event</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
+      </div>
+      <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">manual-trade.js: OCO + safety fallback pattern</div>
+      <div class="update-summary">Original pattern (TP1 limit + standalone SL) was rejected by Alpaca with 'insufficient qty' because TP1 held half the shares. Now uses OCO bracket for the TP1 half + standalone stop for the runner. Safety fallback places full-position stop if OCO fails. Telegram alerts added.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">Pine tp2*Be branches now explicitly close</div>
+      <div class="update-summary">BE stop after TP1 was ghosting on Pine v6, leaving positions stuck IN-RUNNER forever (tp2Hit=true blocked all other exits — irrecoverable deadlock). Mirror the SMA50/200/Timeout pattern: cancel BE + strategy.close + flag.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
+      </div>
+      <div class="update-title">GHA cron one-shot pattern replaces local scheduler</div>
+      <div class="update-summary">Manual trades now fire from GitHub runners via cron with date-guards, not via Claude Code's local scheduled-tasks (which required PC to be on). Cloud-first architecture restored.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
+      </div>
+      <div class="update-title">Pine pitfall catalog established</div>
+      <div class="update-summary">Root CLAUDE.md now hosts a cross-strategy Pine bug catalog (10 entries) with back-refs to detailed write-ups in each strategy's memory. Memory-update convention requires any new Pine fix to append a row here.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#ff1493;border-color:#ff1493">TRADE</span>
+      </div>
+      <div class="update-title">First live paper trade: GOOG short fired</div>
+      <div class="update-summary">Regular bot run picked up GOOG short (26sh @ $381.84, stop $405). 9-day signal-to-entry episode with the May 18 $404.47 high becoming the stop. PDT-immune by design — bot manages stops internally.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#ff1493;border-color:#ff1493">TRADE</span>
+      </div>
+      <div class="update-title">MCD hybrid S&amp;D one-off trade</div>
+      <div class="update-summary">Off-strategy paper test using supply-and-demand levels (entry $281.67, TP1 $310.75, SL $272). Uses Alpaca-side OCO + standalone stop, not bot-managed. Pipeline-verification trade — proves cloud→Alpaca path works.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">Pine info table now renders on 1D</div>
+      <div class="update-summary">barstate.islast was not firing on UNH 1D (worked on 4h). Broadened gate to barstate.islast OR barstate.islastconfirmedhistory OR bar_index &gt;= last_bar_index - 1. Confirmed via data_get_pine_tables MCP query.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-22</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">Pine three-layer safety force-close</div>
+      <div class="update-summary">Stuck-runner positions opened before the entryBarIdx variable existed had it as na, so the 90-bar safety check never fired. Now triple-layer: init entryBarIdx if na + safety on barsSinceEntry + safety on barsSinceTp1.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-21</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">bot-sid.js scan path: 6mo → 2y daily lookback</div>
+      <div class="update-summary">Default fetchDailyCandles range was 6mo (~125-130 daily bars → ~26-28 weekly bars after resample, below the 30-bar minimum for the weekly check). 9 AUTO-tier tickers were silently rejected with 'insufficient weekly history'. Fix: explicit '2y' on the scan path.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-21</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">Pine strategy.close() blocked by pending strategy.exit()</div>
+      <div class="update-summary">After TP1 set a BE stop via strategy.exit, the BE order hung on the entry and blocked all subsequent strategy.close() calls — positions stuck IN RUNNER from decades ago, locking the strategy slot. Fix: cancel BE exit BEFORE every strategy.close() in TP2 branches.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-18</span>
+        <span class="update-cat" style="color:#ffaa00;border-color:#ffaa00">RELEASE</span>
+      </div>
+      <div class="update-title">V2.1 Dynamic TP1+TP2 launch (paper)</div>
+      <div class="update-summary">Two-stage exit: TP1 closes 50% at RSI 50 and moves stop to break-even; TP2 closes runner on BE / SMA50 / SMA200 / 30-bar timeout. Backtest: 302 trades, 69.5% WR, PF 2.55, +$28k over 5y at fixed $200 risk. v2.0 single-exit toggle preserved (SID_DYNAMIC_TP=false).</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-18</span>
+        <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
+      </div>
+      <div class="update-title">V2.1 backtest warmup bug fixed</div>
+      <div class="update-summary">main() was downloading only 5y of price data — Wilder RSI and weekly resamples weren't seasoned at the start of the trade window, silently rejecting ~75% of signals in years 1-3. Now downloads HISTORY_WARMUP_DAYS + BACKTEST_YEARS, filters trades after warmup ends.</div>
+    </li></ul>
+    </div>
+  </div>
+
   <!-- DISCLAIMER -->
   <div class="disclaimer">
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 69.5% win rate is from a 5-year simulated backtest (302 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-<<<<<<< Updated upstream
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-21 22:39:24 UTC</footer>
-=======
-<<<<<<< Updated upstream
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-21 22:07:09 UTC</footer>
-=======
-<<<<<<< Updated upstream
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-20 22:47:00 UTC</footer>
-=======
-<<<<<<< Updated upstream
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-19 22:01:04 UTC</footer>
-=======
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-19 03:00:54 UTC</footer>
->>>>>>> Stashed changes
->>>>>>> Stashed changes
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-22 23:52:33 UTC</footer>
 
 </div>
 
