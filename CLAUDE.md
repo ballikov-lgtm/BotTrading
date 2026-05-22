@@ -214,6 +214,25 @@ If `data_get_pine_tables` returns `study_count: 0` but `data_get_pine_labels` re
 - If the user's Pine Editor has an "Untitled script" tab open, `pine_open` on another script will fail. The user must close Untitled (don't save) first.
 - `pine_new` should NEVER be called during error recovery — it creates a duplicate script slot. Always recover by calling `pine_open` on an existing script (any script will force the editor panel open, then re-open the target script). See `SID/CLAUDE.md` § pitfall.
 
+### Ad-hoc cloud-fired trades — use GHA cron, never local schedulers
+
+**Rule:** any trade automation (scheduled bot runs, one-off pipeline tests, manual S&D entries) MUST run in the cloud and be PC-independent. The user's machine may be off when trades are due.
+
+**Never use:** Claude Code's `scheduled-tasks` MCP for trade execution. Those tasks require the local Claude Code app to be open at fire time — if the PC is off, the task runs on next launch (after market close, the trade fails). Confirmed 2026-05-22 — wrong tool, retracted in favour of GHA cron.
+
+**Cloud-fired pattern for one-off ad-hoc trades:**
+
+1. Write the underlying logic as a Node script (e.g. `SID/manual-trade.js`) that reads trade params from env vars
+2. Create a workflow that exposes BOTH triggers:
+   - `workflow_dispatch` with inputs (for manual triggers via `gh workflow run` or GitHub UI from anywhere — phone, laptop, Railway)
+   - `schedule: cron` with the desired fire time (for hands-off scheduled execution)
+3. For one-shot crons, add a **year guard** in the workflow body (`if [ "$year" != "2026" ]; exit 1`) to prevent accidental yearly re-fires if the file isn't deleted after firing
+4. After the one-shot fires successfully, delete the workflow file in the next housekeeping push
+
+**Live example:** `.github/workflows/sid-oneshot-mcd-2026-05-22.yml` — fires MCD trade once via cron `'35 13 22 5 *'` (13:35 UTC = 14:35 BST May 22), year-guarded to 2026.
+
+**Why this matters:** The user has Railway available and can also dispatch via webhook → GHA REST API if more complex scheduling logic is needed (e.g. multi-leg trades, conditional fires). But for simple "fire X at time T", GHA cron + year guard is the lowest-engineering path. Railway is reserved for stateful, long-running, or sub-minute-cadence work (like the Ironclad 15-min loop).
+
 ### Sizing methodology — always note which
 Three methodologies coexist:
 - **Fixed dollar risk** ($200/trade) — raw backtest JSON/CSV

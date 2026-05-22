@@ -1,0 +1,65 @@
+name: SID One-Shot — MCD Hybrid S&D Trade (2026-05-22)
+
+# ⚠️  ONE-OFF workflow — fires exactly once on 2026-05-22 at 13:35 UTC (14:35 BST).
+# DELETE THIS FILE after firing to prevent yearly re-runs (the year-guard below
+# stops the trade from executing in future years, but the workflow still
+# triggers and burns GHA minutes).
+#
+# Purpose: cloud-side scheduled trigger for the MCD pipeline-verification trade.
+# Eliminates the previous Claude Code local-scheduler approach which required
+# the user's PC to be running.
+#
+# The actual trade logic lives in SID/manual-trade.js — this workflow only
+# provides the cron trigger + hardcoded params for this specific trade.
+
+on:
+  schedule:
+    # 13:35 UTC = 14:35 BST = 09:35 ET = 5 min after US market open.
+    # GHA cron resolution is "earliest start every UTC minute, may be delayed
+    # up to ~15 min under load." 13:35 with NYSE open from 13:30 still gives
+    # us ~10 min of buffer before the scheduled SID bot run at 14:35 UTC.
+    - cron: '35 13 22 5 *'
+  # Manual fallback in case cron is significantly delayed or skipped
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fire-mcd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Year guard — abort if not 2026
+        run: |
+          year=$(date -u +%Y)
+          if [ "$year" != "2026" ]; then
+            echo "::error::Cron fired in year $year, but this workflow is a 2026-05-22 one-shot. Aborting safely."
+            exit 1
+          fi
+          echo "✓ Year guard passed: $(date -u)"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Submit MCD hybrid S&D trade
+        working-directory: SID
+        env:
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+
+          # Hardcoded MCD params (off-strategy / pipeline-test)
+          TRADE_TICKER:    MCD
+          TRADE_SIDE:      long
+          TRADE_SHARES:    "8"
+          TRADE_TP1_PRICE: "310.75"
+          TRADE_SL_PRICE:  "272"
+          TRADE_NOTE:      "SID hybrid S&D trade (one-shot cron 2026-05-22)"
+        run: node manual-trade.js
