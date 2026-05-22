@@ -361,6 +361,36 @@ Never call `pine_new` to "recover" — it's only for genuinely creating a brand-
 
 If duplicates are already in the account, the TV MCP has no `pine_delete` tool — the user must manually right-click each duplicate in their saved-scripts list and Delete. Apologise and explain rather than leaving them.
 
+### Pitfall: `barstate.islast` doesn't always fire on 1D charts — broaden the gate
+
+Confirmed 2026-05-22 on UNH 1D chart. The SID v2.1 info table was rendering on 4h but NOT on 1D, despite:
+- `i_showInfoTable=true` (user confirmed input was ticked in dialog)
+- Pine script running fine (data_get_pine_labels showed 9 labels, data_get_pine_lines showed 9 lines)
+- No compile errors (pine_get_errors returned has_errors=false)
+- Identical Pine bytecode running on both timeframes (same compiled study)
+
+The ONLY block in the entire script gated on `barstate.islast` was the info table at the bottom. That's the one block that failed on 1D. Likely interaction with `calc_on_every_tick=false` + the realtime forming bar on 1D not yet being processed by the script (the previous fully-closed bar gets processed instead, where `barstate.islast` evaluates false because the dataset already contains the incomplete realtime bar at a higher index).
+
+**Diagnostic that nailed it down:**
+- `data_get_pine_tables` with `study_filter="SID Strategy"` on 1D → 0 tables
+- Same call on 4h → 1 table with all 10 IDLE-state rows populated correctly
+
+**Fix:** widen the gate from `barstate.islast` alone to a 3-way OR:
+```pine
+showTableNow = barstate.islast or barstate.islastconfirmedhistory or bar_index >= last_bar_index - 1
+if i_showInfoTable and showTableNow
+    var table info = table.new(position.top_right, 2, 14, ...)
+    ...
+```
+
+- `barstate.islast` covers the realtime/forming bar
+- `barstate.islastconfirmedhistory` covers the last closed historical bar (the one the script actually processes when calc_on_every_tick=false and the realtime bar isn't yet ticked over)
+- `bar_index >= last_bar_index - 1` is the belt-and-braces fallback
+
+Trade-off: table block runs on up-to-2 bars instead of 1. Negligible perf cost. Tables overwrite cells each call so the visual result is identical.
+
+**Workflow gotcha during the fix:** pushing the source via `pine_set_source` got blocked because the user's Pine Editor had an "Untitled script" tab open (created accidentally when the agent called `pine_new` during error recovery — see existing pitfall about that). The MCP couldn't switch to v2.1.5 while the editor was on Untitled. Resolution requires the user to close the Untitled tab (don't save) before any further automation can target v2.1.5.
+
 ### Pitfall: arm logic on a strategy that uses `RSI in extreme zone` re-fires every bar
 
 If your Pine arm condition is `isOverbought = dailyRSI > 70` and `shouldArmShort = na(armDir) and isOverbought and ...`, then once an arm expires (timeout), the very next bar re-arms if RSI is still above 70. On sustained trends this produces a vertical line every 5 bars — chart chaos.
@@ -440,6 +470,45 @@ if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_
 ```
 
 After deploying this, the UNH 4H stuck position cleared and the info table went from "IN LONG (runner) Entry $13.34" to clean "IDLE".
+
+### Pitfall: Pine `tp2*Be` branches must EXPLICITLY close — don't trust the BE stop order
+
+Sister-bug to the next one. Confirmed 2026-05-22 on MCD daily — the original v2.1 code wrote the BE observation branches as:
+
+```pine
+if tp2LongBe
+    // BE L stop closes the position automatically; just mark tp2Hit
+    tp2Hit := true
+```
+
+Theory was: `strategy.exit("BE L", from_entry="Long", stop=entryPrice)` (set at TP1) automatically closes when price touches BE. So the tp2*Be branch just marks the flag and trusts the BE stop to fire.
+
+**Reality:** the BE stop doesn't reliably fire after a partial close. Pine v6 quirk — when the entry's been split (TP1 closed 50%), the remaining `strategy.exit` order tied to it can ghost. Position stays IN-RUNNER even though price has clearly crossed BE.
+
+**The deadlock that makes it irrecoverable:** `tp2Hit := true` blocks ALL other TP2 conditions (SMA50/SMA200/Timeout are gated by `not tp2Hit`). So:
+1. BE stop doesn't fire (the bug)
+2. `tp2Hit = true` (just got set)
+3. SMA50/200/Timeout exits all blocked by `not tp2Hit`
+4. Position stays "IN SHORT (runner)" / "IN LONG (runner)" forever, Days since TP1 climbing past the 30-bar timeout
+5. Strategy slot occupied → no new entries can fire ever again
+
+Symptom on MCD 1D 2026-05-22: position entered at $326.46 (short), TP1 hit 8 bars ago, BE stop set at $326.46. Price subsequently rose to ~$341 (clearly through $326.46), but position still showed "IN SHORT (runner)" with no close.
+
+**Fix:** mirror the SMA50/200/Timeout pattern — explicit cancel + close, never trust the BE stop alone:
+
+```pine
+if tp2LongBe
+    strategy.cancel("BE L")
+    strategy.close("Long", comment="TP2 BE")
+    tp2Hit := true
+
+if tp2ShortBe
+    strategy.cancel("BE S")
+    strategy.close("Short", comment="TP2 BE")
+    tp2Hit := true
+```
+
+**Rule for new Pine strategies:** if you set a `strategy.exit()` stop AND have other TP conditions that should also close the same entry, EVERY closure branch must explicitly cancel that exit and call `strategy.close()` itself. Never rely on the exit stop to fire silently — it can ghost after partial closes.
 
 ### Pitfall: Pine `strategy.close()` blocked by pending `strategy.exit()` on same entry
 

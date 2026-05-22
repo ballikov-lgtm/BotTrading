@@ -91,6 +91,7 @@ Memory files are append-mostly journals. They should capture:
 - Strategy-specific lessons → that strategy's memory file
 - Cross-cutting lessons (push protocol, GitHub Actions, dashboard infra, shared state files) → this root file
 - Personal/cross-session facts (user preferences, environmental quirks) → `~/.claude/projects/.../memory/MEMORY.md`
+- **Pine Script bugs and fixes → BOTH the strategy's memory file (detailed write-up) AND this root file's "Pine Script pitfall catalog" section (one-line summary + back-ref).** This is non-negotiable: Pine bugs almost always recur across strategies, and a future session creating a new Pine script must be able to scan a single catalog to avoid them. The detailed pitfall in the strategy memory captures root cause + code samples + symptom; the catalog row is the rapid-recall pointer.
 
 **Don't summarise from session-to-session. Write it down.** The whole point of this architecture is that institutional memory persists.
 
@@ -158,6 +159,60 @@ There are TWO MCPs that can touch TradingView, and they are not interchangeable:
 Even if the user says "TV Desktop doesn't work," **always run `mcp__tradingview__tv_health_check` first** — it may already be connected. The Chrome MCP will refuse `tradingview.com` no matter what permission the user clicks. We wasted two turns on this on 2026-05-19 before checking.
 
 For the full Pine-push workflow (open editor, inject source, compile, save, verify, suppress TV's auto trade markers, recent-bars visual gate) see `SID/CLAUDE.md` § "How to push a Pine Script to TradingView".
+
+### Pine Script pitfall catalog (cross-strategy quick-reference)
+
+When writing or auditing ANY Pine strategy, scan this list. Each entry is a bug pattern we've already hit + the canonical fix. Detailed write-ups (root cause, code samples, symptom) live in the linked strategy memory file — but the catalog is the rapid-recall layer so we don't pay the debugging tax twice.
+
+**Convention:** when a major Pine bug is fixed in any strategy, add a one-line summary here AND a detailed pitfall section in the strategy's memory file. The owning agent is responsible — see "Memory-update convention" below.
+
+| # | Pattern | Symptom | Fix |
+|---|---|---|---|
+| 1 | **ARM re-fires every bar in extreme zone** | Vertical line every 5-15 bars on trends, chart chaos | Use `crossingOversold`/`crossingOverbought` predicate (RSI just crossed INTO zone) + re-arm cooldown counter. See [SID/CLAUDE.md § ARM logic pitfall](SID/CLAUDE.md) |
+| 2 | **TP conditions re-fire every bar after threshold met** | Stacked "TP2 Timeout 30/31/32…" labels across chart | Gate each TP condition with `not tp2Hit` so it fires once per trade. See [SID/CLAUDE.md § TP2 re-fire pitfall](SID/CLAUDE.md) |
+| 3 | **`bgcolor()` paints every match across all history** | "Christmas tree" of entry bands on 5y backtest | Add `inVisualWindow = bar_index > last_bar_index - i_visualLookback` gate on all `bgcolor()` and conditional `label.new`. See [SID/CLAUDE.md § bgcolor pitfall](SID/CLAUDE.md) |
+| 4 | **Stop-order persists after partial close** | Stop double-fires or replaces unexpectedly | `strategy.cancel("Stop X")` BEFORE submitting the replacement `strategy.exit("BE X", ...)`. See [SID/CLAUDE.md § stop-order replacement pitfall](SID/CLAUDE.md) |
+| 5 | **`strategy.close()` blocked by pending `strategy.exit()`** | Position stuck "IN runner" for years past TP2 timeout, locks strategy slot forever | EVERY TP2 close branch must `strategy.cancel("BE X")` then `strategy.close()`. See [SID/CLAUDE.md § strategy.close blocked pitfall](SID/CLAUDE.md) |
+| 6 | **`tp2*Be` branches relying on BE stop to fire** | After TP1 hits, price crosses BE, BE stop doesn't trigger, position stays runner, `tp2Hit=true` blocks all other exits — irrecoverable deadlock | tp2*Be branches must ALSO `cancel("BE X")` + `strategy.close()` — never trust the BE stop alone. See [SID/CLAUDE.md § tp2*Be pitfall](SID/CLAUDE.md) |
+| 7 | **Safety force-close needs MULTI-LAYER check** | Adding a new safety guard variable doesn't catch positions opened before that variable existed (`entryBarIdx` is `na`) | Triple-layer net: (a) initialize var if `na`, (b) safety on `barsSinceEntry`, (c) safety on `barsSinceTp1`. See [SID/CLAUDE.md § three-layer safety pitfall](SID/CLAUDE.md) |
+| 8 | **`barstate.islast` doesn't always fire on 1D** | Table renders fine on 4h, never on 1D — labels and lines draw OK so script IS running | Broaden gate to `barstate.islast or barstate.islastconfirmedhistory or bar_index >= last_bar_index - 1`. Confirm via `data_get_pine_tables` (4h returns table, 1D returns 0). See [SID/CLAUDE.md § barstate.islast pitfall](SID/CLAUDE.md) |
+| 9 | **TV auto-renders "TP/Long/Short" labels at every fill** | Stacked orange labels on every historical trade bar, chart chaos | NOT fixable in Pine — instruct user: chart's indicator settings → Style tab → uncheck "Signal Labels" |
+| 10 | **`pine_new` during error recovery creates duplicate scripts** | Orphaned "SID Strategy v2.1 4", "SID Strategy v2.1 5"… cluttering account | Recover by `pine_open` on any existing script (forces editor panel), then `pine_open` the target. NEVER call `pine_new` during error recovery |
+
+**Debugging methodology** for any "visible draw is missing" report: see next section (the 5-step diagnostic ladder).
+
+### Pine Script debugging methodology — when "something visual is missing"
+
+When a user reports "the X isn't showing on my chart" for a Pine script (table, label, line, bgcolor, etc.), follow this ordered diagnostic ladder rather than jumping straight to source edits. Earned the hard way on the 2026-05-22 UNH 1D info table bug (8+ hours of debugging compressed into ~20 minutes of method).
+
+**Step 1 — Confirm the script is loaded and running.**
+- `chart_get_state` → is the study in the studies array?
+- `data_get_study_values` → are its `plot()` outputs returning real numbers? (If yes, the script runs.)
+- `pine_get_errors` → any compile errors? (If yes, fix those first — nothing else will work.)
+
+**Step 2 — Query the Pine output API directly.** This is the killer diagnostic. Tradingview MCP exposes:
+- `data_get_pine_tables { study_filter: "X" }` — returns the actual table rows the script is drawing
+- `data_get_pine_labels { study_filter: "X" }` — returns all label.new texts
+- `data_get_pine_lines { study_filter: "X" }` — returns line.new horizontals
+
+If `data_get_pine_tables` returns `study_count: 0` but `data_get_pine_labels` returns N labels, **the script is running but the table block isn't executing**. That narrows the bug to the table's gate condition — not the table rendering, not overlap, not chart layout.
+
+**Step 3 — Compare across timeframes.** Switch the chart timeframe (`chart_set_timeframe`) and re-query the same Pine output API. If 4h returns tables but 1D doesn't, the bug is a runtime condition that's timeframe-sensitive. Same compiled bytecode, different result → look at `barstate.*`, `request.security` warmup, `last_bar_index`, or any time-derived inputs.
+
+**Step 4 — Don't assume overlap.** Pine tables anchored at the same `position.*` DO stack and last-rendered wins, but `data_get_pine_tables` returns whatever the script COMPUTED, regardless of z-ordering. If the API says no table, the overlap theory is wrong — move on.
+
+**Step 5 — Don't assume stale cache without proof.** `pine_smart_compile` recompiles even when source is unchanged. If a force-recompile doesn't change behaviour, the issue is in the source itself, not a cached bytecode.
+
+**Common Pine pitfalls that produce "invisible draw":**
+- `barstate.islast` not firing on the last realtime forming bar with `calc_on_every_tick=false`. Workaround: broaden to `barstate.islast or barstate.islastconfirmedhistory or bar_index >= last_bar_index - 1`. (See `SID/CLAUDE.md` § pitfall.)
+- `var table info = table.new(...)` inside an if-block — table is initialized only on the first bar the if condition is true. If that bar never arrives, the table never exists.
+- `position.top_right` overlap from another script's table — but disprovable with `data_get_pine_tables` (Step 2).
+- `inVisualWindow` gates that compute `bar_index > last_bar_index - N` — if `last_bar_index` is unstable on a given chart, the gate can silently flip.
+
+**Workflow gotchas during the fix (lessons earned):**
+- Don't paste Pine line-number-based instructions to the user — line numbers drift between local file and TV's saved version. Use **Find & Replace text** for manual edits.
+- If the user's Pine Editor has an "Untitled script" tab open, `pine_open` on another script will fail. The user must close Untitled (don't save) first.
+- `pine_new` should NEVER be called during error recovery — it creates a duplicate script slot. Always recover by calling `pine_open` on an existing script (any script will force the editor panel open, then re-open the target script). See `SID/CLAUDE.md` § pitfall.
 
 ### Sizing methodology — always note which
 Three methodologies coexist:

@@ -1,0 +1,82 @@
+name: SID Manual One-Off Trade
+
+# ⚠️  NOT part of the standard SID strategy.
+# This workflow is for HYBRID / off-strategy / pipeline-verification trades that
+# bypass the bot's signal scanner. Submits a direct market entry on Alpaca paper
+# (or live, with the same safety gating as the main bot) with custom TP1 + SL
+# orders.
+#
+# What this workflow does NOT do:
+#   - run the SID scanner
+#   - touch open-positions-sid.json (state stays clean for the real bot)
+#   - manage RSI 50 TP1 logic (user provides explicit TP1 price)
+#   - manage 30-bar TP2 timeout (user closes the runner manually)
+#
+# Trigger via:
+#   gh workflow run sid-manual-trade.yml \
+#     -f ticker=MCD -f side=long -f shares=8 -f tp1_price=310.75 -f sl_price=272 \
+#     -f note="SID hybrid S&D trade"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "Ticker symbol (e.g. MCD)"
+        required: true
+        type: string
+      side:
+        description: "long or short"
+        required: true
+        type: choice
+        options: [long, short]
+      shares:
+        description: "Number of shares (integer)"
+        required: true
+        type: string
+      tp1_price:
+        description: "TP1 limit price (closes 50%)"
+        required: true
+        type: string
+      sl_price:
+        description: "Stop-loss price (closes full position)"
+        required: true
+        type: string
+      note:
+        description: "Free-text note for the trade journal"
+        required: false
+        type: string
+        default: "SID manual hybrid trade"
+
+permissions:
+  contents: read
+
+jobs:
+  manual-trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Submit manual trade
+        working-directory: SID
+        env:
+          # ── Alpaca credentials (reuse existing secrets) ────────────────────
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+
+          # ── Manual trade params ────────────────────────────────────────────
+          TRADE_TICKER:    ${{ inputs.ticker }}
+          TRADE_SIDE:      ${{ inputs.side }}
+          TRADE_SHARES:    ${{ inputs.shares }}
+          TRADE_TP1_PRICE: ${{ inputs.tp1_price }}
+          TRADE_SL_PRICE:  ${{ inputs.sl_price }}
+          TRADE_NOTE:      ${{ inputs.note }}
+        run: node manual-trade.js

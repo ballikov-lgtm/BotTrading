@@ -250,7 +250,11 @@ tp2ShortBe      = inShort and tp1Hit and not tp2Hit and not na(stopLevel) and hi
 tp2ShortTimeout = inShort and tp1Hit and not tp2Hit and not na(barsSinceTp1) and barsSinceTp1 >= i_tp2TimeoutBars
 
 if tp2LongBe
-    // BE L stop closes the position automatically; just mark tp2Hit
+    // FIX 2026-05-22: don't rely on strategy.exit("BE L") to close — it
+    // doesn't reliably fire after the TP1 partial close (Pine v6 quirk).
+    // Explicitly cancel + close to guarantee the runner exits at BE.
+    strategy.cancel("BE L")
+    strategy.close("Long", comment="TP2 BE")
     tp2Hit := true
 else if tp2LongSma50
     strategy.cancel("BE L")
@@ -266,7 +270,11 @@ else if tp2LongTimeout
     tp2Hit := true
 
 if tp2ShortBe
-    // BE S stop closes the position automatically; just mark tp2Hit
+    // FIX 2026-05-22: don't rely on strategy.exit("BE S") to close — it
+    // doesn't reliably fire after the TP1 partial close (Pine v6 quirk).
+    // Explicitly cancel + close to guarantee the runner exits at BE.
+    strategy.cancel("BE S")
+    strategy.close("Short", comment="TP2 BE")
     tp2Hit := true
 else if tp2ShortSma50
     strategy.cancel("BE S")
@@ -410,7 +418,13 @@ plot(i_showEntryLine and strategy.position_size != 0 ? strategy.position_avg_pri
 plot(i_showStopLine  and strategy.position_size != 0 ? stopLevel                   : na, "Stop / BE",   color=color.new(tp1Hit ? color.gray : color.red, 30), style=plot.style_linebr, linewidth=2)
 
 // -- INFO TABLE --------------------------------------------------------------
-if i_showInfoTable and barstate.islast
+// FIX 2026-05-22: gate was `barstate.islast` only — on UNH 1D this never
+// fired (labels + lines drew fine, but table block was skipped). Switched
+// to a broader gate that fires on either the last confirmed historical
+// bar OR the realtime bar OR within 1 bar of last_bar_index, so the table
+// reliably renders across all timeframes.
+showTableNow = barstate.islast or barstate.islastconfirmedhistory or bar_index >= last_bar_index - 1
+if i_showInfoTable and showTableNow
     var table info = table.new(position.top_right, 2, 14, bgcolor=color.new(color.black, 70), border_width=1, border_color=color.new(color.gray, 50))
 
     state = strategy.position_size != 0 ? (strategy.position_size > 0 ? "IN LONG" + (tp1Hit ? " (runner)" : "") : "IN SHORT" + (tp1Hit ? " (runner)" : "")) : (na(armDir) ? "IDLE" : "ARMED " + armDir + " (" + str.tostring(barsSinceArm) + "/" + str.tostring(i_armTimeout) + ")")
