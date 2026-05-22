@@ -471,6 +471,56 @@ if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_
 
 After deploying this, the UNH 4H stuck position cleared and the info table went from "IN LONG (runner) Entry $13.34" to clean "IDLE".
 
+### Pitfall: Alpaca rejects SL stop for full position when TP1 limit already holds partial
+
+Confirmed 2026-05-22 on the MCD oneshot trade (entry filled 8 shares @ $281.67). Original `manual-trade.js` pattern was:
+1. Submit market entry for 8 shares → filled
+2. Submit limit SELL for 4 shares @ $310.75 (TP1) → accepted
+3. Submit stop SELL for 8 shares @ $272 (SL) → **REJECTED** with `AlpacaError: insufficient qty available for order (requested: 8, available: 4)`
+
+**Root cause:** Alpaca "holds" shares against open orders. The TP1 limit holds 4 of the 8 shares, so only 4 are "available" when the SL is submitted. Alpaca refuses to let the SL claim shares that another open order already claims.
+
+**The deadly consequence:** the script crashed AFTER entry filled but BEFORE the log was written. Position was on Alpaca with TP1 but no SL — completely unprotected on the downside. If MCD had gapped down, full loss with no recourse.
+
+**Fix — OCO pattern + standalone runner stop:**
+
+For a position of N shares split 50/50 (TP1 half + runner half):
+1. Submit market entry for N shares → poll for fill
+2. Submit an OCO order for N/2 shares — the TP1 limit AND the SL stop are bundled together:
+   ```js
+   client.submitOrder({
+     symbol, qty: N/2, side: exitSide,
+     type: 'limit', limit_price: tp1Price,
+     time_in_force: 'gtc',
+     order_class: 'oco',
+     take_profit: { limit_price: tp1Price },
+     stop_loss:   { stop_price:  slPrice  },
+   });
+   ```
+3. Submit a standalone stop for the other N/2 shares at the SL price:
+   ```js
+   client.submitOrder({
+     symbol, qty: N/2, side: exitSide,
+     type: 'stop', stop_price: slPrice,
+     time_in_force: 'gtc',
+   });
+   ```
+
+**Why it works:**
+- OCO bundles TP1+SL for the SAME N/2 shares. Only one fires (the other auto-cancels). No double-holding.
+- Standalone runner stop covers the other N/2 shares for the SL case. No conflict because no other order claims those shares.
+
+**Behaviour matrix:**
+| Event | OCO leg fires | OCO sibling | Runner stop | Result |
+|---|---|---|---|---|
+| Price rises to TP1 | TP1 limit (closes N/2) | Auto-cancels its SL | Still pending | N/2 closed at profit; runner protected |
+| Price falls to SL first | OCO SL stop (closes N/2) | Auto-cancels its limit | Fires too (closes N/2) | Full N shares closed at loss |
+| TP1 hits then price drops to SL | TP1 limit closed N/2 | Cancelled | Fires for the N/2 runner | Mixed: half profit, half loss |
+
+**Safety fallback for any future failure:** if OCO submit fails for any reason (e.g. Alpaca outage, invalid params, even a transient 5xx), `manual-trade.js` now attempts a `trySafetyStop()` — a single full-position stop at SL — so the position is never left totally unprotected. Logs alarm to Telegram if even that fails.
+
+Detailed runbook + working code in `SID/manual-trade.js` (the FIXED version, 2026-05-22 commit). Recovery script for the broken trade is `SID/manual-trade-recovery-mcd.js` (one-off, can be deleted after MCD position closes).
+
 ### Pitfall: Pine `tp2*Be` branches must EXPLICITLY close — don't trust the BE stop order
 
 Sister-bug to the next one. Confirmed 2026-05-22 on MCD daily — the original v2.1 code wrote the BE observation branches as:

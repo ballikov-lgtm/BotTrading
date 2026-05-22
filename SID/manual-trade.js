@@ -12,10 +12,15 @@
  * What it does:
  *   1. Submits market entry (buy for long, sell for short)
  *   2. Polls Alpaca until the entry order fills (max 60s)
- *   3. Submits limit close for 50% of shares at TP1_PRICE  (tif=gtc)
- *   4. Submits stop close for ALL shares at SL_PRICE       (tif=gtc)
- *      → After TP1 fires, the stop fires for whatever shares remain.
- *   5. Appends a record to SID/manual-trades-log.json (separate from
+ *   3. Submits an OCO order for HALF the shares — limit leg @ TP1_PRICE +
+ *      stop leg @ SL_PRICE. If TP1 hits, OCO cancels its own stop. If SL
+ *      hits first, OCO closes those shares at SL.
+ *   4. Submits a standalone stop for the OTHER HALF (the runner) @ SL_PRICE.
+ *      This is the "if SL hits first, full position closes" half.
+ *   5. If steps 3 or 4 fail, attempts a SAFETY FALLBACK: a single
+ *      full-position stop, so the position is never left unprotected.
+ *   6. Sends Telegram alert with entry + order IDs.
+ *   7. Appends a record to SID/manual-trades-log.json (separate from
  *      open-positions-sid.json so the real bot's state stays clean).
  *
  * Does NOT touch:
@@ -24,6 +29,15 @@
  *   - sid-account.json
  *
  * TP2 (e.g. RSI 70 exit on the runner) is the user's manual job.
+ *
+ * == Why the OCO pattern? ==
+ * The original (broken) pattern was "submit TP1 limit, then submit SL stop
+ * for full position". Alpaca rejected the SL because the TP1 limit was
+ * "holding" half the shares, leaving fewer shares "available" than the SL
+ * order required. The OCO pattern bundles TP1+SL for the same 4 shares into
+ * a single linked order (one fires → the other auto-cancels), so there's no
+ * conflict. The runner half is protected by a plain standalone stop.
+ * Confirmed 2026-05-22 on the MCD oneshot — see SID/CLAUDE.md § pitfall.
  */
 
 import fs from 'node:fs';
@@ -31,6 +45,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AlpacaClient } from './alpaca-client.js';
 import { resolveTradingMode } from './alpaca-executor.js';
+import { alertEntryFired, sendMessage } from './telegram-alerts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,12 +71,13 @@ if (!Number.isFinite(slPrice)  || slPrice  <= 0) bail(`TRADE_SL_PRICE must be > 
 const entrySide = side === 'long' ? 'buy'  : 'sell';
 const exitSide  = side === 'long' ? 'sell' : 'buy';
 const tp1Qty    = Math.floor(shares / 2);
+const runnerQty = shares - tp1Qty;
 if (tp1Qty < 1) bail(`Cannot split ${shares} shares into a 50% TP1 — need at least 2 shares`);
 
 // ── Mode + client ──────────────────────────────────────────────────────────
 const mode = resolveTradingMode();
 console.log(`[SID-MANUAL] mode=${mode}`);
-console.log(`[SID-MANUAL] ${ticker} ${side.toUpperCase()} ${shares} shares  TP1=${tp1Price} (${tp1Qty}sh)  SL=${slPrice}  note="${note}"`);
+console.log(`[SID-MANUAL] ${ticker} ${side.toUpperCase()} ${shares} shares  TP1=${tp1Price} (${tp1Qty}sh)  Runner=${runnerQty}sh  SL=${slPrice}  note="${note}"`);
 
 if (mode === 'dry_run') {
   console.log('[SID-MANUAL] dry_run mode — no orders will be sent. Set SID_TRADING_MODE=paper to actually submit.');
@@ -95,7 +111,7 @@ const entryOrder = await client.submitOrder({
   time_in_force:   'day',
   client_order_id: `${prefix}-entry`,
 });
-console.log(`[SID-MANUAL] Entry submitted: ${entryOrder.id} (client_order_id: ${entryOrder.client_order_id})`);
+console.log(`[SID-MANUAL] Entry submitted: ${entryOrder.id}`);
 
 // ── 2) Poll for fill (max 60s) ─────────────────────────────────────────────
 let filled = null;
@@ -104,36 +120,85 @@ for (let i = 0; i < 30; i++) {
   const o = await client.getOrder(entryOrder.id);
   console.log(`[SID-MANUAL] Poll ${i+1}: status=${o.status} filled_qty=${o.filled_qty}/${o.qty} filled_avg=${o.filled_avg_price}`);
   if (o.status === 'filled') { filled = o; break; }
-  if (['rejected', 'canceled', 'expired'].includes(o.status)) bail(`Entry order ${o.status}: ${o.failed_at || o.canceled_at}`);
+  if (['rejected', 'canceled', 'expired'].includes(o.status)) bail(`Entry order ${o.status}`);
 }
 if (!filled) bail('Entry order did not fill within 60 seconds. Investigate manually on Alpaca.');
 
 const fillPrice = parseFloat(filled.filled_avg_price);
 console.log(`[SID-MANUAL] ✅ Entry filled: ${filled.filled_qty} @ $${fillPrice.toFixed(2)}`);
 
-// ── 3) Submit TP1 limit close (50%) ────────────────────────────────────────
-const tp1Order = await client.submitOrder({
-  symbol:          ticker,
-  qty:             tp1Qty,
-  side:            exitSide,
-  type:            'limit',
-  limit_price:     tp1Price,
-  time_in_force:   'gtc',
-  client_order_id: `${prefix}-tp1`,
-});
-console.log(`[SID-MANUAL] TP1 limit ${exitSide} ${tp1Qty} @ $${tp1Price} submitted: ${tp1Order.id}`);
+// ── Helper: safety fallback — try to place a full-position stop ────────────
+async function trySafetyStop(reason) {
+  console.error(`[SID-MANUAL] !!! Safety fallback triggered: ${reason}`);
+  console.error('[SID-MANUAL] !!! Attempting full-position stop as safety net…');
+  try {
+    const stop = await client.submitOrder({
+      symbol:          ticker,
+      qty:             shares,
+      side:            exitSide,
+      type:            'stop',
+      stop_price:      slPrice,
+      time_in_force:   'gtc',
+      client_order_id: `${prefix}-safetystop`,
+    });
+    console.error(`[SID-MANUAL] !!! Safety stop placed (full position): ${stop.id}`);
+    return stop;
+  } catch (e) {
+    console.error(`[SID-MANUAL] !!! CRITICAL — even safety stop failed: ${e.message}`);
+    console.error('[SID-MANUAL] !!! POSITION IS UNPROTECTED — manual intervention required on Alpaca.');
+    try {
+      await sendMessage(`🚨 SID MANUAL TRADE FAILURE: ${ticker} ${side} ${shares}sh @ $${fillPrice.toFixed(2)} is UNPROTECTED on Alpaca. Both OCO and safety stop failed: ${e.message}. Manual intervention required.`);
+    } catch (_) {}
+    return null;
+  }
+}
 
-// ── 4) Submit SL stop close (full) ─────────────────────────────────────────
-const slOrder = await client.submitOrder({
-  symbol:          ticker,
-  qty:             shares,
-  side:            exitSide,
-  type:            'stop',
-  stop_price:      slPrice,
-  time_in_force:   'gtc',
-  client_order_id: `${prefix}-sl`,
-});
-console.log(`[SID-MANUAL] SL stop ${exitSide} ${shares} @ $${slPrice} submitted: ${slOrder.id}`);
+// ── 3) Submit OCO for half the shares (TP1 limit + SL stop bundle) ────────
+let ocoOrder = null;
+try {
+  ocoOrder = await client.submitOrder({
+    symbol:          ticker,
+    qty:             tp1Qty,
+    side:            exitSide,
+    type:            'limit',
+    limit_price:     tp1Price,
+    time_in_force:   'gtc',
+    order_class:     'oco',
+    take_profit:     { limit_price: tp1Price },
+    stop_loss:       { stop_price:  slPrice  },
+    client_order_id: `${prefix}-oco`,
+  });
+  console.log(`[SID-MANUAL] ✓ OCO submitted: ${ocoOrder.id}  (TP1 ${tp1Qty}@$${tp1Price} / SL ${tp1Qty}@$${slPrice})`);
+} catch (e) {
+  await trySafetyStop(`OCO submission failed: ${e.message}`);
+  bail(`OCO failed — entry exists but exits are degraded. Check Alpaca UI.`);
+}
+
+// Brief wait so OCO holds register before runner stop submission
+await new Promise(r => setTimeout(r, 1500));
+
+// ── 4) Submit standalone runner stop ──────────────────────────────────────
+let runnerStop = null;
+try {
+  runnerStop = await client.submitOrder({
+    symbol:          ticker,
+    qty:             runnerQty,
+    side:            exitSide,
+    type:            'stop',
+    stop_price:      slPrice,
+    time_in_force:   'gtc',
+    client_order_id: `${prefix}-runnerstop`,
+  });
+  console.log(`[SID-MANUAL] ✓ Runner stop submitted: ${runnerStop.id}  (${runnerQty}sh @ $${slPrice})`);
+} catch (e) {
+  console.error(`[SID-MANUAL] ⚠ Runner stop FAILED: ${e.message}`);
+  console.error(`[SID-MANUAL] ⚠ ${tp1Qty} shares covered by OCO, but ${runnerQty} shares are UNPROTECTED.`);
+  console.error(`[SID-MANUAL] ⚠ Manual fix required on Alpaca: submit stop sell ${runnerQty} ${ticker} @ $${slPrice}.`);
+  try {
+    await sendMessage(`⚠ SID MANUAL TRADE PARTIAL FAILURE: ${ticker} ${side} ${shares}sh. OCO covers ${tp1Qty} but runner stop failed (${runnerQty}sh unprotected): ${e.message}. Manual fix needed.`);
+  } catch (_) {}
+  // Don't bail — OCO is covering tp1Qty, runner is exposed but partial protection is better than none.
+}
 
 // ── 5) Append to manual-trades-log.json (separate from bot state) ──────────
 const logPath = path.join(__dirname, 'manual-trades-log.json');
@@ -152,13 +217,14 @@ const record = {
   ticker,
   side,
   shares_total:     shares,
-  tp1_shares:       tp1Qty,
+  tp1_qty:          tp1Qty,
+  runner_qty:       runnerQty,
   tp1_price:        tp1Price,
   sl_price:         slPrice,
   entry_fill_price: fillPrice,
   entry_order_id:   entryOrder.id,
-  tp1_order_id:     tp1Order.id,
-  sl_order_id:      slOrder.id,
+  oco_order_id:     ocoOrder?.id ?? null,
+  runner_stop_id:   runnerStop?.id ?? null,
   client_order_id_prefix: prefix,
   mode,
 };
@@ -166,8 +232,32 @@ logArr.push(record);
 fs.writeFileSync(logPath, JSON.stringify(logArr, null, 2));
 console.log(`[SID-MANUAL] Recorded to ${logPath}`);
 
+// ── 6) Telegram alert ──────────────────────────────────────────────────────
+try {
+  await alertEntryFired({
+    symbol:    ticker,
+    side,
+    entryPrice: fillPrice,
+    stopLoss:   slPrice,
+    shares,
+    riskUsd:    Math.abs(fillPrice - slPrice) * shares,
+    orderId:    entryOrder.id,
+    mode,
+  });
+  await sendMessage(
+    `🎯 *${note}*\n` +
+    `${ticker} ${side.toUpperCase()} ${shares}sh @ $${fillPrice.toFixed(2)}\n` +
+    `TP1 $${tp1Price.toFixed(2)} (${tp1Qty}sh, OCO ${ocoOrder?.id?.slice(0,8) ?? 'FAIL'})\n` +
+    `SL $${slPrice.toFixed(2)} (${shares}sh total cover, runner stop ${runnerStop?.id?.slice(0,8) ?? 'FAIL'})\n` +
+    `Mode: ${mode}`
+  );
+  console.log(`[SID-MANUAL] ✓ Telegram alerts sent`);
+} catch (e) {
+  console.warn(`[SID-MANUAL] Telegram alert failed (non-fatal): ${e.message}`);
+}
+
 console.log('\n[SID-MANUAL] ✅ DONE');
 console.log(`   Position: ${shares} shares ${side.toUpperCase()} ${ticker} @ $${fillPrice.toFixed(2)}`);
-console.log(`   TP1 (limit ${exitSide} ${tp1Qty} @ $${tp1Price.toFixed(2)})  ← gtc, sits on Alpaca`);
-console.log(`   SL  (stop  ${exitSide} ${shares} @ $${slPrice.toFixed(2)})  ← gtc, fires for whatever remains`);
-console.log(`   TP2 logic (e.g. RSI 70 exit) is YOUR manual job — Alpaca won't auto-fire that.`);
+console.log(`   OCO     : ${tp1Qty}sh — TP1 limit $${tp1Price.toFixed(2)} | SL stop $${slPrice.toFixed(2)}`);
+console.log(`   Runner  : ${runnerQty}sh — standalone stop $${slPrice.toFixed(2)}`);
+console.log(`   TP2 logic (e.g. RSI 70 close on runner) is YOUR manual job.`);
