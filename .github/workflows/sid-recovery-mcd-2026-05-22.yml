@@ -1,0 +1,38 @@
+name: SID Recovery — MCD 2026-05-22 (add missing SL)
+
+# ⚠️  ONE-OFF — runs `SID/manual-trade-recovery-mcd.js` to fix the missing SL on
+# the MCD position opened by sid-oneshot-mcd-2026-05-22.yml. The original
+# workflow's script crashed after placing TP1 limit but before placing SL,
+# leaving the position unprotected. This recovery uses the correct OCO pattern
+# (4-share OCO bracket + 4-share standalone stop) so all 8 shares have SL
+# coverage.
+#
+# DELETE THIS FILE after successful run.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover-mcd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run MCD SL recovery
+        working-directory: SID
+        env:
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+        run: node manual-trade-recovery-mcd.js
