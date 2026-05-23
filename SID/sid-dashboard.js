@@ -317,9 +317,12 @@ function renderOpenPositionsCards(rows) {
       </div>
       ${chartSvg}
       <div class="pos-meta">
+        <span>ENTRY <strong>$${entry.toFixed(2)}</strong></span>
+        <span>STOP <strong>$${stop.toFixed(2)}</strong></span>
+        <span title="Snapshot from last scanner run (3×/day) — may lag real-time. Compare against your broker for live P&amp;L.">SNAPSHOT <strong>$${current.toFixed(2)}</strong></span>
+        ${tp1Line}
         <span>QTY <strong>${r.shares ?? '—'}</strong></span>
         <span>RISK <strong>$${(r.riskUsd ?? 0).toFixed(2)}</strong></span>
-        ${tp1Line}
         <span>TO STOP <strong>${stopDistPct.toFixed(1)}%</strong></span>
         <span>DAYS <strong>${daysOpen}</strong></span>
         <span>OPEN <strong>${esc(r.openDate || '—')}</strong></span>
@@ -1402,7 +1405,7 @@ ${PAPER_TRADING_MODE ? `
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // ${allLivePositions.length} OPEN (${open.length} bot · ${manualNormalized.length} manual)</div>
+      <div class="panel-title">LIVE TRADES // ${allLivePositions.length} OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF ${esc(generated)}</span></div>
       ${renderOpenPositionsCards(allLivePositions)}
     </div>
 
