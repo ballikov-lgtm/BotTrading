@@ -15,8 +15,9 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 | Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
 |----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
 | **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.1) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
-| **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **LIVE** | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
+| **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
+| **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |
 
 **Status legend:**
 - **ALPHA** — in-development, not deployed
@@ -55,22 +56,25 @@ When the user references a *type* of strategy rather than naming one, use this l
 | User says... | Matching strategies | Why |
 |---|---|---|
 | "a swing strategy" / "swing rules" | SID, Ironclad | Both hold positions days-weeks |
-| "a scalp" / "intraday" / "scalping logic" | VWAP Scalper | 4h holds |
+| "a scalp" / "intraday" / "scalping logic" | VWAP Scalper, C.A.T.S. | VWAP=4h holds, C.A.T.S.=1H entries |
 | "how we handle pullbacks" | SID, Ironclad | SID = daily RSI<30 pullback; Ironclad = 15m pullback within daily trend |
-| "a crypto strategy" | VWAP, Ironclad | Both trade BitGet |
+| "a crypto strategy" | VWAP, Ironclad, C.A.T.S. | All trade BitGet |
 | "a stocks strategy" / "US equities" | SID, Ironclad (stocks mode) | |
 | "a ranging-market strategy" | VWAP | Explicitly skips trending |
 | "a trending-market strategy" | Ironclad | Explicitly requires daily trend |
 | "daily timeframe rules" | SID, Ironclad | |
-| "intraday rules" | VWAP, Ironclad (15m entry side) | |
-| "live status" / "running now" | Ironclad (LIVE), SID + VWAP (LIVE PAPER) | |
+| "intraday rules" | VWAP, Ironclad (15m entry side), C.A.T.S. (1H) | |
+| "1H rules" / "hourly entries" | C.A.T.S. | Only one on 1H primary |
+| "live status" / "running now" | SID + VWAP (LIVE PAPER), Ironclad PAUSED, C.A.T.S. ALPHA | |
 | "backtest vault" / "tested variants" | SID — see `SID/strategy-test-vault/` | Others use ad-hoc records |
 | "oversold entry" / "RSI extreme" | SID (RSI<30 daily) | Mean-reversion play |
 | "trend break entry" | Ironclad (15m break of swing low/high) | Trend-following |
 | "VWAP" / "RSI(3)" / "EMA(8)" | VWAP Scalper | Indicator stack lives there |
-| "TP1 / TP2 / dynamic exits" | SID v2.1 | See SID/CLAUDE.md § V2.1 method |
+| "TP1 / TP2 / dynamic exits" | SID v2.1, C.A.T.S. (dynamic short TP planned) | See SID/CLAUDE.md § V2.1 method, CATS-MEMORY.md |
 | "Railway" / "Cloudflare" / "futures account" | Ironclad | Only one on Railway |
 | "Alpaca" / "PDT-immune" | SID | Only one on Alpaca |
+| "supply / demand zones" / "S&D" / "rejection zones" / "order blocks" / "ICT" / "SMC" / "Wyckoff" | C.A.T.S. | Levels-based methodology research lives in CATS-MEMORY.md |
+| "Ironclad replacement" / "new crypto bot" | C.A.T.S. | Explicitly the successor |
 
 When two strategies match, **read both memory files** and report what each does separately.
 
@@ -106,6 +110,7 @@ Each strategy owns specific files. Full lists live in each strategy's memory fil
 | SID | `SID/` folder, `docs/sid/`, `.github/workflows/sid*.yml`, `SID/requirements.txt` |
 | Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `audit.js`, `monitor.js`, `railway-runner.js`, `rules-ironclad.json`, `*-ironclad.json/csv`, `hype-state.json`, `docs/index.html` (research dashboard), `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` |
 | VWAP Scalper | `bot.js`, `rules.json`, `trades.csv`, `safety-check-log.json`, `.github/workflows/trade.yml` |
+| **C.A.T.S.** | `bot-cats.js` (TBD), `rules-cats.json` (TBD), `*-cats.json/csv` (TBD), `cats/` folder if needed, `docs/cats/` (TBD), `pine/cats-visualiser.pine` (TBD), `.github/workflows/cats.yml` (TBD), `CATS-MEMORY.md` |
 | Shared infra | `package.json`, `node_modules/`, `.env.example`, `README.md` (human-facing readmes are not memory files) |
 
 **When in doubt, check the owning strategy's memory file before touching a file.**
