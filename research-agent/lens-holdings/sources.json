@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1",
+  "last_updated": "2026-05-24",
+  "default_sources": [
+    {"domain": "trustnet.com",            "priority": 1, "for": ["funds", "ETFs", "performance"]},
+    {"domain": "hl.co.uk",                "priority": 1, "for": ["funds", "ETFs", "research", "wealth-shortlist"]},
+    {"domain": "morningstar.co.uk",       "priority": 1, "for": ["funds", "ratings", "analyst-views"]},
+    {"domain": "ft.com",                  "priority": 2, "for": ["news", "fund-manager-profiles", "markets"]},
+    {"domain": "investorschronicle.co.uk",  "priority": 2, "for": ["UK-funds", "commentary"]},
+    {"domain": "citywire.com",            "priority": 2, "for": ["fund-manager-ratings"]},
+    {"domain": "bloomberg.com",           "priority": 3, "for": ["global-news", "macro"]},
+    {"domain": "reuters.com",             "priority": 3, "for": ["global-news", "breaking"]}
+  ],
+  "opportunity_sources": [
+    {"domain": "hl.co.uk",                "for": ["wealth-shortlist", "newly-added"]},
+    {"domain": "morningstar.co.uk",       "for": ["analyst-picks", "manager-changes"]},
+    {"domain": "trustnet.com",            "for": ["top-performers"]},
+    {"domain": "citywire.com",            "for": ["highly-rated-managers"]}
+  ],
+  "blocked_sources": [],
+  "_notes": "default_sources are queried when researching individual holdings. opportunity_sources bias the broader 'what's predicted to do well' scan. priority 1 = trusted/primary, queried first. blocked_sources is a deny-list for paywalled or low-quality domains."
+}

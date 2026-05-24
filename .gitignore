@@ -2,3 +2,23 @@ node_modules/
 .env
 .claude/worktrees/
 .claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Private investment data — MUST NEVER be tracked ──────────────────────────
+# Real holdings & generated reports live OUTSIDE this repo at
+# ~/OneDrive/Documents/Private Investments/ — these rules are belt-and-braces
+# in case anything drifts into the working tree.
+research-agent/lens-holdings/holdings.json
+research-agent/outputs/holdings-alerts.json
+research-agent/outputs/holdings-*.json
+**/Holdings.docx
+**/Pension.docx
+**/FinancialPlan.docx
+**/holdings.json
+**/pension.json
+**/financial_plan.json
+**/holdings-alerts*.json
