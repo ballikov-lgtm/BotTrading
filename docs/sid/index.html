@@ -810,7 +810,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 16:34:27</span>
+        <span>SYS · 19:32:35</span>
       </div>
     </div>
   </header>
@@ -831,7 +831,7 @@
   <div class="stat-grid">
     <div class="stat-tile" style="--accent:var(--cyan)">
     <div class="stat-label">OPEN POSITIONS</div>
-    <div class="stat-value">2</div>
+    <div class="stat-value">3</div>
     <div class="stat-sub">live</div>
   </div>
 
@@ -895,8 +895,51 @@
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-05-26 16:34:27 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-05-26 19:32:35 UTC</span></div>
       <div class="position-grid"><div class="position-card">
+      <div class="pos-head">
+        <div>
+          <span class="pos-symbol">UNH</span>
+          <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
+          
+        </div>
+        <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-4.08%</div>
+      </div>
+      
+      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
+        <defs>
+          <linearGradient id="grad-fd464876-88d9-4c30-a1d2-72cc52caa0e7" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+          </linearGradient>
+        </defs>
+        <!-- background band showing profit / loss zones -->
+        <rect x="12" y="22" width="256" height="12" fill="url(#grad-fd464876-88d9-4c30-a1d2-72cc52caa0e7)" rx="2"/>
+        <!-- baseline -->
+        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
+        <!-- stop marker -->
+        <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
+        <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
+        <!-- entry marker -->
+        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <!-- current price pulsing dot -->
+        <circle cx="241.15274755933882" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
+          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
+        </circle>
+        <text x="241.15274755933882" y="18" text-anchor="middle" font-size="9" fill="#ff0044" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #ff0044)">$393.85</text>
+      </svg>
+      <div class="pos-meta">
+        <span>ENTRY <strong>$378.42</strong></span>
+        <span>STOP <strong>$405.00</strong></span>
+        <span title="Snapshot from last scanner run (3×/day) — may lag real-time. Compare against your broker for live P&amp;L.">SNAPSHOT <strong>$393.85</strong></span>
+        
+        <span>QTY <strong>26</strong></span>
+        <span>RISK <strong>$691.08</strong></span>
+        <span>TO STOP <strong>2.8%</strong></span>
+        <span>DAYS <strong>0</strong></span>
+        <span>OPEN <strong>2026-05-26</strong></span>
+      </div>
+    </div><div class="position-card">
       <div class="pos-head">
         <div>
           <span class="pos-symbol">GOOG</span>
@@ -1921,7 +1964,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 69.5% win rate is from a 5-year simulated backtest (302 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-26 16:34:27 UTC</footer>
+  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-05-26 19:32:35 UTC</footer>
 
 </div>
 
