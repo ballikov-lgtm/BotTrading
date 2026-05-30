@@ -815,5 +815,43 @@
     "closeDate": "2026-05-29",
     "closeTime": "15:00:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1780023427255",
+    "symbol": "APTUSDT",
+    "side": "short",
+    "entry": 0.93,
+    "stopLoss": 0.9635,
+    "takeProfit": 0.8872,
+    "qty": 5.359057,
+    "totalUsd": 5,
+    "openDate": "2026-05-29",
+    "openTime": "02:57:07",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.5403,
+    "exitLevel": "sl",
+    "exitPrice": 0.9635,
+    "closeDate": "2026-05-30",
+    "closeTime": "02:00:00",
+    "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1780023427438",
+    "symbol": "ONDOUSDT",
+    "side": "short",
+    "entry": 0.37,
+    "stopLoss": 0.3807,
+    "takeProfit": 0.3482,
+    "qty": 13.598042,
+    "totalUsd": 5,
+    "openDate": "2026-05-29",
+    "openTime": "02:57:07",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.8838,
+    "exitLevel": "tp1",
+    "exitPrice": 0.3482,
+    "closeDate": "2026-05-30",
+    "closeTime": "00:30:00",
+    "outcome": "WIN"
   }
 ]
