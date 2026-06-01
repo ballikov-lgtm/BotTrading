@@ -891,5 +891,43 @@
     "closeDate": "2026-06-01",
     "closeTime": "06:15:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1780023427088",
+    "symbol": "VIRTUALUSDT",
+    "side": "short",
+    "entry": 0.72,
+    "stopLoss": 0.7522,
+    "takeProfit": 0.6684,
+    "qty": 6.957006,
+    "totalUsd": 5,
+    "openDate": "2026-05-29",
+    "openTime": "02:57:07",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.6708,
+    "exitLevel": "sl",
+    "exitPrice": 0.7522,
+    "closeDate": "2026-06-01",
+    "closeTime": "19:45:00",
+    "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1780051137122",
+    "symbol": "VIRTUALUSDT",
+    "side": "short",
+    "entry": 0.72,
+    "stopLoss": 0.7515,
+    "takeProfit": 0.6707,
+    "qty": 6.952169,
+    "totalUsd": 5,
+    "openDate": "2026-05-29",
+    "openTime": "10:38:57",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.6562,
+    "exitLevel": "sl",
+    "exitPrice": 0.7515,
+    "closeDate": "2026-06-01",
+    "closeTime": "19:45:00",
+    "outcome": "LOSS"
   }
 ]
