@@ -929,5 +929,24 @@
     "closeDate": "2026-06-01",
     "closeTime": "19:45:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1780409145162",
+    "symbol": "HYPEUSDT",
+    "side": "long",
+    "entry": 73.07,
+    "stopLoss": 70.1643,
+    "takeProfit": 77.4211,
+    "qty": 0.06843,
+    "totalUsd": 5,
+    "openDate": "2026-06-02",
+    "openTime": "14:05:45",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.5965,
+    "exitLevel": "sl",
+    "exitPrice": 70.1643,
+    "closeDate": "2026-06-02",
+    "closeTime": "19:15:00",
+    "outcome": "LOSS"
   }
 ]
