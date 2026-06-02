@@ -810,7 +810,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 20:23:29</span>
+        <span>SYS · 20:58:41</span>
       </div>
     </div>
   </header>
@@ -888,14 +888,14 @@
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(12)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(15)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-06-02 20:23:29 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-06-02 20:58:41 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -952,7 +952,7 @@
       <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
         <defs>
           <linearGradient id="grad-b9b591df-ae20-49c4-822b-9af6c6712cbd" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="75%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="75%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
+            <stop offset="0%" stop-color="#39ff14" stop-opacity="0.05"/><stop offset="150%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="150%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="100%" stop-color="#ff0044" stop-opacity="0.45"/>
           </linearGradient>
         </defs>
         <!-- background band showing profit / loss zones -->
@@ -963,8 +963,8 @@
         <line x1="268" y1="18" x2="268" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
         <text x="268" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
         <!-- entry marker -->
-        <line x1="204" y1="16" x2="204" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="204" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <line x1="396" y1="16" x2="396" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="396" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
         <!-- current price pulsing dot -->
         <circle cx="268" cy="28" r="5" fill="#ff0044" style="filter: drop-shadow(0 0 6px #ff0044)">
           <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
@@ -973,7 +973,7 @@
       </svg>
       <div class="pos-meta">
         <span>ENTRY <strong>$381.84</strong></span>
-        <span>STOP <strong>$382.00</strong></span>
+        <span>STOP <strong>$381.83</strong></span>
         <span title="Snapshot from last scanner run (3×/day) — may lag real-time. Compare against your broker for live P&amp;L.">SNAPSHOT <strong>$393.32</strong></span>
         
         <span>QTY <strong>26</strong></span>
@@ -1864,7 +1864,7 @@
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (12)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (15)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1872,6 +1872,27 @@
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-06-02</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">BE stop direction-aware penny rounding — no more small-loss BE exits</div>
+      <div class="update-summary">bot-sid.js:931 used Math.round(entry) for the post-TP1 BE stop, which was direction-blind — a long entry of $281.49 rounded DOWN to $281 (tiny loss locked in), and a short entry of $381.84 rounded UP to $382 (tiny loss locked in). Replaced with direction-aware penny rounding: long stop = entry+0.01, short stop = entry−0.01. Every BE stop now locks in ≥1¢/share profit instead of risking a small loss. Existing GOOG position retrofitted from $382 → $381.83. Audit task #11 MED finding resolved.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-06-01</span>
+        <span class="update-cat" style="color:#ff1493;border-color:#ff1493">TRADE</span>
+      </div>
+      <div class="update-title">GOOG SHORT — TP1 fired (RSI 49.34)</div>
+      <div class="update-summary">First live paper TP1 trigger in v2.1. Closed 13 of 26 shares at $372.58 for +$120.38 realised. Stop moved to BE area ($381.83 post-fix). Runner now sitting on +$305 unrealised as GOOG continues lower toward $358.</div>
+    </li><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-05-26</span>
+        <span class="update-cat" style="color:#ff1493;border-color:#ff1493">TRADE</span>
+      </div>
+      <div class="update-title">UNH SHORT fired (26sh @ $378.42)</div>
+      <div class="update-summary">RSI overbought (73.12) episode from 2026-04-17, trigger fired May 26 with RSI 58.1 + MACD both pointing down. Stop $405 (Math.ceil of episode high). Position currently flat, working as designed.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-05-22</span>
         <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
@@ -1964,7 +1985,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 69.5% win rate is from a 5-year simulated backtest (302 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-06-02 20:23:29 UTC</footer>
+  <footer>SID v2.1 // PRIVATE TERMINAL // GENERATED 2026-06-02 20:58:41 UTC</footer>
 
 </div>
 

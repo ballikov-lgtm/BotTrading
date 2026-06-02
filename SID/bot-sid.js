@@ -928,7 +928,16 @@ async function checkPositions(executor = null) {
         pos.tp1_reason       = 'rsi50';
         pos.tp1_rsi          = rsi;
         pos.shares_remaining = pos.shares_total - tp1Shares;
-        pos.stopLoss         = Math.round(pos.entry); // break-even stop (whole dollar)
+        // BE stop — direction-aware penny rounding, ALWAYS locks ≥ 1¢/share profit.
+        // Replaces the old Math.round(entry) which was direction-blind: a long
+        // entry of $281.49 used to round DOWN to $281 (tiny loss), and a short
+        // entry of $381.84 used to round UP to $382 (tiny loss). Now: round to
+        // nearest cent first (float-safe), then bias 1¢ in the favourable
+        // direction (long: 1¢ above entry; short: 1¢ below). Guarantees
+        // post-TP1 BE stop never closes at a small loss.
+        const beCents = Math.round(pos.entry * 100);
+        const beBias  = pos.side === 'long' ? 1 : -1;
+        pos.stopLoss  = (beCents + beBias) / 100;
         // Book TP1 partial P&L immediately so account compounds
         const acctAfterTp1 = updateAccount(tp1Pnl);
         appendTrade([

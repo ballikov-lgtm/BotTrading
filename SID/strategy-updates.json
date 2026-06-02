@@ -1,5 +1,23 @@
 [
   {
+    "date": "2026-06-02",
+    "category": "fix",
+    "title": "BE stop direction-aware penny rounding — no more small-loss BE exits",
+    "summary": "bot-sid.js:931 used Math.round(entry) for the post-TP1 BE stop, which was direction-blind — a long entry of $281.49 rounded DOWN to $281 (tiny loss locked in), and a short entry of $381.84 rounded UP to $382 (tiny loss locked in). Replaced with direction-aware penny rounding: long stop = entry+0.01, short stop = entry−0.01. Every BE stop now locks in ≥1¢/share profit instead of risking a small loss. Existing GOOG position retrofitted from $382 → $381.83. Audit task #11 MED finding resolved."
+  },
+  {
+    "date": "2026-06-01",
+    "category": "trade",
+    "title": "GOOG SHORT — TP1 fired (RSI 49.34)",
+    "summary": "First live paper TP1 trigger in v2.1. Closed 13 of 26 shares at $372.58 for +$120.38 realised. Stop moved to BE area ($381.83 post-fix). Runner now sitting on +$305 unrealised as GOOG continues lower toward $358."
+  },
+  {
+    "date": "2026-05-26",
+    "category": "trade",
+    "title": "UNH SHORT fired (26sh @ $378.42)",
+    "summary": "RSI overbought (73.12) episode from 2026-04-17, trigger fired May 26 with RSI 58.1 + MACD both pointing down. Stop $405 (Math.ceil of episode high). Position currently flat, working as designed."
+  },
+  {
     "date": "2026-05-22",
     "category": "fix",
     "title": "manual-trade.js: OCO + safety fallback pattern",
