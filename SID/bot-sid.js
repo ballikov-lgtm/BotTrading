@@ -980,20 +980,40 @@ async function checkPositions(executor = null) {
       let tp2Reason    = null;
       let tp2ExitPrice = null;
 
+      // FIX 2026-06-02 — SMA touch semantics: previous logic ONLY checked STRADDLE
+      // (low ≤ sma ≤ high). That correctly catches the common case where a bar's
+      // range includes the SMA, but MISSES gap-throughs where the previous bar
+      // closed on one side of the SMA and the current bar opens fully on the other
+      // side (e.g., GOOG short runner with SMA50 at $347 and current price $358 —
+      // if GOOG gaps down to open at $345 and bounces to close $349, bar high $349
+      // is BELOW SMA $347 wait that's above, let me redo — if SMA $347 and bar
+      // opens $343, low $341, high $345, close $344, bar entirely below SMA but
+      // previous close was $358 ABOVE SMA → crossed via gap, straddle misses).
+      //
+      // Helper checks BOTH cases:
+      //   1. Straddle: bar's range includes the SMA (the common in-bar touch)
+      //   2. Gap-cross: prevClose was on one side, currClose on the other (the gap case)
+      // Audit task #11 MED finding resolved.
+      const prevClose = i > 0 ? candles[i - 1].close : null;
+      const crossedSMA = (ma) =>
+        ma !== null && (
+          (c.low <= ma && ma <= c.high) ||                                    // touched the SMA in-bar
+          (prevClose !== null && Math.sign(prevClose - ma) !== Math.sign(c.close - ma))  // gapped across SMA
+        );
       if (pos.side === 'long') {
         if (c.low <= pos.stopLoss) {
           tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
-        } else if (ma50 !== null && c.low <= ma50 && ma50 <= c.high) {
+        } else if (crossedSMA(ma50)) {
           tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
-        } else if (ma200 !== null && c.low <= ma200 && ma200 <= c.high) {
+        } else if (crossedSMA(ma200)) {
           tp2Hit = true; tp2Reason = 'sma200_touch'; tp2ExitPrice = ma200;
         }
       } else { // short
         if (c.high >= pos.stopLoss) {
           tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
-        } else if (ma50 !== null && c.low <= ma50 && ma50 <= c.high) {
+        } else if (crossedSMA(ma50)) {
           tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
-        } else if (ma200 !== null && c.low <= ma200 && ma200 <= c.high) {
+        } else if (crossedSMA(ma200)) {
           tp2Hit = true; tp2Reason = 'sma200_touch'; tp2ExitPrice = ma200;
         }
       }
