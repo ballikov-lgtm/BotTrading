@@ -1,0 +1,74 @@
+name: SID Set Limit Close
+
+# Places a GTC limit order against an existing position. Cloud-side intraday
+# exit handler — use this when you want a TP2-style price-level exit (S&D
+# zone, horizontal level, Fib retrace, etc.) before the bot's daily-poll
+# would catch it.
+#
+# Alpaca's matching engine watches the price continuously after submission —
+# fills automatically when the limit is hit, no further infra required.
+# When it fills, the bot's next scheduled run reconciles open-positions-sid.json.
+#
+# Trigger from anywhere with gh CLI:
+#   gh workflow run sid-set-limit-close.yml \
+#     -f ticker=GOOG -f qty=13 -f limit_price=348 -f side=buy \
+#     -f note="S&D bounce target $345-348"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "Ticker symbol (e.g. GOOG)"
+        required: true
+        type: string
+      qty:
+        description: "Shares to close (integer, ≤ open position)"
+        required: true
+        type: string
+      limit_price:
+        description: "Limit price"
+        required: true
+        type: string
+      side:
+        description: "buy = close a short / sell = close a long"
+        required: true
+        type: choice
+        options: [buy, sell]
+      note:
+        description: "Reason for the trade journal (optional)"
+        required: false
+        type: string
+        default: "Manual limit close"
+
+permissions:
+  contents: read
+
+jobs:
+  set-limit-close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Submit limit close
+        working-directory: SID
+        env:
+          # ── Alpaca credentials (reuse existing secrets) ────────────────────
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+
+          # ── Limit-close params ────────────────────────────────────────────
+          TRADE_TICKER:      ${{ inputs.ticker }}
+          TRADE_QTY:         ${{ inputs.qty }}
+          TRADE_LIMIT_PRICE: ${{ inputs.limit_price }}
+          TRADE_SIDE:        ${{ inputs.side }}
+          TRADE_NOTE:        ${{ inputs.note }}
+        run: node set-limit-close.js
