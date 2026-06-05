@@ -134,24 +134,47 @@ class AlpacaExecutor {
    */
   async syncPositions(localOpen) {
     const alpacaPositions = await this.client.listPositions();
-    const alpacaSymbols = new Set(alpacaPositions.map(p => p.symbol.toUpperCase()));
+    const alpacaBySymbol = new Map(
+      alpacaPositions.map(p => [p.symbol.toUpperCase(), p])
+    );
 
     const stillOpen = [];
     const closedExternally = [];
+    const partialClosed = [];
 
     for (const pos of localOpen) {
-      if (alpacaSymbols.has(pos.symbol.toUpperCase())) {
-        // Still held on Alpaca — keep tracking. We do NOT pull qty from Alpaca
-        // and overwrite local because partial fills / averaging is a future feature.
+      const alpacaPos = alpacaBySymbol.get(pos.symbol.toUpperCase());
+
+      if (alpacaPos) {
+        // Position still on Alpaca — but compare share counts to catch
+        // partial fills (FIX task #25, 2026-06-05). The old code blindly
+        // kept local qty in sync only when the bot itself fired the close,
+        // missing externally-fired partial fills like the MCD May 26 case
+        // where 4 of 8 shares closed but the bot ran for 10 days thinking
+        // it still held 8.
+        const alpacaQty = Math.abs(parseInt(alpacaPos.qty, 10));
+        const localQty  = pos.shares_remaining ?? pos.shares;
+        if (Number.isFinite(alpacaQty) && Number.isFinite(localQty) && alpacaQty < localQty) {
+          const deltaShares = localQty - alpacaQty;
+          // Snapshot pos BEFORE we mutate it so the caller has the prev state
+          partialClosed.push({
+            pos: { ...pos },
+            prevQty: localQty,
+            newQty: alpacaQty,
+            deltaShares,
+          });
+          // Update local pos.shares_remaining to match Alpaca truth
+          pos.shares_remaining = alpacaQty;
+        }
         stillOpen.push(pos);
       } else {
-        // Local says open, Alpaca says no. Either the stop filled, or we just
-        // submitted the close. Either way: treat as externally closed.
+        // Local says open, Alpaca says no. Externally closed (stop fill,
+        // OCO fill, manual close, anything else).
         closedExternally.push(pos);
       }
     }
 
-    return { stillOpen, closedExternally, alpacaPositions };
+    return { stillOpen, closedExternally, partialClosed, alpacaPositions };
   }
 
   /**

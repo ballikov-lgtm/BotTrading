@@ -297,6 +297,144 @@ function addOpenPosition(pos) {
   saveOpenPositions(open);
 }
 
+// ── External close recorder (FIX tasks #25 + #26, 2026-06-05) ────────────────
+// When syncPositions detects that Alpaca closed shares we didn't fire ourselves
+// (stop fills, OCO fills, manual broker-side closes), this records the close
+// properly in: closed-positions-sid.json, trades-sid.csv, sid-account.json +
+// Telegram alert. Queries Alpaca's filled orders to find the actual exit
+// price; falls back to the position's stop level if order history is
+// unavailable.
+async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind, isFullClose }) {
+  // ── Find the actual exit price from Alpaca's order history ─────────
+  let exitPrice = null;
+  let fillsUsed = [];
+  try {
+    const oppositeSide = pos.side === 'long' ? 'sell' : 'buy';
+    const afterIso = pos.openDate ? `${pos.openDate}T00:00:00Z` : undefined;
+    const orders = await alpacaClient.listOrders({
+      symbols: pos.symbol,
+      status:  'closed', // includes filled + canceled
+      after:   afterIso,
+      limit:   100,
+    });
+    const fills = (orders || []).filter(o =>
+      o &&
+      String(o.side || '').toLowerCase() === oppositeSide &&
+      String(o.status || '').toLowerCase() === 'filled' &&
+      parseFloat(o.filled_qty || 0) > 0
+    );
+    if (fills.length > 0) {
+      // For a PARTIAL external close, use the most recent fill closest to
+      // sharesClosed. For a FULL close, weighted-average across all fills
+      // up to sharesClosed.
+      let qtyCounted = 0;
+      let costCounted = 0;
+      const sortedFills = fills.sort((a, b) => new Date(b.filled_at || b.updated_at || b.created_at) - new Date(a.filled_at || a.updated_at || a.created_at));
+      for (const f of sortedFills) {
+        if (qtyCounted >= sharesClosed) break;
+        const q = parseFloat(f.filled_qty);
+        const p = parseFloat(f.filled_avg_price);
+        const take = Math.min(q, sharesClosed - qtyCounted);
+        qtyCounted += take;
+        costCounted += take * p;
+        fillsUsed.push({
+          orderId: f.id,
+          filledAt: f.filled_at || f.updated_at,
+          qty: take,
+          price: parseFloat(p.toFixed(4)),
+        });
+      }
+      if (qtyCounted > 0) exitPrice = costCounted / qtyCounted;
+    }
+  } catch (err) {
+    console.warn(`[recordExternalClose] Failed to query Alpaca orders for ${pos.symbol} exit price: ${err.message}`);
+  }
+
+  // Fallback: use the bot's tracked stop level. For Alpaca-side stops set at
+  // bot's stopLoss, this is usually within a few cents of actual fill.
+  if (exitPrice === null || !Number.isFinite(exitPrice)) {
+    exitPrice = pos.stopLoss;
+    console.warn(`[recordExternalClose] No Alpaca fills found for ${pos.symbol} — using stopLoss $${exitPrice} as approximation`);
+  }
+
+  // ── Compute realised P&L ───────────────────────────────────────────
+  const entry = pos.entry;
+  const pnl = pos.side === 'long'
+    ? (exitPrice - entry) * sharesClosed
+    : (entry - exitPrice) * sharesClosed;
+  const pnlRounded = parseFloat(pnl.toFixed(2));
+  const exitPriceRounded = parseFloat(exitPrice.toFixed(4));
+
+  // ── Append to closed-positions-sid.json ─────────────────────────────
+  const closed = loadClosedPositions();
+  const closedRec = {
+    ...pos,
+    closeDate: todayString(),
+    closeTime: new Date().toISOString().slice(11, 19),
+    exit_strategy: reasonKind,
+    exit_price:    exitPriceRounded,
+    exit_pnl:      pnlRounded,
+    exit_shares:   sharesClosed,
+    exit_fills:    fillsUsed,
+    total_pnl:     pnlRounded,
+    realizedPnl:   pnlRounded,
+    is_full_close: isFullClose,
+  };
+  closed.push(closedRec);
+  saveClosedPositions(closed);
+
+  // ── Append row to trades-sid.csv ────────────────────────────────────
+  const totalUsd = (sharesClosed * entry).toFixed(2);
+  const riskPct  = ((pnl / (sharesClosed * entry)) * 100).toFixed(2);
+  appendTrade([
+    todayString(),
+    new Date().toISOString().slice(11, 19),
+    'Alpaca/' + (pos.mode || 'paper'),
+    pos.symbol,
+    `${pos.side}-extclose`,
+    sharesClosed,
+    entry.toFixed(2),
+    pos.stopLoss != null ? pos.stopLoss.toFixed(2) : '',
+    totalUsd,
+    pnlRounded,
+    riskPct,
+    pos.signalDate || '',
+    `EXT-${pos.symbol}-${Date.now()}`,
+    pos.mode || 'paper',
+    pos.strategy || 'SID v2.1',
+  ].join(','));
+
+  // ── Update account state ────────────────────────────────────────────
+  updateAccount(pnlRounded);
+
+  // ── Telegram alert ──────────────────────────────────────────────────
+  const pnlEmoji = pnlRounded >= 0 ? '📈' : '📉';
+  const sign = pnlRounded >= 0 ? '+' : '';
+  try {
+    await tg.sendMessage(
+      `${pnlEmoji} <b>SID external close detected</b>\n\n` +
+      `${pos.symbol} ${pos.side.toUpperCase()} ${sharesClosed}sh ${isFullClose ? '(FULL)' : '(PARTIAL)'}\n` +
+      `Entry: $${entry.toFixed(2)}  Exit: $${exitPriceRounded.toFixed(2)}\n` +
+      `Realized P&amp;L: <b>${sign}$${pnlRounded.toFixed(2)}</b>\n` +
+      `Reason: ${reasonKind}\n\n` +
+      `Trade journal + account auto-updated. Position freed for new entries.`
+    );
+  } catch (e) {
+    console.warn(`[recordExternalClose] Telegram alert failed: ${e.message}`);
+  }
+
+  writeLog({
+    kind:        'external_close_recorded',
+    symbol:      pos.symbol,
+    sharesClosed,
+    exitPrice:   exitPriceRounded,
+    pnl:         pnlRounded,
+    reason:      reasonKind,
+    isFullClose,
+    fillsUsed,
+  });
+}
+
 // ── Market Data (Yahoo Finance — no API key needed) ───────────────────────────
 
 async function fetchDailyCandles(symbol, range = '6mo') {
@@ -1188,13 +1326,47 @@ async function run() {
     // (checkPositions) still runs for RSI 50 evaluation on what remains.
     try {
       const localOpen = loadOpenPositions();
-      const { stillOpen, closedExternally } = await executor.syncPositions(localOpen);
+      const { stillOpen, closedExternally, partialClosed } = await executor.syncPositions(localOpen);
+
+      // ── Handle partial external closes (FIX task #25, 2026-06-05) ─────
+      // Bot used to silently keep local qty unchanged when Alpaca showed a
+      // smaller position. Now: detect, record the partial close in the journal,
+      // and update local qty to match Alpaca truth.
+      if (partialClosed.length) {
+        console.log(`[Alpaca] Reconciliation: ${partialClosed.length} partial close(s) detected`);
+        for (const event of partialClosed) {
+          const { pos, prevQty, newQty, deltaShares } = event;
+          console.log(`           - ${pos.symbol} ${pos.side}: ${prevQty} → ${newQty} (${deltaShares} sh closed externally)`);
+          await recordExternalClose({
+            pos,
+            sharesClosed:  deltaShares,
+            alpacaClient:  executor.client,
+            reasonKind:    'partial_external_fill',
+            isFullClose:   false,
+          });
+        }
+      }
+
+      // ── Handle full external closes (FIX task #26, 2026-06-05) ────────
+      // Bot used to log to safety log + remove from open-positions but never
+      // write to closed-positions / trades.csv / sid-account. Now: full
+      // journal update.
       if (closedExternally.length) {
         console.log(`[Alpaca] Reconciliation: ${closedExternally.length} position(s) closed externally (stop fills?)`);
         for (const pos of closedExternally) {
-          console.log(`           - ${pos.symbol} ${pos.side} ${pos.shares}sh @ $${pos.entry}`);
-          writeLog({ kind: 'external_close', symbol: pos.symbol, position: pos });
+          const qtyClosed = pos.shares_remaining ?? pos.shares;
+          console.log(`           - ${pos.symbol} ${pos.side} ${qtyClosed}sh (entry $${pos.entry})`);
+          await recordExternalClose({
+            pos,
+            sharesClosed:  qtyClosed,
+            alpacaClient:  executor.client,
+            reasonKind:    'full_external_fill',
+            isFullClose:   true,
+          });
         }
+      }
+
+      if (partialClosed.length || closedExternally.length) {
         saveOpenPositions(stillOpen);
       }
     } catch (err) {
