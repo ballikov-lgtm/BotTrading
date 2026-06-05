@@ -1,0 +1,73 @@
+name: SID Set Stop
+
+# Places a GTC stop order against an existing position. Sister to
+# sid-set-limit-close.yml — limits handle TPs, this handles SLs. Use this
+# to give an existing position broker-side stop protection so the matching
+# engine fires it intraday on touch, rather than waiting for the bot's
+# next-morning daily-poll exit (the PDT-immune design's trade-off).
+#
+# Trigger from anywhere with gh CLI:
+#   gh workflow run sid-set-stop.yml \
+#     -f ticker=UNH -f qty=26 -f stop_price=405 -f side=buy \
+#     -f note="Bot internal stop, now broker-enforced"
+#
+# Or via browser:
+#   https://github.com/ballikov-lgtm/BotTrading/actions/workflows/sid-set-stop.yml
+#   → Run workflow → fill inputs → Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "Ticker symbol (e.g. UNH)"
+        required: true
+        type: string
+      qty:
+        description: "Shares to protect (integer, ≤ open position)"
+        required: true
+        type: string
+      stop_price:
+        description: "Stop trigger price"
+        required: true
+        type: string
+      side:
+        description: "buy = cover a short / sell = exit a long"
+        required: true
+        type: choice
+        options: [buy, sell]
+      note:
+        description: "Reason for the trade journal (optional)"
+        required: false
+        type: string
+        default: "Manual stop placement"
+
+permissions:
+  contents: read
+
+jobs:
+  set-stop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Submit stop order
+        working-directory: SID
+        env:
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          SID_PAPER:          ${{ secrets.SID_PAPER }}
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+
+          TRADE_TICKER:     ${{ inputs.ticker }}
+          TRADE_QTY:        ${{ inputs.qty }}
+          TRADE_STOP_PRICE: ${{ inputs.stop_price }}
+          TRADE_SIDE:       ${{ inputs.side }}
+          TRADE_NOTE:       ${{ inputs.note }}
+        run: node set-stop.js
