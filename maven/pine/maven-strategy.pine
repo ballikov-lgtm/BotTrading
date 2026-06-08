@@ -1,0 +1,238 @@
+//@version=5
+// ============================================================================
+//  MAVEN — Strategy (TradingView tester) — mirrors backtest-maven.py
+//  4-hour, both-directions mean-reversion 20-SMA trend rider.
+//  Authoritative spec : Trading Setup/maven/MAVEN.md
+//  Engine mirrored from: Trading Setup/maven/backtest-maven.py  (run_core)
+//  Run on a 4-HOUR crypto chart. This produces a trade list + equity curve that
+//  should BROADLY track the Python (different fill model — not penny-identical).
+//
+//  Fill-model differences vs the Python (marked [APPROX] inline):
+//   1. Entry  : strategy.entry fills at the NEXT bar open — same as Python. ✓
+//   2. Stop   : strategy.exit fills intrabar at the stop price — same as Python. ✓
+//   3. TP1/TP2/TIME exits use strategy.close which fills at the NEXT bar open,
+//      whereas Python exits at the signal bar's close / 1h close (half-bar late).
+//   4. Position sizing is risk-based using an ESTIMATE of the stop taken on the
+//      signal bar (entry proxy = signal close); the protective stop is then
+//      recomputed exactly from the real fill price.
+//   5. Daily-200 regime uses the last CONFIRMED daily bar (non-repaint); Python
+//      uses the same day's close.
+// ============================================================================
+strategy("MAVEN — Strategy", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.fixed, currency=currency.USD,
+     commission_type=strategy.commission.percent, commission_value=0.08,
+     process_orders_on_close=false, calc_on_every_tick=false,
+     pyramiding=0, max_labels_count=500)
+
+// ---------------------------------------------------------------- Inputs -----
+grpCore = "Core"
+smaLen   = input.int(20, "SMA length", group=grpCore)
+rsiLen   = input.int(14, "RSI length", group=grpCore)
+macdFast = input.int(12, "MACD fast", group=grpCore)
+macdSlow = input.int(26, "MACD slow", group=grpCore)
+macdSig  = input.int(9,  "MACD signal", group=grpCore)
+
+grpTrig = "Triggers (RSI arming)"
+bullOS  = input.float(32, "Long oversold trigger — BULL regime", group=grpTrig)
+bearOS  = input.float(30, "Long oversold trigger — BEAR regime", group=grpTrig)
+ob      = input.float(70, "Short overbought trigger — any regime", group=grpTrig)
+armBars = input.int(6, "Arm window (bars the RSI extreme may have fired)", minval=1, group=grpTrig)
+
+grpReg = "Regime & Direction"
+allowLongs     = input.bool(true,  "Allow longs", group=grpReg)
+allowShorts    = input.bool(true,  "Allow shorts", group=grpReg)
+withRegimeOnly = input.bool(false, "With-trend only (long in BULL / short in BEAR)", group=grpReg)
+shortsBearOnly = input.bool(false, "Shorts only in BEAR regime", group=grpReg)
+
+grpStop = "Stop"
+stopMode   = input.string("wick2", "Stop mode", options=["wick2", "prevclose", "swing"], group=grpStop)
+maxRiskPct = input.float(2.0, "Max risk % (the 2% cap for wick2)", group=grpStop)
+atrBuf     = input.float(0.0, "ATR buffer beyond the level (× ATR)", group=grpStop)
+atrLen     = input.int(14, "ATR length", group=grpStop)
+
+grpEx = "Exits"
+tp1Rsi       = input.float(50, "TP1 RSI level", group=grpEx)
+tp1Pct       = input.float(50, "TP1 % closed", group=grpEx)
+maxBarsInput = input.int(20, "Time stop (number of 4h bars)", group=grpEx)
+tp2Use1h     = input.bool(true, "TP2 uses 1h close through SMA (off = 4h close)", group=grpEx)
+
+grpFilt = "Filters (default OFF — A/B one at a time)"
+useAtrFilter  = input.bool(false, "ATR% filter on", group=grpFilt)
+minAtrPct     = input.float(0.0, "  skip if ATR% below", group=grpFilt)
+maxAtrPct     = input.float(0.0, "  skip if ATR% above (0 = off)", group=grpFilt)
+useDistFilter = input.bool(false, "Distance-from-SMA filter on", group=grpFilt)
+maxDistPct    = input.float(5.0, "  skip if entry > this % from 20 SMA", group=grpFilt)
+useDepth      = input.bool(false, "RSI-depth confluence on", group=grpFilt)
+longDeep      = input.float(25, "  require long arm RSI ≤", group=grpFilt)
+shortDeep     = input.float(75, "  require short arm RSI ≥", group=grpFilt)
+useSlope      = input.bool(false, "Daily-200 SMA slope filter on", group=grpFilt)
+useCooldown   = input.bool(false, "Cooldown on", group=grpFilt)
+cooldownBars  = input.int(1, "  bars to wait after an exit", minval=0, group=grpFilt)
+
+grpRisk = "Risk / Costs"
+riskPct = input.float(1.0, "Risk % of equity per trade", group=grpRisk)
+feePct  = input.float(0.08, "Fee % per side (break-even+fees maths)", group=grpRisk)
+
+// ------------------------------------------------------------ Indicators -----
+sma20 = ta.sma(close, smaLen)
+rsi   = ta.rsi(close, rsiLen)
+[macdLine, sigLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+atr   = ta.atr(atrLen)
+cost  = feePct / 100.0
+
+dClose      = request.security(syminfo.tickerid, "1D", close,                lookahead=barmerge.lookahead_off)
+dSma200     = request.security(syminfo.tickerid, "1D", ta.sma(close, 200),    lookahead=barmerge.lookahead_off)
+dSma200Prev = request.security(syminfo.tickerid, "1D", ta.sma(close, 200)[1], lookahead=barmerge.lookahead_off)
+isBull    = dClose > dSma200
+regimeStr = isBull ? "BULL" : "BEAR"
+
+oneHcloses = request.security_lower_tf(syminfo.tickerid, "60", close)
+
+plot(sma20, "20 SMA", color=color.new(color.orange, 0), linewidth=2)
+bgcolor(isBull ? color.new(color.green, 93) : color.new(color.red, 93), title="Regime shade")
+
+// ----------------------------------------------------- Setup conditions ------
+osTh      = isBull ? bullOS : bearOS
+minRsiArm = ta.lowest(rsi, armBars)
+maxRsiArm = ta.highest(rsi, armBars)
+swingLow  = ta.lowest(low, armBars)
+swingHigh = ta.highest(high, armBars)
+
+armedLong  = minRsiArm <= osTh
+armedShort = maxRsiArm >= ob
+reclaimUp  = not na(sma20[1]) and close > sma20 and close[1] <= sma20[1]
+reclaimDn  = not na(sma20[1]) and close < sma20 and close[1] >= sma20[1]
+rsiUp  = rsi  > rsi[1]
+rsiDn  = rsi  < rsi[1]
+macdUp = hist > hist[1]
+macdDn = hist < hist[1]
+
+atrPct  = atr / close * 100
+distPct = math.abs(close - sma20) / close * 100
+atrOk        = not useAtrFilter  or (atrPct >= minAtrPct and (maxAtrPct <= 0 or atrPct <= maxAtrPct))
+distOk       = not useDistFilter or distPct <= maxDistPct
+depthLongOk  = not useDepth or minRsiArm <= longDeep
+depthShortOk = not useDepth or maxRsiArm >= shortDeep
+slopeLongOk  = not useSlope or dSma200 > dSma200Prev
+slopeShortOk = not useSlope or dSma200 < dSma200Prev
+
+warmOk = not na(sma20) and not na(sma20[1]) and not na(rsi[1]) and not na(hist[1])
+
+longSig  = warmOk and allowLongs  and armedLong  and reclaimUp and rsiUp and macdUp and atrOk and distOk and depthLongOk  and slopeLongOk
+shortSig = warmOk and allowShorts and armedShort and reclaimDn and rsiDn and macdDn and atrOk and distOk and depthShortOk and slopeShortOk
+if shortsBearOnly and regimeStr != "BEAR"
+    shortSig := false
+if withRegimeOnly
+    longSig  := longSig  and isBull
+    shortSig := shortSig and not isBull
+
+// ---------------------------------------------------- Stop estimate fn -------
+// Returns the stop level for a given entry price & side, mirroring run_core.
+stopFor(float entryP, int sideS, float confLow, float confHigh, float prevClose, float sLow, float sHigh) =>
+    buf = atrBuf * (na(atr) ? 0.0 : atr)
+    float stp = na
+    float risk = 0.0
+    if sideS == 1
+        if stopMode == "prevclose"
+            stp := prevClose - buf
+            risk := entryP - stp
+        else if stopMode == "swing"
+            stp := sLow - buf
+            risk := entryP - stp
+        if na(stp) or risk <= 0
+            w = confLow - buf
+            rw = entryP - w
+            risk := rw <= 0 ? entryP * (maxRiskPct / 100) : math.min(rw, entryP * (maxRiskPct / 100))
+            stp  := entryP - risk
+    else
+        if stopMode == "prevclose"
+            stp := prevClose + buf
+            risk := stp - entryP
+        else if stopMode == "swing"
+            stp := sHigh + buf
+            risk := stp - entryP
+        if na(stp) or risk <= 0
+            w = confHigh + buf
+            rw = w - entryP
+            risk := rw <= 0 ? entryP * (maxRiskPct / 100) : math.min(rw, entryP * (maxRiskPct / 100))
+            stp  := entryP + risk
+    [stp, risk]
+
+// --------------------------------------------------------- State / orders ----
+var float stopLevel = na
+var bool  tp1Done   = false
+var int   entryBar  = na
+// confirmation-candle data captured on the signal bar, used to size the entry
+var float cLow  = na
+var float cHigh = na
+var float cPrev = na
+var float cSlow = na
+var float cShigh= na
+
+cooldownOk = not useCooldown or na(strategy.opentrades) or (bar_index - entryBar) >= cooldownBars
+flat = strategy.position_size == 0
+
+// ---- ENTRY: arm on the signal bar; strategy.entry fills at next open --------
+if flat and (longSig or shortSig)
+    sideS = longSig ? 1 : -1
+    // capture confirmation data for stop sizing
+    cLow  := low
+    cHigh := high
+    cPrev := close[1]
+    cSlow := swingLow
+    cShigh:= swingHigh
+    // risk-based size using an ESTIMATE (entry proxy = this bar's close) [APPROX 4]
+    [estStop, estRisk] = stopFor(close, sideS, cLow, cHigh, cPrev, cSlow, cShigh)
+    if estRisk > 0
+        qty = (strategy.equity * (riskPct / 100)) / estRisk
+        if sideS == 1
+            strategy.entry("L", strategy.long, qty=qty)
+        else
+            strategy.entry("S", strategy.short, qty=qty)
+
+// ---- On the bar the position opens: set the real stop from the fill price ---
+justOpened = strategy.position_size != 0 and strategy.position_size[1] == 0
+if justOpened
+    sideS = strategy.position_size > 0 ? 1 : -1
+    [realStop, realRisk] = stopFor(strategy.position_avg_price, sideS, cLow, cHigh, cPrev, cSlow, cShigh)
+    stopLevel := realStop
+    tp1Done   := false
+    entryBar  := bar_index
+
+// ---- MANAGE (only after the entry bar) -------------------------------------
+if strategy.position_size != 0 and bar_index > entryBar
+    sideS = strategy.position_size > 0 ? 1 : -1
+    eP = strategy.position_avg_price
+    // b) TP1 — half off at RSI 50, move stop to break-even + fees
+    if not tp1Done
+        tp1Hit = sideS == 1 ? rsi >= tp1Rsi : rsi <= tp1Rsi
+        if tp1Hit
+            strategy.close(sideS == 1 ? "L" : "S", qty_percent=tp1Pct, comment="TP1")
+            tp1Done   := true
+            stopLevel := eP * (1 + sideS * 2 * cost)
+    // c) TP2 runner — first 1h (or 4h) close through the last CLOSED 4h 20 SMA
+    ref = sma20[1]
+    bool tp2Hit = false
+    if not na(ref)
+        if tp2Use1h and array.size(oneHcloses) > 0
+            for j = 0 to array.size(oneHcloses) - 1
+                cc = array.get(oneHcloses, j)
+                through = sideS == 1 ? cc < ref : cc > ref
+                if through
+                    tp2Hit := true
+        else if not tp2Use1h
+            tp2Hit := sideS == 1 ? close < ref : close > ref
+    timeout = (bar_index - entryBar) >= maxBarsInput
+    if tp2Hit
+        strategy.close(sideS == 1 ? "L" : "S", comment="TP2")
+    else if timeout
+        strategy.close(sideS == 1 ? "L" : "S", comment="TIME")
+
+// ---- Protective / break-even stop (intrabar fill at the stop price) ---------
+// a) Stop is checked first within a bar because strategy.exit fills intrabar,
+//    before the close-based strategy.close orders above — mirrors run_core order.
+if strategy.position_size != 0 and not na(stopLevel)
+    if strategy.position_size > 0
+        strategy.exit("L-stop", from_entry="L", stop=stopLevel)
+    else
+        strategy.exit("S-stop", from_entry="S", stop=stopLevel)

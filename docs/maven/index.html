@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maven — Live Paper Dashboard</title>
+<style>
+  :root{--bg:#0b0e14;--card:#141925;--card2:#1b2230;--ink:#e6edf3;--mut:#8b97a8;
+        --grn:#2ecc71;--red:#ff5c5c;--amb:#f5a623;--blu:#4aa8ff;--line:#222a38}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#4aa8ff,#2ecc71);
+        display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#06223a}
+  h1{font-size:22px;margin:0;letter-spacing:.3px}
+  .sub{color:var(--mut);font-size:13px}
+  .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
+  .pill.paper{background:#3a2d00;color:var(--amb)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .stat .v{font-size:24px;font-weight:700;margin-top:4px}
+  .v.pos{color:var(--grn)} .v.neg{color:var(--red)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:0 0 12px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .tag{font-weight:700} .tag.win{color:var(--grn)} .tag.loss{color:var(--red)}
+  .reason{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--card2);color:var(--ink)}
+  .empty{color:var(--mut);text-align:center;padding:26px;font-style:italic}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px}
+  .evt{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+  footer{color:var(--mut);font-size:12px;text-align:center;margin:22px 0 8px}
+  .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grn);margin-right:6px;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">M</div>
+    <div>
+      <h1>MAVEN <span class="pill paper">Paper</span></h1>
+      <div class="sub" id="sub">loading…</div>
+    </div>
+    <div style="margin-left:auto" class="sub"><span class="live"></span><span id="lastrun">—</span></div>
+  </header>
+
+  <div class="grid" id="stats"></div>
+
+  <div class="card">
+    <h2>Open positions</h2>
+    <div id="open"></div>
+  </div>
+
+  <div class="card">
+    <h2>Watchlist</h2>
+    <div class="chips" id="watch"></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent activity</h2>
+    <div id="events"></div>
+  </div>
+
+  <div class="card">
+    <h2>Closed trades</h2>
+    <div id="closed"></div>
+  </div>
+
+  <footer>Maven runs on a cloud schedule — this page is updated automatically after every run.
+  An empty board means the strategy is <b>armed and waiting</b> for a real setup (it's low-frequency by design).</footer>
+</div>
+
+<script>
+const fmt = (n,d=2)=> (n==null?'—':Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}));
+const sign = n => n>0?'pos':(n<0?'neg':'');
+function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+async function load(){
+  let s;
+  try{ s = await (await fetch('./state.json?_='+Date.now())).json(); }
+  catch(e){ document.getElementById('sub').textContent='waiting for first run…'; return; }
+
+  const st = s.stats||{};
+  document.getElementById('sub').textContent =
+    `${s.mode||'paper'} · started ${s.started} · $${fmt(s.start_equity,0)} start · 2% risk · max 3 concurrent · 3× cap`;
+  document.getElementById('lastrun').textContent = 'updated '+(s.last_run||'—');
+
+  const netCls = sign(st.net_usdt);
+  document.getElementById('stats').innerHTML = [
+    ['Equity', '$'+fmt(s.equity), ''],
+    ['Return', (st.return_pct>=0?'+':'')+fmt(st.return_pct,1)+'%', netCls],
+    ['Net P&L', (st.net_usdt>=0?'+$':'-$')+fmt(Math.abs(st.net_usdt)), netCls],
+    ['Win rate', fmt(st.win_rate,1)+'%', ''],
+    ['Profit factor', fmt(st.profit_factor,2), ''],
+    ['Trades', (st.closed_trades||0)+' closed · '+(st.open_trades||0)+' open', ''],
+  ].map(([k,v,c])=>`<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  const open = Object.values(s.open||{});
+  document.getElementById('open').innerHTML = open.length ? `<table>
+    <tr><th>Coin</th><th>Entry</th><th>Stop</th><th>Risk $</th><th>Since</th></tr>
+    ${open.map(p=>`<tr><td class="tag">${esc(p.symbol)}</td><td>${fmt(p.entry,4)}</td>
+      <td>${fmt(p.stop,4)}</td><td>$${fmt(p.risk_amt)}</td><td class="sub">${esc(p.entry_time||p.opened_at)}</td></tr>`).join('')}
+    </table>` : `<div class="empty">No open positions — armed and waiting for a setup.</div>`;
+
+  document.getElementById('watch').innerHTML = (s.watchlist||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('');
+
+  const ev = s.events_last_run||[];
+  document.getElementById('events').innerHTML = ev.length ? ev.map(e=>`<div class="evt">${esc(e)}</div>`).join('')
+    : `<div class="empty">No new activity last run.</div>`;
+
+  const cl = (s.closed||[]).slice().reverse().slice(0,40);
+  document.getElementById('closed').innerHTML = cl.length ? `<table>
+    <tr><th>Coin</th><th>Reason</th><th>R</th><th>P&L</th><th>Entry</th><th>Closed</th></tr>
+    ${cl.map(t=>`<tr><td class="tag">${esc(t.symbol)}</td><td><span class="reason">${esc(t.reason)}</span></td>
+      <td class="${sign(t.R)}">${(t.R>=0?'+':'')+fmt(t.R,2)}R</td>
+      <td class="tag ${t.pnl>0?'win':'loss'}">${(t.pnl>=0?'+$':'-$')+fmt(Math.abs(t.pnl))}</td>
+      <td class="sub">${esc(t.entry_time)}</td><td class="sub">${esc(t.closed_at)}</td></tr>`).join('')}
+    </table>` : `<div class="empty">No closed trades yet.</div>`;
+}
+load(); setInterval(load, 60000);
+</script>
+</body>
+</html>

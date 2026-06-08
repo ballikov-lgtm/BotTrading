@@ -1,0 +1,49 @@
+{
+  "_comment": "Maven live/paper bot config. The bot reuses backtest-maven.py's validated signal engine so live logic == backtest logic. Edit the watchlist + params here; never fork the strategy logic.",
+  "mode": "paper",
+  "exchange": "bitget",
+  "timeframe": "4h",
+
+  "account": {
+    "start_equity_usdt": 1000,
+    "risk_pct_per_trade": 2.0,
+    "max_concurrent": 3,
+    "leverage_cap": 3.0,
+    "compounding": true
+  },
+
+  "watchlist": [
+    "ETHUSDT", "SOLUSDT", "XRPUSDT", "SUIUSDT", "VIRTUALUSDT",
+    "HYPEUSDT", "APTUSDT", "FETUSDT", "SEIUSDT", "TRXUSDT"
+  ],
+
+  "strategy_params": {
+    "_note": "These mirror the validated config D. The engine's default_params() are the source of truth; only the overrides below differ from defaults.",
+    "use_cross_gate": true,
+    "min_sep_pct": 3.0,
+    "mtf_slope_gate": true,
+    "slope_4h": 10,
+    "slope_d": 5,
+    "bull_os": 35,
+    "bear_os": 35,
+    "ob": 65,
+    "shorts": false,
+    "stop_mode": "wick2",
+    "max_risk": 0.02,
+    "tp1_rsi": 50,
+    "tp1_pct": 0.5,
+    "max_bars": 20,
+    "event_blackout": false
+  },
+
+  "watchlist_selection": {
+    "_note": "Curate by BTC relative strength (research-agent feeds candidates). A coin earns a slot when ALT/BTC is trending up. Review quarterly. Binned: LINK, BTC, WIF, PEPE.",
+    "criterion": "alt_outperforming_btc_on_trend",
+    "review_cadence": "quarterly"
+  },
+
+  "reporting": {
+    "telegram": true,
+    "dashboard": true
+  }
+}
