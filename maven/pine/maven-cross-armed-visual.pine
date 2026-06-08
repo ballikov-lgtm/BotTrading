@@ -1,0 +1,210 @@
+//@version=5
+// ============================================================================
+//  MAVEN — Cross-Armed VISUAL (the VALIDATED config, for eyeballing)   [2026-06-08]
+//  Long-biased 4h trend-pullback. Mirrors backtest-maven.py config D (PF 2.19,
+//  portfolio +60% / 4.6% DD). This is the indicator twin of the strategy — it shows
+//  WHY each trade fires: the 20x200 cross, the gap, the MTF 200-slope agreement,
+//  the RSI-35 pullback, plus entry/exit labels, the stepped stop line and a table.
+//  Run on a 4-HOUR crypto chart (the curated watchlist: SOL, VIRTUAL, SUI, TRX...).
+//
+//  [APPROX] daily values = last CONFIRMED daily bar (non-repaint); TP2 scans the
+//  intrabar 1h closes via request.security_lower_tf; P/L% is a price-based blend.
+// ============================================================================
+indicator("MAVEN — Cross-Armed VISUAL", overlay=true, max_labels_count=500, max_lines_count=100)
+
+// ---------------------------------------------------------------- Inputs -----
+grpCore = "Core"
+smaLen    = input.int(20,  "Fast SMA (spine)", group=grpCore)
+sma200Len = input.int(200, "Slow SMA (trend line)", group=grpCore)
+rsiLen    = input.int(14,  "RSI length", group=grpCore)
+macdFast  = input.int(12,  "MACD fast", group=grpCore)
+macdSlow  = input.int(26,  "MACD slow", group=grpCore)
+macdSig   = input.int(9,   "MACD signal", group=grpCore)
+
+grpGate = "Trend gates (the established-trend test)"
+useCrossGate = input.bool(true,  "Cross gate: long only when 20 > 200", group=grpGate)
+minSepPct    = input.float(3.0,  "Min 20-vs-200 gap %", group=grpGate)
+useMtfSlope  = input.bool(true,  "MTF 200-slope: 4h 200 AND daily 200 rising", group=grpGate)
+slope4h      = input.int(10,     "  4h 200 slope lookback (bars)", minval=1, group=grpGate)
+slopeD       = input.int(5,      "  daily 200 slope lookback (days)", minval=1, group=grpGate)
+
+grpEntry = "Entry (the pullback)"
+rsiFloor   = input.float(35, "RSI floor (dip-to-then-turn-up)", group=grpEntry)
+armBars    = input.int(6,  "Arm window (bars the RSI floor may have fired)", minval=1, group=grpEntry)
+useReclaim = input.bool(true, "Require 4h 20-SMA reclaim", group=grpEntry)
+
+grpStop = "Stop"
+maxRiskPct = input.float(2.0, "Stop = tighter of wick or this %", group=grpStop)
+
+grpEx = "Exits"
+tp1Rsi   = input.float(50, "TP1 RSI level", group=grpEx)
+tp1Pct   = input.float(50, "TP1 % closed", group=grpEx)
+maxBars  = input.int(20, "Time stop (4h bars)", group=grpEx)
+tp2Use1h = input.bool(true, "TP2 uses 1h close through SMA", group=grpEx)
+
+grpViz = "Visuals"
+feePct       = input.float(0.08, "Fee % per side", group=grpViz)
+showStopLine = input.bool(true, "Plot active stop line", group=grpViz)
+showTable    = input.bool(true, "Show recent-trades table", group=grpViz)
+tableN       = input.int(8, "Trades in table", minval=1, maxval=20, group=grpViz)
+
+// ------------------------------------------------------------ Indicators -----
+sma20  = ta.sma(close, smaLen)
+sma200 = ta.sma(close, sma200Len)
+rsi    = ta.rsi(close, rsiLen)
+[macdLine, sigLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+cost   = feePct / 100.0
+
+dSma200     = request.security(syminfo.tickerid, "1D", ta.sma(close, 200),         lookahead=barmerge.lookahead_off)
+dSma200Prev = request.security(syminfo.tickerid, "1D", ta.sma(close, 200)[slopeD], lookahead=barmerge.lookahead_off)
+dSlopeUp    = not na(dSma200) and not na(dSma200Prev) and dSma200 > dSma200Prev
+oneHcloses  = request.security_lower_tf(syminfo.tickerid, "60", close)
+
+// ------------------------------------------------------- Plot the spine ------
+plot(sma20,  "20 SMA",  color=color.new(color.orange, 0), linewidth=2)
+plot(sma200, "200 SMA", color=color.new(color.blue, 0),   linewidth=2)
+
+// ----------------------------------------------------- Gate computations -----
+bullGate   = sma20 > sma200
+gapPct     = sma200 != 0 ? math.abs(sma20 - sma200) / sma200 * 100 : 0.0
+gapOk      = minSepPct <= 0 or gapPct >= minSepPct
+slope4hUp  = not na(sma200[slope4h]) and sma200 > sma200[slope4h]
+mtfOk      = not useMtfSlope or (slope4hUp and dSlopeUp)
+gateLongOk = (not useCrossGate or bullGate) and gapOk and mtfOk   // the full "is the trend real?" test
+
+// background: green when the trend gate is fully OPEN (long-hunting), faint grey otherwise
+bgcolor(gateLongOk ? color.new(color.green, 88) : color.new(color.gray, 94), title="Trend gate state")
+
+// ----------------------------------------------------- Setup conditions ------
+minRsiArm = ta.lowest(rsi, armBars)
+swingLow  = ta.lowest(low, armBars)
+armed     = minRsiArm <= rsiFloor
+reclaimUp = not na(sma20[1]) and close > sma20 and close[1] <= sma20[1]
+rsiUp     = rsi > rsi[1]
+macdUp    = hist > hist[1]
+warmOk    = not na(sma200) and not na(sma20[1]) and not na(rsi[1]) and not na(hist[1])
+longSig   = warmOk and gateLongOk and armed and (not useReclaim or reclaimUp) and rsiUp and macdUp
+
+// arming dot (RSI in the pullback zone while the gate is open)
+plotshape(gateLongOk and rsi <= rsiFloor, "Pullback (armed)", shape.triangleup, location.belowbar, color.new(color.teal, 30), size=size.tiny)
+
+// --------------------------------------------------- Trade state machine -----
+var bool  inPos      = false
+var float entryPrice = na
+var float stopLevel  = na
+var int   entryBar   = na
+var bool  tp1Done    = false
+var float rsiEntry   = na
+var float tp1Px      = na
+var float gapAtEntry = na
+var bool  lastWin    = false
+var bool  pend       = false
+var float pendConfLow= na
+
+var array<string> tReason = array.new<string>()
+var array<float>  tPct    = array.new<float>()
+var array<string> tTime   = array.new<string>()
+
+bool didEnter = false
+bool didTP1   = false
+bool didExit  = false
+
+// STEP 0: execute pending entry at this bar's open
+if pend and not inPos
+    entryPrice := open
+    w   = pendConfLow
+    rw  = entryPrice - w
+    risk = rw <= 0 ? entryPrice*(maxRiskPct/100) : math.min(rw, entryPrice*(maxRiskPct/100))
+    stp = entryPrice - risk
+    if risk > 0
+        inPos := true
+        stopLevel := stp
+        entryBar := bar_index
+        tp1Done := false
+        didEnter := true
+        label.new(bar_index, low,
+             text = "▲ LONG\nRSI " + str.tostring(rsiEntry, "#.0") + "  gap " + str.tostring(gapAtEntry, "#.0") + "%",
+             style = label.style_label_up, color = color.new(color.teal, 0), textcolor = color.white, size = size.small)
+    pend := false
+
+// STEP 1: manage (after entry bar)
+if inPos and bar_index > entryBar
+    bool closed = false
+    string reason = na
+    float exitPx = na
+    if low <= stopLevel
+        exitPx := stopLevel
+        reason := tp1Done ? "BE-STOP" : "STOP"
+        closed := true
+    else
+        if not tp1Done and rsi >= tp1Rsi
+            tp1Px := close
+            tp1Done := true
+            stopLevel := entryPrice * (1 + 2*cost)   // break-even + fees
+            didTP1 := true
+        ref = sma20[1]
+        bool tp2Hit = false
+        float tp2Px = na
+        if not na(ref)
+            if tp2Use1h and array.size(oneHcloses) > 0
+                for j = 0 to array.size(oneHcloses) - 1
+                    cc = array.get(oneHcloses, j)
+                    if cc < ref and not tp2Hit
+                        tp2Hit := true
+                        tp2Px := cc
+            else if not tp2Use1h and close < ref
+                tp2Hit := true
+                tp2Px := close
+        timeout = (bar_index - entryBar) >= maxBars
+        if tp2Hit or timeout
+            exitPx := tp2Hit ? tp2Px : close
+            reason := tp2Hit ? "TP2" : "TIME"
+            closed := true
+    if closed
+        fr = tp1Pct / 100
+        runnerPct = (exitPx/entryPrice - 1)
+        gross = tp1Done ? (fr*(tp1Px/entryPrice-1) + (1-fr)*runnerPct) : runnerPct
+        tradePct = gross*100 - feePct*2
+        lastWin := tradePct > 0
+        label.new(bar_index, high,
+             text = reason + "  " + str.tostring(tradePct, "#.0") + "%",
+             style = label.style_label_down,
+             color = lastWin ? color.new(color.green, 0) : color.new(color.red, 0),
+             textcolor = color.white, size = size.small)
+        array.push(tReason, reason)
+        array.push(tPct, tradePct)
+        array.push(tTime, str.format_time(time, "yyyy-MM-dd HH:mm", syminfo.timezone))
+        didExit := true
+        inPos := false
+
+// STEP 2: detect a new setup -> arm for next bar
+if not inPos and not pend and longSig
+    pend := true
+    pendConfLow := low
+    rsiEntry := rsi
+    gapAtEntry := gapPct
+
+// ------------------------------------------------------------- Drawings ------
+plot(showStopLine and inPos ? stopLevel : na, "Stop", color=color.new(color.red, 0), style=plot.style_linebr, linewidth=1)
+plotshape(didEnter, "Entry", shape.triangleup,   location.belowbar, color.new(color.lime, 0),   size=size.small)
+plotshape(didTP1,   "TP1",   shape.circle,       location.abovebar, color.new(color.yellow, 0), size=size.tiny)
+plotshape(didExit,  "Exit",  shape.xcross,       location.abovebar, color.new(lastWin ? color.green : color.red, 0), size=size.tiny)
+
+// ----------------------------------------------------- Recent-trades table ---
+var table tbl = table.new(position.top_right, 4, tableN + 1, frame_color=color.gray, frame_width=1, border_color=color.gray, border_width=1)
+if barstate.islast and showTable
+    table.cell(tbl, 0, 0, "#",      text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 1, 0, "Reason", text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 2, 0, "P/L%",   text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 3, 0, "Time",   text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    total = array.size(tReason)
+    shown = math.min(tableN, total)
+    if shown > 0
+        for k = 0 to shown - 1
+            idx = total - shown + k
+            pc  = array.get(tPct, idx)
+            rc  = pc > 0 ? color.new(color.green, 80) : color.new(color.red, 80)
+            table.cell(tbl, 0, k+1, str.tostring(idx + 1),              text_color=color.white,  bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 1, k+1, array.get(tReason, idx),            text_color=color.white,  bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 2, k+1, str.tostring(pc, "#.0"),            text_color=color.white,  bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 3, k+1, array.get(tTime, idx),             text_color=color.silver, bgcolor=rc, text_size=size.tiny)

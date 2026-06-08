@@ -1,0 +1,342 @@
+//@version=5
+// ============================================================================
+//  MAVEN  Daily-Armed — Visual review indicator (variant of maven-raw.pine)
+//  4-hour entry timing, but ARMED by the DAILY RSI extreme (Alan, 2026-06-07).
+//  Authoritative spec : Trading Setup/maven/MAVEN.md
+//  Engine basis       : Trading Setup/maven/backtest-maven.py (run_core), adapted.
+//
+//  IDEA (Alan): the DAILY RSI oversold/overbought is the high-conviction trigger
+//  — daily oversold is where real buyers historically step in, and it's usually
+//  THE bottom (rare). The 4-hour is only the entry TIMING: once the daily is
+//  armed, wait for a 4h close back through the 20 SMA WITH 4h RSI turning and
+//  MACD histogram turning, then enter next 4h open. Stop = the swing extreme over
+//  the daily arm window (the actual low/high of the move). TP1/TP2/time unchanged.
+//  Net effect: far fewer, higher-quality trades than the 4h-armed original.
+//
+//  Run on a 4-HOUR crypto chart (e.g. BTCUSDT, SOLUSDT).
+//  Approximations vs the Python original (marked [APPROX]):
+//   1. Daily values via request.security(...,"1D",lookahead_off) = last CONFIRMED
+//      daily bar (non-repaint). Arm = "daily RSI hit the trigger within the last
+//      `armDays` daily bars" (ta.barssince <= armDays, computed in daily context).
+//   2. TP2 uses request.security_lower_tf("60") intrabar 1h closes (toggle off
+//      for a 4h-close approx).
+//   3. P/L% in labels is a price-based blend (visual proxy), not equity-weighted.
+//   4. Stop "dswing" = lowest low / highest high over the daily arm window.
+// ============================================================================
+indicator("MAVEN Daily-Armed — Visual", overlay=true, max_labels_count=500, max_lines_count=100, max_boxes_count=50)
+
+// ---------------------------------------------------------------- Inputs -----
+grpCore = "Core"
+smaLen   = input.int(20, "SMA length", group=grpCore)
+rsiLen   = input.int(14, "RSI length (4h & daily)", group=grpCore)
+macdFast = input.int(12, "MACD fast", group=grpCore)
+macdSlow = input.int(26, "MACD slow", group=grpCore)
+macdSig  = input.int(9,  "MACD signal", group=grpCore)
+
+grpTrig = "Daily trigger (the ARM)"
+dBullOS = input.float(35, "Daily long oversold — BULL regime", group=grpTrig)
+dBearOS = input.float(30, "Daily long oversold — BEAR regime", group=grpTrig)
+dOB     = input.float(70, "Daily short overbought — any regime", group=grpTrig)
+armDays = input.int(5, "Arm window (daily bars the extreme stays live)", minval=1, group=grpTrig)
+
+grpEntry = "Entry (4h timing)"
+useReclaim = input.bool(true, "Require 4h 20-SMA reclaim (confirmation)", group=grpEntry)
+
+grpReg = "Regime & Direction"
+allowLongs     = input.bool(true,  "Allow longs", group=grpReg)
+allowShorts    = input.bool(true,  "Allow shorts", group=grpReg)
+withRegimeOnly = input.bool(false, "With-trend only (long in BULL / short in BEAR)", group=grpReg)
+shortsBearOnly = input.bool(false, "Shorts only in BEAR regime", group=grpReg)
+
+grpStop = "Stop"
+stopMode   = input.string("dswing", "Stop mode", options=["dswing", "wick2", "prevclose"], group=grpStop)
+maxRiskPct = input.float(2.0, "Max risk % (the cap for wick2)", group=grpStop)
+atrBuf     = input.float(0.0, "ATR buffer beyond the level (× ATR)", group=grpStop)
+atrLen     = input.int(14, "ATR length", group=grpStop)
+
+grpEx = "Exits"
+tp1Rsi       = input.float(50, "TP1 4h RSI level", group=grpEx)
+tp1Pct       = input.float(50, "TP1 % closed", group=grpEx)
+maxBarsInput = input.int(20, "Time stop (number of 4h bars)", group=grpEx)
+tp2Use1h     = input.bool(true, "TP2 uses 1h close through SMA (off = 4h close)", group=grpEx)
+
+grpFilt = "Filters (default OFF — A/B one at a time)"
+useAtrFilter  = input.bool(false, "ATR% filter on", group=grpFilt)
+minAtrPct     = input.float(0.0, "  skip if ATR% below", group=grpFilt)
+maxAtrPct     = input.float(0.0, "  skip if ATR% above (0 = off)", group=grpFilt)
+useDistFilter = input.bool(false, "Distance-from-SMA filter on", group=grpFilt)
+maxDistPct    = input.float(5.0, "  skip if entry > this % from 20 SMA", group=grpFilt)
+useDepth      = input.bool(false, "DAILY RSI-depth confluence on", group=grpFilt)
+longDeep      = input.float(25, "  require daily arm RSI ≤", group=grpFilt)
+shortDeep     = input.float(75, "  require daily arm RSI ≥", group=grpFilt)
+useSlope      = input.bool(false, "Daily-200 SMA slope filter on", group=grpFilt)
+useCooldown   = input.bool(false, "Cooldown on", group=grpFilt)
+cooldownBars  = input.int(1, "  bars to wait after an exit", minval=0, group=grpFilt)
+
+grpCost = "Costs"
+feePct = input.float(0.08, "Fee % per side (for break-even+fees maths)", group=grpCost)
+
+grpViz = "Visuals"
+showStopLine = input.bool(true, "Plot the active stop line", group=grpViz)
+showTable    = input.bool(true, "Show recent-trades table", group=grpViz)
+tableN       = input.int(8, "Trades shown in table", minval=1, maxval=20, group=grpViz)
+
+// ------------------------------------------------------------ Indicators -----
+sma20 = ta.sma(close, smaLen)
+rsi   = ta.rsi(close, rsiLen)                       // 4h RSI (entry timing)
+[macdLine, sigLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+atr   = ta.atr(atrLen)
+cost  = feePct / 100.0
+
+// ---- DAILY pack (one security call, last CONFIRMED daily bar, non-repaint) --
+// All computed in the daily context: regime, arm flags (barssince <= armDays),
+// daily RSI now, daily arm-window RSI extremes, daily swing low/high, 200 slope.
+fDaily() =>
+    r   = ta.rsi(close, rsiLen)
+    s   = ta.sma(close, 200)
+    bull = close > s
+    osL = bull ? dBullOS : dBearOS
+    armL = ta.barssince(r <= osL) <= armDays
+    armS = ta.barssince(r >= dOB) <= armDays
+    [bull, armL, armS, r, ta.lowest(r, armDays), ta.highest(r, armDays), ta.lowest(low, armDays), ta.highest(high, armDays), s > s[1]]
+[isBull, dArmLong, dArmShort, dRsiNow, dRsiLowArm, dRsiHighArm, dSwingLow, dSwingHigh, dSlopeUp] = request.security(syminfo.tickerid, "1D", fDaily(), lookahead=barmerge.lookahead_off)
+regimeStr = isBull ? "BULL" : "BEAR"
+osTh      = isBull ? dBullOS : dBearOS
+
+// Intrabar 1h closes for the current 4h bar (faithful TP2 check). [APPROX 2]
+oneHcloses = request.security_lower_tf(syminfo.tickerid, "60", close)
+
+// ------------------------------------------------------- Plot the spine ------
+plot(sma20, "20 SMA", color=color.new(color.orange, 0), linewidth=2)
+bgcolor(isBull ? color.new(color.green, 93) : color.new(color.red, 93), title="Regime shade")
+
+// Daily-arm markers (the bar a fresh daily arm window opens)
+armLongEdge  = dArmLong  and not dArmLong[1]
+armShortEdge = dArmShort and not dArmShort[1]
+plotshape(armLongEdge,  "Daily LONG arm",  shape.triangleup,   location.belowbar, color.new(color.teal, 0),   size=size.small, text="D-OS")
+plotshape(armShortEdge, "Daily SHORT arm", shape.triangledown, location.abovebar, color.new(color.maroon, 0), size=size.small, text="D-OB")
+// faint tint while a daily arm is live
+bgcolor(dArmLong  ? color.new(color.teal, 90)   : na, title="Long armed")
+bgcolor(dArmShort ? color.new(color.maroon, 90) : na, title="Short armed")
+
+// ----------------------------------------------------- Setup conditions ------
+reclaimUp  = not na(sma20[1]) and close > sma20 and close[1] <= sma20[1]
+reclaimDn  = not na(sma20[1]) and close < sma20 and close[1] >= sma20[1]
+rsiUp  = rsi  > rsi[1]
+rsiDn  = rsi  < rsi[1]
+macdUp = hist > hist[1]
+macdDn = hist < hist[1]
+
+// Filters
+atrPct  = atr / close * 100
+distPct = math.abs(close - sma20) / close * 100
+atrOk        = not useAtrFilter  or (atrPct >= minAtrPct and (maxAtrPct <= 0 or atrPct <= maxAtrPct))
+distOk       = not useDistFilter or distPct <= maxDistPct
+depthLongOk  = not useDepth or dRsiLowArm  <= longDeep
+depthShortOk = not useDepth or dRsiHighArm >= shortDeep
+slopeLongOk  = not useSlope or dSlopeUp
+slopeShortOk = not useSlope or not dSlopeUp
+
+warmOk = not na(sma20) and not na(sma20[1]) and not na(rsi[1]) and not na(hist[1]) and not na(dArmLong)
+
+reclaimOkLong  = not useReclaim or reclaimUp
+reclaimOkShort = not useReclaim or reclaimDn
+
+longSig  = warmOk and allowLongs  and dArmLong  and reclaimOkLong  and rsiUp and macdUp and atrOk and distOk and depthLongOk  and slopeLongOk
+shortSig = warmOk and allowShorts and dArmShort and reclaimOkShort and rsiDn and macdDn and atrOk and distOk and depthShortOk and slopeShortOk
+if shortsBearOnly and regimeStr != "BEAR"
+    shortSig := false
+if withRegimeOnly
+    longSig  := longSig  and isBull
+    shortSig := shortSig and not isBull
+
+// --------------------------------------------------- Trade state machine -----
+// Mirrors run_core: step0 enter at this bar open, step1 manage (after entry bar),
+// step2 detect a new setup -> arm entry for next bar.
+var bool   inPos      = false
+var int    posSide    = 0
+var float  entryPrice = na
+var float  stopLevel  = na
+var float  stopOrig   = na
+var int    entryBar   = na
+var bool   tp1Done    = false
+var string regEntry   = na
+var float  rsiEntry   = na      // DAILY RSI at the arm, for the label
+var float  tp1Px      = na
+var string trigStr    = na
+var int    lastExitBar = -100000
+var bool   lastWin    = false
+
+var bool   pend         = false
+var int    pendSide     = 0
+var float  pendConfLow  = na
+var float  pendConfHigh = na
+var float  pendPrevClose= na
+var float  pendSwingLow = na
+var float  pendSwingHigh= na
+var string pendReg      = na
+var string pendTrig     = na
+var float  pendDrsi     = na
+
+var array<string> tSide   = array.new<string>()
+var array<string> tReason = array.new<string>()
+var array<float>  tPct    = array.new<float>()
+var array<string> tTime   = array.new<string>()
+
+bool   didEnterLong  = false
+bool   didEnterShort = false
+bool   didTP1        = false
+bool   didExit       = false
+
+// ---- STEP 0: execute a pending entry at THIS bar's open --------------------
+if pend and not inPos
+    entryPrice := open
+    buf = atrBuf * (na(atr) ? 0.0 : atr)
+    float stp = na
+    float risk = 0.0
+    if pendSide == 1
+        if stopMode == "dswing"
+            stp := pendSwingLow - buf
+            risk := entryPrice - stp
+        else if stopMode == "prevclose"
+            stp := pendPrevClose - buf
+            risk := entryPrice - stp
+        if na(stp) or risk <= 0    // wick2 default / fallback
+            w = pendConfLow - buf
+            rw = entryPrice - w
+            risk := rw <= 0 ? entryPrice * (maxRiskPct / 100) : math.min(rw, entryPrice * (maxRiskPct / 100))
+            stp  := entryPrice - risk
+    else
+        if stopMode == "dswing"
+            stp := pendSwingHigh + buf
+            risk := stp - entryPrice
+        else if stopMode == "prevclose"
+            stp := pendPrevClose + buf
+            risk := stp - entryPrice
+        if na(stp) or risk <= 0
+            w = pendConfHigh + buf
+            rw = w - entryPrice
+            risk := rw <= 0 ? entryPrice * (maxRiskPct / 100) : math.min(rw, entryPrice * (maxRiskPct / 100))
+            stp  := entryPrice + risk
+    if risk > 0
+        inPos     := true
+        posSide   := pendSide
+        stopLevel := stp
+        stopOrig  := stp
+        entryBar  := bar_index
+        tp1Done   := false
+        regEntry  := pendReg
+        rsiEntry  := pendDrsi
+        trigStr   := pendTrig
+        didEnterLong  := pendSide == 1
+        didEnterShort := pendSide == -1
+        label.new(bar_index, posSide == 1 ? low : high,
+             text = (posSide == 1 ? "▲ LONG " : "▼ SHORT ") + regEntry + "\nDaily RSI " + str.tostring(rsiEntry, "#.0") + "  " + trigStr,
+             style = posSide == 1 ? label.style_label_up : label.style_label_down,
+             color = posSide == 1 ? color.new(color.teal, 0) : color.new(color.maroon, 0),
+             textcolor = color.white, size = size.small)
+    pend := false
+
+// ---- STEP 1: manage an open position (only after its entry bar) ------------
+if inPos and bar_index > entryBar
+    sgn = posSide
+    bool closed = false
+    string reason = na
+    float exitPx = na
+    stopHit = posSide == 1 ? low <= stopLevel : high >= stopLevel
+    if stopHit
+        exitPx := stopLevel
+        reason := tp1Done ? "BE-STOP" : "STOP"
+        closed := true
+    else
+        if not tp1Done
+            tp1Hit = posSide == 1 ? rsi >= tp1Rsi : rsi <= tp1Rsi
+            if tp1Hit
+                tp1Px   := close
+                tp1Done := true
+                stopLevel := entryPrice * (1 + sgn * 2 * cost)   // BE + fees
+                didTP1  := true
+        ref = sma20[1]
+        bool tp2Hit = false
+        float tp2Px = na
+        if not na(ref)
+            if tp2Use1h and array.size(oneHcloses) > 0
+                for j = 0 to array.size(oneHcloses) - 1
+                    cc = array.get(oneHcloses, j)
+                    through = posSide == 1 ? cc < ref : cc > ref
+                    if through and not tp2Hit
+                        tp2Hit := true
+                        tp2Px  := cc
+            else if not tp2Use1h
+                through4 = posSide == 1 ? close < ref : close > ref
+                if through4
+                    tp2Hit := true
+                    tp2Px  := close
+        timeout = (bar_index - entryBar) >= maxBarsInput
+        if tp2Hit or timeout
+            exitPx := tp2Hit ? tp2Px : close
+            reason := tp2Hit ? "TP2" : "TIME"
+            closed := true
+    if closed
+        fr = tp1Pct / 100
+        runnerPct = sgn * (exitPx / entryPrice - 1)
+        gross = tp1Done ? (fr * (sgn * (tp1Px / entryPrice - 1)) + (1 - fr) * runnerPct) : runnerPct
+        tradePct = gross * 100 - feePct * 2
+        lastWin := tradePct > 0
+        labCol = lastWin ? color.new(color.green, 0) : color.new(color.red, 0)
+        label.new(bar_index, posSide == 1 ? high : low,
+             text = reason + "  " + str.tostring(tradePct, "#.0") + "%",
+             style = posSide == 1 ? label.style_label_down : label.style_label_up,
+             color = labCol, textcolor = color.white, size = size.small)
+        array.push(tSide,   posSide == 1 ? "LONG" : "SHORT")
+        array.push(tReason, reason)
+        array.push(tPct,    tradePct)
+        array.push(tTime,   str.format_time(time, "yyyy-MM-dd HH:mm", syminfo.timezone))
+        didExit := true
+        inPos := false
+        lastExitBar := bar_index
+
+// ---- STEP 2: detect a NEW setup (flat, no pending, past cooldown) ----------
+cooldownOk = not useCooldown or (bar_index - lastExitBar) >= cooldownBars
+if not inPos and not pend and cooldownOk and warmOk
+    if longSig or shortSig
+        pend         := true
+        pendSide     := longSig ? 1 : -1
+        pendConfLow  := low
+        pendConfHigh := high
+        pendPrevClose:= close[1]
+        pendSwingLow := dSwingLow     // daily arm-window low  (the swing extreme)
+        pendSwingHigh:= dSwingHigh    // daily arm-window high
+        pendReg      := regimeStr
+        pendDrsi     := dRsiNow
+        pendTrig     := longSig ? ("D-OS≤" + str.tostring(osTh, "#")) : ("D-OB≥" + str.tostring(dOB, "#"))
+
+// ------------------------------------------------------------- Drawings ------
+plot(showStopLine and inPos ? stopLevel : na, "Stop", color=color.new(color.red, 0), style=plot.style_linebr, linewidth=1)
+plotshape(didEnterLong,  "Entry long",  shape.triangleup,   location.belowbar, color.new(color.lime, 0),  size=size.small)
+plotshape(didEnterShort, "Entry short", shape.triangledown, location.abovebar, color.new(color.fuchsia, 0), size=size.small)
+plotshape(didTP1,        "TP1",         shape.circle,       location.abovebar, color.new(color.yellow, 0), size=size.tiny)
+plotshape(didExit,       "Exit",        shape.xcross,       location.abovebar, color.new(lastWin ? color.green : color.red, 0), size=size.tiny)
+
+// ----------------------------------------------------- Recent-trades table ---
+var table tbl = table.new(position.top_right, 5, tableN + 1, frame_color=color.gray, frame_width=1, border_color=color.gray, border_width=1)
+if barstate.islast and showTable
+    table.cell(tbl, 0, 0, "#",      text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 1, 0, "Side",   text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 2, 0, "Reason", text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 3, 0, "P/L%",   text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    table.cell(tbl, 4, 0, "Time",   text_color=color.white, bgcolor=color.new(color.gray, 0), text_size=size.tiny)
+    total = array.size(tSide)
+    shown = math.min(tableN, total)
+    if shown > 0
+        for k = 0 to shown - 1
+            idx = total - shown + k
+            row = k + 1
+            pc  = array.get(tPct, idx)
+            rc  = pc > 0 ? color.new(color.green, 80) : color.new(color.red, 80)
+            sd  = array.get(tSide, idx)
+            table.cell(tbl, 0, row, str.tostring(idx + 1),   text_color=color.white, bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 1, row, sd,                      text_color = sd == "LONG" ? color.teal : color.orange, bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 2, row, array.get(tReason, idx), text_color=color.white, bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 3, row, str.tostring(pc, "#.0"), text_color=color.white, bgcolor=rc, text_size=size.tiny)
+            table.cell(tbl, 4, row, array.get(tTime, idx),   text_color=color.silver, bgcolor=rc, text_size=size.tiny)

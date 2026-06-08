@@ -1,0 +1,247 @@
+//@version=5
+// ============================================================================
+//  MAVEN  Cross-Armed v2 — Strategy   [Alan 2026-06-07]
+//  v3 cross-armed + DIRECTION-QUALITY filters to fix the shorts (and tighten longs).
+//  Authoritative spec : Trading Setup/maven/MAVEN.md
+//  Engine basis       : Trading Setup/maven/backtest-maven.py (run_core), adapted.
+//
+//  WHY v2 (from the basket L/S split): shorts bled because "20<200" fires on every
+//  pullback-in-uptrend and every wiggle across a FLAT 200 (sideways/transition),
+//  then gets squeezed by crypto's upward drift (BTC shorts: 47% WR but PF 0.13).
+//  FIX: only trade an ESTABLISHED trend, not the cross/transition zone —
+//   - 200-SMA SLOPE gate: long only if 200 rising, short only if 200 falling
+//     (a flat 200 = no trend = no trade). This is the "which direction is it really in" test.
+//   - optional min 20-vs-200 GAP % (skip right at the cross), and
+//   - optional min BARS SINCE the cross (let the trend prove itself).
+//  Plus the existing daily-200 regime-agree toggle (withRegimeOnly) which already
+//  helped BTC/XRP. All toggles so each can be A/B'd toward a MECHANICAL ruleset.
+//
+//  Run on a 4-HOUR crypto chart. Deep Backtesting + matched date range.
+// ============================================================================
+strategy("MAVEN Cross-Armed v2 — Strategy", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.fixed, currency=currency.USD,
+     commission_type=strategy.commission.percent, commission_value=0.08,
+     process_orders_on_close=false, calc_on_every_tick=false,
+     pyramiding=0, max_labels_count=500)
+
+// ---------------------------------------------------------------- Inputs -----
+grpCore = "Core"
+smaLen    = input.int(20,  "Fast SMA (the spine)", group=grpCore)
+sma200Len = input.int(200, "Slow SMA (the cross line)", group=grpCore)
+rsiLen    = input.int(14,  "RSI length", group=grpCore)
+macdFast  = input.int(12,  "MACD fast", group=grpCore)
+macdSlow  = input.int(26,  "MACD slow", group=grpCore)
+macdSig   = input.int(9,   "MACD signal", group=grpCore)
+
+grpTrig = "Entry RSI floor (after the cross)"
+bullOS  = input.float(35, "Long RSI floor — dip-to-then-turn-up", group=grpTrig)
+bearOS  = input.float(35, "Long RSI floor — BEAR regime (adaptivity)", group=grpTrig)
+ob      = input.float(65, "Short RSI ceiling (downtrends top ~60-65)", group=grpTrig)
+armBars = input.int(6, "Arm window (bars the RSI floor/ceiling may have fired)", minval=1, group=grpTrig)
+
+grpGate = "Cross gate & confirmation"
+useCrossGate = input.bool(true,  "Cross gate: long only 20>200, short only 20<200", group=grpGate)
+useReclaim   = input.bool(true,  "Require 4h 20-SMA reclaim (confirmation)", group=grpGate)
+
+grpSwing = "Direction-quality (established-trend) filters"
+useSlopeGate = input.bool(true,  "200-SMA slope gate: long if 200 rising / short if 200 falling", group=grpSwing)
+slopeLen     = input.int(5,   "  200-SMA slope lookback (bars)", minval=1, group=grpSwing)
+minSepPct    = input.float(0.0, "  Min 20-vs-200 gap % (0 = off; skip the cross zone)", group=grpSwing)
+minBarsCross = input.int(0,   "  Min bars since the 20x200 cross (0 = off)", minval=0, group=grpSwing)
+
+grpReg = "Regime & Direction"
+allowLongs     = input.bool(true,  "Allow longs", group=grpReg)
+allowShorts    = input.bool(true,  "Allow shorts", group=grpReg)
+withRegimeOnly = input.bool(false, "Also require daily-200 regime agree", group=grpReg)
+shortsBearOnly = input.bool(false, "Shorts only in daily BEAR regime", group=grpReg)
+
+grpStop = "Stop"
+stopMode   = input.string("swing", "Stop mode", options=["swing", "wick2", "prevclose"], group=grpStop)
+maxRiskPct = input.float(2.0, "Max risk % (the cap for wick2)", group=grpStop)
+atrBuf     = input.float(0.0, "ATR buffer beyond the level (× ATR)", group=grpStop)
+atrLen     = input.int(14, "ATR length", group=grpStop)
+
+grpEx = "Exits"
+tp1Rsi       = input.float(50, "TP1 RSI level", group=grpEx)
+tp1Pct       = input.float(50, "TP1 % closed", group=grpEx)
+maxBarsInput = input.int(20, "Time stop (number of 4h bars)", group=grpEx)
+tp2Use1h     = input.bool(true, "TP2 uses 1h close through SMA (off = 4h close)", group=grpEx)
+
+grpFilt = "Filters (default OFF)"
+useAtrFilter  = input.bool(false, "ATR% filter on", group=grpFilt)
+minAtrPct     = input.float(0.0, "  skip if ATR% below", group=grpFilt)
+maxAtrPct     = input.float(0.0, "  skip if ATR% above (0 = off)", group=grpFilt)
+useDistFilter = input.bool(false, "Distance-from-SMA filter on", group=grpFilt)
+maxDistPct    = input.float(5.0, "  skip if entry > this % from 20 SMA", group=grpFilt)
+useCooldown   = input.bool(false, "Cooldown on", group=grpFilt)
+cooldownBars  = input.int(1, "  bars to wait after an exit", minval=0, group=grpFilt)
+
+grpRisk = "Risk / Costs"
+riskPct = input.float(1.0, "Risk % of equity per trade", group=grpRisk)
+feePct  = input.float(0.08, "Fee % per side", group=grpRisk)
+
+// ------------------------------------------------------------ Indicators -----
+sma20  = ta.sma(close, smaLen)
+sma200 = ta.sma(close, sma200Len)
+rsi    = ta.rsi(close, rsiLen)
+[macdLine, sigLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+atr    = ta.atr(atrLen)
+cost   = feePct / 100.0
+
+dClose  = request.security(syminfo.tickerid, "1D", close,             lookahead=barmerge.lookahead_off)
+dSma200 = request.security(syminfo.tickerid, "1D", ta.sma(close, 200), lookahead=barmerge.lookahead_off)
+isBull    = dClose > dSma200
+regimeStr = isBull ? "BULL" : "BEAR"
+
+oneHcloses = request.security_lower_tf(syminfo.tickerid, "60", close)
+
+// ------------------------------------------------------- Plot the spine ------
+plot(sma20,  "20 SMA",  color=color.new(color.orange, 0), linewidth=2)
+plot(sma200, "200 SMA", color=color.new(color.blue, 0), linewidth=2)
+bgcolor(sma20 > sma200 ? color.new(color.green, 92) : color.new(color.red, 92), title="Cross state")
+
+// ----------------------------------------------------- Setup conditions ------
+osTh      = isBull ? bullOS : bearOS
+minRsiArm = ta.lowest(rsi, armBars)
+maxRsiArm = ta.highest(rsi, armBars)
+swingLow  = ta.lowest(low, armBars)
+swingHigh = ta.highest(high, armBars)
+
+armedLong  = minRsiArm <= osTh
+armedShort = maxRsiArm >= ob
+reclaimUp  = not na(sma20[1]) and close > sma20 and close[1] <= sma20[1]
+reclaimDn  = not na(sma20[1]) and close < sma20 and close[1] >= sma20[1]
+rsiUp  = rsi  > rsi[1]
+rsiDn  = rsi  < rsi[1]
+macdUp = hist > hist[1]
+macdDn = hist < hist[1]
+
+bullGate = sma20 > sma200
+bearGate = sma20 < sma200
+gateLongOk  = not useCrossGate or bullGate
+gateShortOk = not useCrossGate or bearGate
+reclaimOkLong  = not useReclaim or reclaimUp
+reclaimOkShort = not useReclaim or reclaimDn
+
+// --- Direction-quality filters (v2) ---
+slope200Up = not na(sma200[slopeLen]) and sma200 > sma200[slopeLen]
+slope200Dn = not na(sma200[slopeLen]) and sma200 < sma200[slopeLen]
+slopeLongOk  = not useSlopeGate or slope200Up
+slopeShortOk = not useSlopeGate or slope200Dn
+sepPct = sma200 != 0 ? math.abs(sma20 - sma200) / sma200 * 100 : 0.0
+sepOk  = minSepPct <= 0 or sepPct >= minSepPct
+barsSinceCross = ta.barssince(ta.cross(sma20, sma200))
+crossAgeOk = minBarsCross <= 0 or (not na(barsSinceCross) and barsSinceCross >= minBarsCross)
+
+atrPct  = atr / close * 100
+distPct = math.abs(close - sma20) / close * 100
+atrOk   = not useAtrFilter  or (atrPct >= minAtrPct and (maxAtrPct <= 0 or atrPct <= maxAtrPct))
+distOk  = not useDistFilter or distPct <= maxDistPct
+
+warmOk = not na(sma20) and not na(sma20[1]) and not na(sma200) and not na(rsi[1]) and not na(hist[1])
+
+longSig  = warmOk and allowLongs  and armedLong  and gateLongOk  and reclaimOkLong  and slopeLongOk  and sepOk and crossAgeOk and rsiUp and macdUp and atrOk and distOk
+shortSig = warmOk and allowShorts and armedShort and gateShortOk and reclaimOkShort and slopeShortOk and sepOk and crossAgeOk and rsiDn and macdDn and atrOk and distOk
+if shortsBearOnly and regimeStr != "BEAR"
+    shortSig := false
+if withRegimeOnly
+    longSig  := longSig  and isBull
+    shortSig := shortSig and not isBull
+
+// ---------------------------------------------------- Stop estimate fn -------
+stopFor(float entryP, int sideS, float confLow, float confHigh, float prevClose, float sLow, float sHigh) =>
+    buf = atrBuf * (na(atr) ? 0.0 : atr)
+    float stp = na
+    float risk = 0.0
+    if sideS == 1
+        if stopMode == "swing"
+            stp := sLow - buf
+            risk := entryP - stp
+        else if stopMode == "prevclose"
+            stp := prevClose - buf
+            risk := entryP - stp
+        if na(stp) or risk <= 0
+            w = confLow - buf
+            rw = entryP - w
+            risk := rw <= 0 ? entryP * (maxRiskPct / 100) : math.min(rw, entryP * (maxRiskPct / 100))
+            stp  := entryP - risk
+    else
+        if stopMode == "swing"
+            stp := sHigh + buf
+            risk := stp - entryP
+        else if stopMode == "prevclose"
+            stp := prevClose + buf
+            risk := stp - entryP
+        if na(stp) or risk <= 0
+            w = confHigh + buf
+            rw = w - entryP
+            risk := rw <= 0 ? entryP * (maxRiskPct / 100) : math.min(rw, entryP * (maxRiskPct / 100))
+            stp  := entryP + risk
+    [stp, risk]
+
+// --------------------------------------------------------- State / orders ----
+var float stopLevel = na
+var bool  tp1Done   = false
+var int   entryBar  = na
+var float cLow  = na
+var float cHigh = na
+var float cPrev = na
+var float cSlow = na
+var float cShigh= na
+
+flat = strategy.position_size == 0
+
+if flat and (longSig or shortSig)
+    sideS = longSig ? 1 : -1
+    cLow  := low
+    cHigh := high
+    cPrev := close[1]
+    cSlow := swingLow
+    cShigh:= swingHigh
+    [estStop, estRisk] = stopFor(close, sideS, cLow, cHigh, cPrev, cSlow, cShigh)
+    if estRisk > 0
+        qty = (strategy.equity * (riskPct / 100)) / estRisk
+        if sideS == 1
+            strategy.entry("L", strategy.long, qty=qty)
+        else
+            strategy.entry("S", strategy.short, qty=qty)
+
+justOpened = strategy.position_size != 0 and strategy.position_size[1] == 0
+if justOpened
+    sideS = strategy.position_size > 0 ? 1 : -1
+    [realStop, realRisk] = stopFor(strategy.position_avg_price, sideS, cLow, cHigh, cPrev, cSlow, cShigh)
+    stopLevel := realStop
+    tp1Done   := false
+    entryBar  := bar_index
+
+if strategy.position_size != 0 and bar_index > entryBar
+    sideS = strategy.position_size > 0 ? 1 : -1
+    eP = strategy.position_avg_price
+    if not tp1Done
+        tp1Hit = sideS == 1 ? rsi >= tp1Rsi : rsi <= tp1Rsi
+        if tp1Hit
+            strategy.close(sideS == 1 ? "L" : "S", qty_percent=tp1Pct, comment="TP1")
+            tp1Done   := true
+            stopLevel := eP * (1 + sideS * 2 * cost)
+    ref = sma20[1]
+    bool tp2Hit = false
+    if not na(ref)
+        if tp2Use1h and array.size(oneHcloses) > 0
+            for j = 0 to array.size(oneHcloses) - 1
+                cc = array.get(oneHcloses, j)
+                through = sideS == 1 ? cc < ref : cc > ref
+                if through
+                    tp2Hit := true
+        else if not tp2Use1h
+            tp2Hit := sideS == 1 ? close < ref : close > ref
+    timeout = (bar_index - entryBar) >= maxBarsInput
+    if tp2Hit
+        strategy.close(sideS == 1 ? "L" : "S", comment="TP2")
+    else if timeout
+        strategy.close(sideS == 1 ? "L" : "S", comment="TIME")
+
+if strategy.position_size != 0 and not na(stopLevel)
+    if strategy.position_size > 0
+        strategy.exit("L-stop", from_entry="L", stop=stopLevel)
+    else
+        strategy.exit("S-stop", from_entry="S", stop=stopLevel)
