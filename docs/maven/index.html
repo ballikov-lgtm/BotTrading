@@ -10,13 +10,19 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   .wrap{max-width:1100px;margin:0 auto;padding:18px}
-  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px}
   .logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#4aa8ff,#2ecc71);
         display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#06223a}
   h1{font-size:22px;margin:0;letter-spacing:.3px}
   .sub{color:var(--mut);font-size:13px}
   .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
   .pill.paper{background:#3a2d00;color:var(--amb)}
+  /* tabs */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:8px 0 18px}
+  .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--mut);
+       font:600 14px/1 inherit;padding:11px 14px;cursor:pointer}
+  .tab:hover{color:var(--ink)} .tab.active{color:var(--blu);border-bottom-color:var(--blu)}
+  .pane{display:none} .pane.active{display:block}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
   .stat .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
@@ -24,33 +30,40 @@
   .v.pos{color:var(--grn)} .v.neg{color:var(--red)}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
   .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:0 0 12px}
+  .card p{margin:0 0 10px} .card b{color:var(--ink)}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
   th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
   .tag{font-weight:700} .tag.win{color:var(--grn)} .tag.loss{color:var(--red)}
-  .reason{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--card2);color:var(--ink)}
+  .reason{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--card2)}
   .empty{color:var(--mut);text-align:center;padding:26px;font-style:italic}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px}
   .evt{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+  ul.check{list-style:none;padding:0;margin:0} ul.check li{display:flex;gap:10px;padding:7px 0;align-items:flex-start}
+  .ck{flex:0 0 20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+  .ck.done{background:#0d3320;color:var(--grn)} .ck.now{background:#0d2f4d;color:var(--blu)} .ck.todo{background:#222a38;color:var(--mut)}
+  ul.check small{display:block;color:var(--mut);font-size:12px}
+  .upd{border-left:2px solid var(--line);padding:2px 0 2px 14px;margin:0 0 14px}
+  .upd .d{color:var(--blu);font-size:12px;font-weight:700} .upd p{margin:3px 0 0;font-size:14px}
+  .disc{background:#1a1205;border:1px solid #4a3a10;border-radius:12px;padding:14px 16px;color:#e9d9b0;font-size:12.5px;line-height:1.6}
+  .disc b{color:var(--amb)}
   footer{color:var(--mut);font-size:12px;text-align:center;margin:22px 0 8px}
   .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grn);margin-right:6px;animation:pulse 1.6s infinite}
   @keyframes pulse{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
-  /* radar */
   .radar-row{display:grid;grid-template-columns:84px 92px 1fr 70px;align-items:center;gap:12px;padding:8px 4px;border-bottom:1px solid var(--line)}
   .rsym{font-weight:700}
   .rbadge{font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;padding:3px 0;border-radius:6px}
   .rbar{position:relative;height:14px;background:var(--card2);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
-  .rzone{position:absolute;left:0;top:0;bottom:0;background:rgba(245,166,35,.16)}     /* RSI<=floor pullback zone */
-  .rtick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--mut)}        /* RSI 50 (TP1) */
+  .rzone{position:absolute;left:0;top:0;bottom:0;background:rgba(245,166,35,.16)}
+  .rtick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--mut)}
   .rdot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #0b0e14}
   .rrsi{font-size:12px;color:var(--mut);text-align:right}
   .radar-row.intrade .rbadge{background:#0d2f4d;color:var(--blu)}   .radar-row.intrade .rdot{background:var(--blu)}
   .radar-row.armed   .rbadge{background:#3a2d00;color:var(--amb)}   .radar-row.armed   .rdot{background:var(--amb);box-shadow:0 0 8px var(--amb)}
   .radar-row.armed   {background:rgba(245,166,35,.05)}
   .radar-row.watching .rbadge{background:#13283a;color:var(--blu)}  .radar-row.watching .rdot{background:var(--blu);opacity:.7}
-  .radar-row.gated   {opacity:.45}
-  .radar-row.gated   .rbadge{background:#222a38;color:var(--mut)}   .radar-row.gated   .rdot{background:var(--mut)}
+  .radar-row.gated   {opacity:.45} .radar-row.gated .rbadge{background:#222a38;color:var(--mut)} .radar-row.gated .rdot{background:var(--mut)}
 </style>
 </head>
 <body>
@@ -64,100 +77,130 @@
     <div style="margin-left:auto" class="sub"><span class="live"></span><span id="lastrun">—</span></div>
   </header>
 
-  <div class="grid" id="stats"></div>
+  <nav class="tabs">
+    <button class="tab active" data-pane="live">📡 Live</button>
+    <button class="tab" data-pane="strategy">🧭 Strategy</button>
+    <button class="tab" data-pane="status">⚙️ Status &amp; Updates</button>
+    <button class="tab" data-pane="about">⚠️ Disclaimer</button>
+  </nav>
 
-  <div class="card">
-    <h2>Radar — coming into range</h2>
-    <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--amb)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--blu)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
-    <div id="radar"></div>
-  </div>
+  <!-- LIVE -->
+  <section id="pane-live" class="pane active">
+    <div class="grid" id="stats"></div>
+    <div class="card"><h2>Radar — coming into range</h2>
+      <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--amb)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--blu)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
+      <div id="radar"></div></div>
+    <div class="card"><h2>Open positions</h2><div id="open"></div></div>
+    <div class="card"><h2>Watchlist</h2><div class="chips" id="watch"></div></div>
+    <div class="card"><h2>Recent activity</h2><div id="events"></div></div>
+    <div class="card"><h2>Closed trades</h2><div id="closed"></div></div>
+  </section>
 
-  <div class="card">
-    <h2>Open positions</h2>
-    <div id="open"></div>
-  </div>
+  <!-- STRATEGY -->
+  <section id="pane-strategy" class="pane">
+    <div class="card"><h2>What Maven is</h2>
+      <p>A <b>4-hour, long-biased trend-pullback</b> strategy on crypto. It only buys a coin once its trend has <b>demonstrably turned up</b>, then enters the first shallow pullback — banking half early, riding the rest. Longs only. A curated watchlist of <b>Bitcoin-outperforming alts</b>.</p></div>
+    <div class="card"><h2>The trend gates (a trade is only valid when ALL hold)</h2>
+      <p><b>① Cross gate</b> — the 4h 20 SMA is above the 200 SMA (past a golden cross). Kills the "falling-knife" longs.</p>
+      <p><b>② Gap filter</b> — the 20 sits ≥3% above the 200, skipping the choppy cross/transition zone.</p>
+      <p><b>③ MTF 200-slope</b> — both the 4h <b>and</b> daily 200 SMA are rising. No macro uptrend = no trade.</p></div>
+    <div class="card"><h2>The trade</h2>
+      <p><b>Entry:</b> after the gates open, 4h RSI dips to its ~35 floor then turns back up (+ MACD turning, reclaim of the 20 SMA) → enter next 4h open.</p>
+      <p><b>TP1:</b> close 50% at RSI 50, move the stop to break-even.</p>
+      <p><b>Runner:</b> exit when price closes back below the 20 SMA. <b>Time stop:</b> 20 × 4h bars.</p>
+      <p><b>Risk:</b> 2% per trade, max 3 concurrent, 3× leverage cap, compounding from $1,000.</p></div>
+    <div class="card"><h2>Watchlist — curated by relative strength</h2>
+      <p>A coin earns a slot when it's <b>outperforming Bitcoin on the trend</b> (the ALT/BTC ratio rising) — Maven wants the leaders. Reviewed periodically; coins that lose strength are dropped.</p>
+      <p class="sub">Backtest (portfolio sim, 2023–2026, curated watchlist): ~+60% on $1,000, ~4.6% max drawdown, ~70% win rate, PF ~4.4. <b style="color:var(--amb)">Backtested — not a forecast.</b></p></div>
+  </section>
 
-  <div class="card">
-    <h2>Watchlist</h2>
-    <div class="chips" id="watch"></div>
-  </div>
+  <!-- STATUS & UPDATES -->
+  <section id="pane-status" class="pane">
+    <div class="card"><h2>Build status</h2>
+      <ul class="check">
+        <li><span class="ck done">✓</span><div>Strategy validated in backtest<small>cross-gate trend-pullback, longs-only — turned a losing reversal model profitable</small></div></li>
+        <li><span class="ck done">✓</span><div>Engine + paper bot built<small>bot reuses the exact validated engine (live logic = backtest)</small></div></li>
+        <li><span class="ck done">✓</span><div>Live dashboard + Telegram alerts<small>this page + [MAVEN] pings on every entry/TP/stop</small></div></li>
+        <li><span class="ck now">▶</span><div>Paper observation (2–3 weeks)<small>running now in the cloud — confirming live behaviour</small></div></li>
+        <li><span class="ck todo">○</span><div>Live paper, then live (small size)<small>only after the observation period passes</small></div></li>
+      </ul></div>
+    <div class="card"><h2>What's happening / updates</h2>
+      <div class="upd"><div class="d">2026-06-08</div><p>Paper trading went live in the cloud. Added the "coming into range" radar + a per-coin RSI scanner. Short side re-tested (lower overbought trigger) — confirmed shorts don't pay on the runner-alts; longs-only stands.</p></div>
+      <div class="upd"><div class="d">2026-06-07</div><p>Rebuilt Maven from a losing mean-reversion idea into the cross-armed trend-pullback strategy. Validated across the basket; curated the watchlist by Bitcoin relative strength.</p></div></div>
+    <div class="card"><h2>Data &amp; runtime</h2>
+      <p><b>Data:</b> Bitget public klines (4h / 1h / daily) — keyless, no account access.</p>
+      <p><b>Runtime:</b> GitHub Actions cron (cloud, ~every 30 min) — PC-independent. State + dashboard committed each run.</p>
+      <p><b>Mode:</b> <span style="color:var(--amb)">PAPER (simulated)</span> — no real orders, no money at risk.</p></div>
+  </section>
 
-  <div class="card">
-    <h2>Recent activity</h2>
-    <div id="events"></div>
-  </div>
+  <!-- DISCLAIMER -->
+  <section id="pane-about" class="pane">
+    <div class="card"><h2>Important disclaimer</h2>
+      <div class="disc">
+        <p><b>Not financial advice.</b> Maven is a personal, experimental trading research project. Everything here is for <b>informational and educational purposes only</b> and must not be taken as financial, investment, or trading advice, nor as a recommendation or solicitation to buy or sell any asset.</p>
+        <p><b>Paper trading — no real money.</b> This dashboard currently reflects <b>simulated (paper) trades only</b>. No real funds are deployed and no live orders are placed.</p>
+        <p><b>Past &amp; backtested performance is not indicative of future results.</b> Backtests are hypothetical, benefit from hindsight, and do not represent actual trading. Live results will differ and may be losses. Trading cryptocurrencies carries a <b>substantial risk of loss</b> and is not suitable for everyone.</p>
+        <p><b>Public for transparency, not as a product.</b> This repository and dashboard are published openly as a personal research log. They are <b>not a signal service, fund, or product</b>, and nothing here is being advertised, sold, or promoted.</p>
+        <p><b>Do your own research.</b> The author makes no representations or warranties as to accuracy or completeness and <b>accepts no liability whatsoever</b> for any loss or damage arising from any use of, or reliance on, this information. You alone are responsible for your decisions.</p>
+      </div></div>
+  </section>
 
-  <div class="card">
-    <h2>Closed trades</h2>
-    <div id="closed"></div>
-  </div>
-
-  <footer>Maven runs on a cloud schedule — this page is updated automatically after every run.
-  An empty board means the strategy is <b>armed and waiting</b> for a real setup (it's low-frequency by design).</footer>
+  <footer>
+    Maven runs on a cloud schedule — this page updates automatically. A calm board means the strategy is <b>armed and waiting</b> for a real setup (it's low-frequency by design).<br>
+    <span style="color:var(--amb)">⚠️ Not financial advice · paper trading · for research/education only · past performance ≠ future results.</span>
+  </footer>
 </div>
 
 <script>
-const fmt = (n,d=2)=> (n==null?'—':Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}));
-const sign = n => n>0?'pos':(n<0?'neg':'');
+const fmt=(n,d=2)=>(n==null?'—':Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}));
+const sign=n=>n>0?'pos':(n<0?'neg':'');
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); document.getElementById('pane-'+b.dataset.pane).classList.add('active');
+}));
 
 async function load(){
   let s;
-  try{ s = await (await fetch('./state.json?_='+Date.now())).json(); }
+  try{ s=await (await fetch('./state.json?_='+Date.now())).json(); }
   catch(e){ document.getElementById('sub').textContent='waiting for first run…'; return; }
-
-  const st = s.stats||{};
-  document.getElementById('sub').textContent =
-    `${s.mode||'paper'} · started ${s.started} · $${fmt(s.start_equity,0)} start · 2% risk · max 3 concurrent · 3× cap`;
-  document.getElementById('lastrun').textContent = 'updated '+(s.last_run||'—');
-
-  const netCls = sign(st.net_usdt);
-  document.getElementById('stats').innerHTML = [
-    ['Equity', '$'+fmt(s.equity), ''],
-    ['Return', (st.return_pct>=0?'+':'')+fmt(st.return_pct,1)+'%', netCls],
-    ['Net P&L', (st.net_usdt>=0?'+$':'-$')+fmt(Math.abs(st.net_usdt)), netCls],
-    ['Win rate', fmt(st.win_rate,1)+'%', ''],
-    ['Profit factor', fmt(st.profit_factor,2), ''],
-    ['Trades', (st.closed_trades||0)+' closed · '+(st.open_trades||0)+' open', ''],
+  const st=s.stats||{};
+  document.getElementById('sub').textContent=`${s.mode||'paper'} · started ${s.started} · $${fmt(s.start_equity,0)} start · 2% risk · max 3 concurrent · 3× cap`;
+  document.getElementById('lastrun').textContent='updated '+(s.last_run||'—');
+  const netCls=sign(st.net_usdt);
+  document.getElementById('stats').innerHTML=[
+    ['Equity','$'+fmt(s.equity),''],['Return',(st.return_pct>=0?'+':'')+fmt(st.return_pct,1)+'%',netCls],
+    ['Net P&L',(st.net_usdt>=0?'+$':'-$')+fmt(Math.abs(st.net_usdt)),netCls],
+    ['Win rate',fmt(st.win_rate,1)+'%',''],['Profit factor',fmt(st.profit_factor,2),''],
+    ['Trades',(st.closed_trades||0)+' closed · '+(st.open_trades||0)+' open',''],
   ].map(([k,v,c])=>`<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
 
-  // radar — where each coin sits vs the Maven setup
-  const ORD={'IN-TRADE':0,'ARMED':1,'WATCHING':2,'GATED':3};
-  const scan = s.scan||{};
-  const rrows = Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||(a[1].rsi-b[1].rsi));
-  document.getElementById('radar').innerHTML = rrows.length ? rrows.map(([sym,d])=>{
-    const floor=d.rsi_floor||35, rsi=Math.max(0,Math.min(100,d.rsi)), st=d.status;
-    const cls=st==='IN-TRADE'?'intrade':st==='ARMED'?'armed':st==='WATCHING'?'watching':'gated';
-    return `<div class="radar-row ${cls}"><div class="rsym">${esc(sym)}</div>
-      <div class="rbadge">${esc(st)}</div>
-      <div class="rbar"><div class="rzone" style="width:${floor}%"></div>
-        <div class="rtick" style="left:50%"></div><div class="rdot" style="left:${rsi}%"></div></div>
-      <div class="rrsi">RSI ${fmt(d.rsi,1)}</div></div>`;
-  }).join('') : `<div class="empty">Scan updating on the next run…</div>`;
+  const ORD={'IN-TRADE':0,'ARMED':1,'WATCHING':2,'GATED':3}; const scan=s.scan||{};
+  const rr=Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||(a[1].rsi-b[1].rsi));
+  document.getElementById('radar').innerHTML=rr.length?rr.map(([sym,d])=>{
+    const floor=d.rsi_floor||35,rsi=Math.max(0,Math.min(100,d.rsi)),st2=d.status;
+    const cls=st2==='IN-TRADE'?'intrade':st2==='ARMED'?'armed':st2==='WATCHING'?'watching':'gated';
+    return `<div class="radar-row ${cls}"><div class="rsym">${esc(sym)}</div><div class="rbadge">${esc(st2)}</div>
+      <div class="rbar"><div class="rzone" style="width:${floor}%"></div><div class="rtick" style="left:50%"></div><div class="rdot" style="left:${rsi}%"></div></div>
+      <div class="rrsi">RSI ${fmt(d.rsi,1)}</div></div>`;}).join(''):`<div class="empty">Scan updating on the next run…</div>`;
 
-  const open = Object.values(s.open||{});
-  document.getElementById('open').innerHTML = open.length ? `<table>
-    <tr><th>Coin</th><th>Entry</th><th>Stop</th><th>Risk $</th><th>Since</th></tr>
-    ${open.map(p=>`<tr><td class="tag">${esc(p.symbol)}</td><td>${fmt(p.entry,4)}</td>
-      <td>${fmt(p.stop,4)}</td><td>$${fmt(p.risk_amt)}</td><td class="sub">${esc(p.entry_time||p.opened_at)}</td></tr>`).join('')}
-    </table>` : `<div class="empty">No open positions — armed and waiting for a setup.</div>`;
-
-  document.getElementById('watch').innerHTML = (s.watchlist||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('');
-
-  const ev = s.events_last_run||[];
-  document.getElementById('events').innerHTML = ev.length ? ev.map(e=>`<div class="evt">${esc(e)}</div>`).join('')
-    : `<div class="empty">No new activity last run.</div>`;
-
-  const cl = (s.closed||[]).slice().reverse().slice(0,40);
-  document.getElementById('closed').innerHTML = cl.length ? `<table>
-    <tr><th>Coin</th><th>Reason</th><th>R</th><th>P&L</th><th>Entry</th><th>Closed</th></tr>
+  const open=Object.values(s.open||{});
+  document.getElementById('open').innerHTML=open.length?`<table><tr><th>Coin</th><th>Entry</th><th>Stop</th><th>Risk $</th><th>Since</th></tr>
+    ${open.map(p=>`<tr><td class="tag">${esc(p.symbol)}</td><td>${fmt(p.entry,4)}</td><td>${fmt(p.stop,4)}</td><td>$${fmt(p.risk_amt)}</td><td class="sub">${esc(p.entry_time||p.opened_at)}</td></tr>`).join('')}</table>`
+    :`<div class="empty">No open positions — armed and waiting for a setup.</div>`;
+  document.getElementById('watch').innerHTML=(s.watchlist||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join('');
+  const ev=s.events_last_run||[];
+  document.getElementById('events').innerHTML=ev.length?ev.map(e=>`<div class="evt">${esc(e)}</div>`).join(''):`<div class="empty">No new activity last run.</div>`;
+  const cl=(s.closed||[]).slice().reverse().slice(0,40);
+  document.getElementById('closed').innerHTML=cl.length?`<table><tr><th>Coin</th><th>Reason</th><th>R</th><th>P&L</th><th>Entry</th><th>Closed</th></tr>
     ${cl.map(t=>`<tr><td class="tag">${esc(t.symbol)}</td><td><span class="reason">${esc(t.reason)}</span></td>
-      <td class="${sign(t.R)}">${(t.R>=0?'+':'')+fmt(t.R,2)}R</td>
-      <td class="tag ${t.pnl>0?'win':'loss'}">${(t.pnl>=0?'+$':'-$')+fmt(Math.abs(t.pnl))}</td>
-      <td class="sub">${esc(t.entry_time)}</td><td class="sub">${esc(t.closed_at)}</td></tr>`).join('')}
-    </table>` : `<div class="empty">No closed trades yet.</div>`;
+      <td class="${sign(t.R)}">${(t.R>=0?'+':'')+fmt(t.R,2)}R</td><td class="tag ${t.pnl>0?'win':'loss'}">${(t.pnl>=0?'+$':'-$')+fmt(Math.abs(t.pnl))}</td>
+      <td class="sub">${esc(t.entry_time)}</td><td class="sub">${esc(t.closed_at)}</td></tr>`).join('')}</table>`
+    :`<div class="empty">No closed trades yet.</div>`;
 }
-load(); setInterval(load, 60000);
+load(); setInterval(load,60000);
 </script>
 </body>
 </html>
