@@ -62,7 +62,7 @@ def load_state(cfg):
     return {"strategy": "Maven", "mode": cfg.get("mode", "paper"),
             "started": now_utc().strftime("%Y-%m-%d"), "initialized": False,
             "start_equity": acct["start_equity_usdt"], "equity": acct["start_equity_usdt"],
-            "open": {}, "closed": [], "seen_entries": {}, "skipped": {},
+            "open": {}, "closed": [], "seen_entries": {}, "skipped": {}, "scan": {},
             "equity_curve": [{"t": iso(now_utc()), "equity": acct["start_equity_usdt"]}],
             "watchlist": cfg["watchlist"], "last_run": None, "events_last_run": []}
 
@@ -99,9 +99,11 @@ def run():
 
     for sym in cfg["watchlist"]:
         try:
-            trades, pos, _pending = ENG.engine_state(sym, start, end, P)
+            trades, pos, _pending, scan = ENG.engine_state(sym, start, end, P)
         except Exception as e:
             print(f"[{sym}] engine error: {e}"); continue
+        if scan:
+            state.setdefault("scan", {})[sym] = scan
         closed_by_ts = {t["entry_ts"]: t for t in trades}
         seen = state["seen_entries"].setdefault(sym, [])
 

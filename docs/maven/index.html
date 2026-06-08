@@ -36,6 +36,21 @@
   footer{color:var(--mut);font-size:12px;text-align:center;margin:22px 0 8px}
   .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grn);margin-right:6px;animation:pulse 1.6s infinite}
   @keyframes pulse{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+  /* radar */
+  .radar-row{display:grid;grid-template-columns:84px 92px 1fr 70px;align-items:center;gap:12px;padding:8px 4px;border-bottom:1px solid var(--line)}
+  .rsym{font-weight:700}
+  .rbadge{font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;padding:3px 0;border-radius:6px}
+  .rbar{position:relative;height:14px;background:var(--card2);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .rzone{position:absolute;left:0;top:0;bottom:0;background:rgba(245,166,35,.16)}     /* RSI<=floor pullback zone */
+  .rtick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--mut)}        /* RSI 50 (TP1) */
+  .rdot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #0b0e14}
+  .rrsi{font-size:12px;color:var(--mut);text-align:right}
+  .radar-row.intrade .rbadge{background:#0d2f4d;color:var(--blu)}   .radar-row.intrade .rdot{background:var(--blu)}
+  .radar-row.armed   .rbadge{background:#3a2d00;color:var(--amb)}   .radar-row.armed   .rdot{background:var(--amb);box-shadow:0 0 8px var(--amb)}
+  .radar-row.armed   {background:rgba(245,166,35,.05)}
+  .radar-row.watching .rbadge{background:#13283a;color:var(--blu)}  .radar-row.watching .rdot{background:var(--blu);opacity:.7}
+  .radar-row.gated   {opacity:.45}
+  .radar-row.gated   .rbadge{background:#222a38;color:var(--mut)}   .radar-row.gated   .rdot{background:var(--mut)}
 </style>
 </head>
 <body>
@@ -50,6 +65,12 @@
   </header>
 
   <div class="grid" id="stats"></div>
+
+  <div class="card">
+    <h2>Radar — coming into range</h2>
+    <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--amb)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--blu)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
+    <div id="radar"></div>
+  </div>
 
   <div class="card">
     <h2>Open positions</h2>
@@ -99,6 +120,20 @@ async function load(){
     ['Profit factor', fmt(st.profit_factor,2), ''],
     ['Trades', (st.closed_trades||0)+' closed · '+(st.open_trades||0)+' open', ''],
   ].map(([k,v,c])=>`<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  // radar — where each coin sits vs the Maven setup
+  const ORD={'IN-TRADE':0,'ARMED':1,'WATCHING':2,'GATED':3};
+  const scan = s.scan||{};
+  const rrows = Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||(a[1].rsi-b[1].rsi));
+  document.getElementById('radar').innerHTML = rrows.length ? rrows.map(([sym,d])=>{
+    const floor=d.rsi_floor||35, rsi=Math.max(0,Math.min(100,d.rsi)), st=d.status;
+    const cls=st==='IN-TRADE'?'intrade':st==='ARMED'?'armed':st==='WATCHING'?'watching':'gated';
+    return `<div class="radar-row ${cls}"><div class="rsym">${esc(sym)}</div>
+      <div class="rbadge">${esc(st)}</div>
+      <div class="rbar"><div class="rzone" style="width:${floor}%"></div>
+        <div class="rtick" style="left:50%"></div><div class="rdot" style="left:${rsi}%"></div></div>
+      <div class="rrsi">RSI ${fmt(d.rsi,1)}</div></div>`;
+  }).join('') : `<div class="empty">Scan updating on the next run…</div>`;
 
   const open = Object.values(s.open||{});
   document.getElementById('open').innerHTML = open.length ? `<table>

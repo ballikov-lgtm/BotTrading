@@ -418,7 +418,36 @@ def engine_state(symbol, start, end, P):
         return [], None, None
     reg_lookup, dslope_lookup, _ = daily_regime_fn(symbol, start_ms, end_ms, slope_d=P.get("slope_d", 5))
     Pl = dict(P); Pl["blackout_windows"] = load_blackout_windows(Pl)
-    return run_core(symbol, c4, c1, reg_lookup, Pl, dslope_lookup, return_open=True)
+    trades, pos, pending = run_core(symbol, c4, c1, reg_lookup, Pl, dslope_lookup, return_open=True)
+    scan = scan_snapshot(c4, P, dslope_lookup, pos)
+    return trades, pos, pending, scan
+
+def scan_snapshot(c4, P, dslope_lookup, pos):
+    """Latest-bar 'radar' state for the dashboard: where this coin sits vs the Maven setup.
+    status: IN-TRADE / ARMED (gate open + RSI in the pullback zone) / WATCHING (gate open,
+    waiting for a dip) / GATED (trend not established -> no trades)."""
+    closes = [x["c"] for x in c4]
+    s20 = sma_series(closes, P["sma"]); s200 = sma_series(closes, P["sma200"]); r = rsi_series(closes, P["rsi_len"])
+    i = len(c4) - 1
+    if i < 0 or s200[i] is None or r[i] is None or s20[i] is None:
+        return None
+    sl = P.get("slope_4h", 10)
+    slope4h_up = i - sl >= 0 and s200[i - sl] is not None and s200[i] > s200[i - sl]
+    dsl = dslope_lookup(c4[i]["ts"]) if dslope_lookup else None
+    dslope_up = dsl is not None and dsl > 0
+    gap = abs(s20[i] - s200[i]) / s200[i] * 100 if s200[i] else 0.0
+    floor = P["bull_os"]
+    cross_ok = (not P.get("use_cross_gate")) or s20[i] > s200[i]
+    gap_ok   = (P.get("min_sep_pct", 0) <= 0) or gap >= P["min_sep_pct"]
+    mtf_ok   = (not P.get("mtf_slope_gate")) or (slope4h_up and dslope_up)
+    gate_open = cross_ok and gap_ok and mtf_ok
+    status = ("IN-TRADE" if pos is not None else
+              "ARMED" if (gate_open and r[i] <= floor) else
+              "WATCHING" if gate_open else "GATED")
+    return {"rsi": round(r[i], 1), "price": closes[i], "gap_pct": round(gap, 1),
+            "rsi_floor": floor, "gate_open": gate_open, "cross_ok": cross_ok,
+            "gap_ok": gap_ok, "slope4h_up": slope4h_up, "dslope_up": dslope_up,
+            "status": status}
 
 def summarize(trades):
     n = len(trades)
