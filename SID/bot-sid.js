@@ -3,12 +3,16 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 
 import { createExecutor, resolveTradingMode } from './alpaca-executor.js';
+import { rsiTargetPrice } from './rsi-target-price.js';
 import * as tg from './telegram-alerts.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  accountUsd:       parseFloat(process.env.SID_ACCOUNT_USD)     || 10000,  // V2 paper start ($10K matches backtest)
+  // V2.2: accountUsd is set per-run from the internal ledger (loadAccount)
+  // for compounding sizing. The SID_ACCOUNT_USD env var becomes a fallback
+  // only when the ledger is unreadable. See top of main() for the override.
+  accountUsd:       parseFloat(process.env.SID_ACCOUNT_USD)     || 30000,  // V2.2 fallback only
   riskPct:          parseFloat(process.env.SID_RISK_PCT)         || 0.01,   // V2 default 1% per instructor S3_Ep4
   maxPositionPct:   parseFloat(process.env.SID_MAX_POS_PCT)      || 0.10,   // 10% of account max per trade
   maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 3,      // Never hold more than 3 at once
@@ -41,7 +45,7 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.1'; // V2.1: dynamic TP1+TP2 partial exits (paper trading, 2026-05-18)
+const BOT_VERSION = 'v2.2'; // V2.2: intraday-touch RSI-50 TP1 + broker-enforced stops + internal-ledger compounding (paper trading, 2026-06-08)
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
@@ -433,6 +437,172 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
     isFullClose,
     fillsUsed,
   });
+}
+
+// ── V2.2: Broker order maintenance ─────────────────────────────────────────────
+// Helpers that keep the broker-side resting stop + intraday TP1 limit in sync
+// with what the bot expects. Run each bot cycle for every v2.2 position.
+
+const V2_2_PRICE_DRIFT_TOLERANCE = 0.05;   // dollar threshold for "materially different" TP1 limit price
+const V2_2_TP1_RECOMPUTE_RSI     = 50;
+
+/** Is this position managed by V2.2 broker-side orders? */
+function isV2_2Position(pos) {
+  // Either explicitly tagged v2.2 OR has a brokerStopOrderId stamped at entry.
+  // V2.1 GOOG runner (pre-migration) has neither → returns false → keeps legacy
+  // daily-poll management.
+  return (typeof pos.strategy === 'string' && pos.strategy.includes('v2.2'))
+      || !!pos.brokerStopOrderId;
+}
+
+/** Find an open Alpaca order by client_order_id suffix (e.g. "-tp1" or "-stop"). */
+async function findOpenOrder(alpacaClient, symbol, clientOrderIdSuffix) {
+  try {
+    const orders = await alpacaClient.listOrders({ status: 'open', symbols: symbol, limit: 50 });
+    return (orders || []).find(o =>
+      o && typeof o.client_order_id === 'string' &&
+      o.client_order_id.endsWith(clientOrderIdSuffix)
+    );
+  } catch (err) {
+    console.warn(`[V2.2] findOpenOrder failed for ${symbol}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * V2.2 — Maintain the broker-side resting stop and intraday TP1 limit for a
+ * single open position. Called from checkPositions once per run per v2.2 position.
+ *
+ * Semantics:
+ *   - Stop side: opposite of the entry. Stop price = pos.entry if tp1_hit (BE
+ *     on the runner) else pos.stopLoss.
+ *   - TP1 limit: only placed while tp1_hit === false. Price is recomputed each
+ *     run via rsiTargetPrice(closes, 14, 50) — the level the next bar's close
+ *     would have to print for RSI to equal 50. If the existing -tp1 order's
+ *     limit_price drifts more than V2_2_PRICE_DRIFT_TOLERANCE from the new
+ *     target, cancel and resubmit.
+ *
+ * Idempotent — safe to call every run.
+ */
+async function maintainV2_2BrokerOrders(pos, executor, closes) {
+  if (!executor || !pos.clientOrderIdPrefix) {
+    // Either dry_run or missing prefix (legacy position). Skip.
+    return;
+  }
+  const client = executor.client;
+  const exitSide = pos.side === 'long' ? 'sell' : 'buy';
+  const prefix = pos.clientOrderIdPrefix;
+
+  // ── Resting stop ────────────────────────────────────────────────────────
+  const expectedStopPrice = pos.tp1_hit ? parseFloat(pos.entry.toFixed(2)) : pos.stopLoss;
+  const existingStop = await findOpenOrder(client, pos.symbol, '-stop');
+  const stopShares = pos.shares_remaining ?? pos.shares;
+
+  if (!existingStop) {
+    try {
+      const stopOrder = await client.submitOrder({
+        symbol:          pos.symbol,
+        qty:             stopShares,
+        side:            exitSide,
+        type:            'stop',
+        stop_price:      expectedStopPrice,
+        time_in_force:   'gtc',
+        client_order_id: `${prefix}-stop-${Date.now()}`,
+      });
+      pos.brokerStopOrderId = stopOrder.id;
+      console.log(`  [V2.2] Placed missing stop for ${pos.symbol}: ${stopShares}sh @ $${expectedStopPrice} (id ${stopOrder.id})`);
+    } catch (err) {
+      console.warn(`  [V2.2] Stop placement failed for ${pos.symbol}: ${err.message}`);
+    }
+  } else {
+    const existingStopPrice = parseFloat(existingStop.stop_price);
+    const existingStopQty   = parseInt(existingStop.qty, 10);
+    const priceMismatch = Math.abs(existingStopPrice - expectedStopPrice) > V2_2_PRICE_DRIFT_TOLERANCE;
+    const qtyMismatch   = existingStopQty !== stopShares;
+    if (priceMismatch || qtyMismatch) {
+      console.log(`  [V2.2] Refreshing stop for ${pos.symbol}: ${existingStopQty}sh @ $${existingStopPrice} → ${stopShares}sh @ $${expectedStopPrice}`);
+      try {
+        await client.cancelOrder(existingStop.id);
+        await new Promise(r => setTimeout(r, 800));
+        const stopOrder = await client.submitOrder({
+          symbol:          pos.symbol,
+          qty:             stopShares,
+          side:            exitSide,
+          type:            'stop',
+          stop_price:      expectedStopPrice,
+          time_in_force:   'gtc',
+          client_order_id: `${prefix}-stop-${Date.now()}`,
+        });
+        pos.brokerStopOrderId = stopOrder.id;
+      } catch (err) {
+        console.warn(`  [V2.2] Stop refresh failed for ${pos.symbol}: ${err.message}`);
+      }
+    }
+  }
+
+  // ── Resting TP1 limit (only while tp1_hit === false) ────────────────────
+  if (pos.tp1_hit) {
+    // Belt-and-braces: kill any stale TP1 order if somehow still active
+    const staleTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
+    if (staleTp1) {
+      console.log(`  [V2.2] Cancelling stale -tp1 order for ${pos.symbol} (tp1_hit=true)`);
+      try { await client.cancelOrder(staleTp1.id); } catch (_) {}
+    }
+    return;
+  }
+
+  // Compute the RSI-50 target price for the next bar
+  const tp1Target = rsiTargetPrice(closes, 14, V2_2_TP1_RECOMPUTE_RSI);
+  if (!Number.isFinite(tp1Target) || tp1Target <= 0) {
+    console.warn(`  [V2.2] rsiTargetPrice returned ${tp1Target} for ${pos.symbol} — TP1 limit not placed this run`);
+    return;
+  }
+
+  const tp1Qty = Math.floor(pos.shares_total * CONFIG.tp1Portion);
+  if (tp1Qty < 1) {
+    console.warn(`  [V2.2] ${pos.symbol} share count too small to split — no TP1 limit placed`);
+    return;
+  }
+
+  const existingTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
+  if (!existingTp1) {
+    try {
+      const tp1Order = await client.submitOrder({
+        symbol:          pos.symbol,
+        qty:             tp1Qty,
+        side:            exitSide,
+        type:            'limit',
+        limit_price:     tp1Target,
+        time_in_force:   'gtc',
+        client_order_id: `${prefix}-tp1-${Date.now()}`,
+      });
+      console.log(`  [V2.2] Placed TP1 limit for ${pos.symbol}: ${tp1Qty}sh @ $${tp1Target} (id ${tp1Order.id})`);
+    } catch (err) {
+      console.warn(`  [V2.2] TP1 limit placement failed for ${pos.symbol}: ${err.message}`);
+    }
+  } else {
+    const existingTp1Price = parseFloat(existingTp1.limit_price);
+    if (Math.abs(existingTp1Price - tp1Target) > V2_2_PRICE_DRIFT_TOLERANCE) {
+      console.log(`  [V2.2] TP1 limit drift on ${pos.symbol}: was $${existingTp1Price} → now $${tp1Target} (re-pricing)`);
+      try {
+        await client.cancelOrder(existingTp1.id);
+        await new Promise(r => setTimeout(r, 800));
+        await client.submitOrder({
+          symbol:          pos.symbol,
+          qty:             tp1Qty,
+          side:            exitSide,
+          type:            'limit',
+          limit_price:     tp1Target,
+          time_in_force:   'gtc',
+          client_order_id: `${prefix}-tp1-${Date.now()}`,
+        });
+      } catch (err) {
+        console.warn(`  [V2.2] TP1 limit refresh failed for ${pos.symbol}: ${err.message}`);
+      }
+    } else {
+      // Already at the right price — leave it
+    }
+  }
 }
 
 // ── Market Data (Yahoo Finance — no API key needed) ───────────────────────────
@@ -902,6 +1072,16 @@ async function checkPositions(executor = null) {
     const sma50Arr  = CONFIG.useDynamicTp ? calcSMA(closes, 50)  : null;
     const sma200Arr = CONFIG.useDynamicTp ? calcSMA(closes, 200) : null;
 
+    // ── V2.2 broker-order maintenance ──────────────────────────────────────
+    // For positions managed by V2.2 (broker-side stops + intraday TP1 limit),
+    // ensure the resting orders are in sync with current state. V2.1 legacy
+    // positions (e.g. open GOOG runner) are managed by the daily-poll logic
+    // below and skip this step.
+    const posIsV2_2 = isV2_2Position(pos);
+    if (posIsV2_2 && executor) {
+      await maintainV2_2BrokerOrders(pos, executor, closes);
+    }
+
     // tp1_date may exist on legacy data — locate its index in *this* run's
     // candles array (yfinance can shift indices vs prior runs) for accurate
     // bars-since-TP1 timeout calc.
@@ -922,6 +1102,12 @@ async function checkPositions(executor = null) {
 
       // ── Branch A: TP1 not yet hit ─────────────────────────────────────────
       if (!pos.tp1_hit) {
+        // V2.2 SHORT-CIRCUIT: broker-side resting stop + intraday TP1 limit
+        // manage these exits. syncPositions detects the fills and updates state
+        // before we reach this point. Skip the v2.1 daily-close polling here
+        // so we don't accidentally double-fire on the same condition.
+        if (posIsV2_2) continue;
+
         // Original stop check — full stop-out before TP1 = full loss on shares_total
         const stopHit = pos.side === 'long'
           ? c.low  <= pos.stopLoss
@@ -1139,7 +1325,8 @@ async function checkPositions(executor = null) {
           (prevClose !== null && Math.sign(prevClose - ma) !== Math.sign(c.close - ma))  // gapped across SMA
         );
       if (pos.side === 'long') {
-        if (c.low <= pos.stopLoss) {
+        // V2.2: BE stop is broker-managed → skip the daily-poll BE check, keep SMA exits
+        if (!posIsV2_2 && c.low <= pos.stopLoss) {
           tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
         } else if (crossedSMA(ma50)) {
           tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
@@ -1147,7 +1334,8 @@ async function checkPositions(executor = null) {
           tp2Hit = true; tp2Reason = 'sma200_touch'; tp2ExitPrice = ma200;
         }
       } else { // short
-        if (c.high >= pos.stopLoss) {
+        // V2.2: BE stop is broker-managed → skip the daily-poll BE check, keep SMA exits
+        if (!posIsV2_2 && c.high >= pos.stopLoss) {
           tp2Hit = true; tp2Reason = 'breakeven_stop'; tp2ExitPrice = pos.stopLoss;
         } else if (crossedSMA(ma50)) {
           tp2Hit = true; tp2Reason = 'sma50_touch';  tp2ExitPrice = ma50;
@@ -1306,14 +1494,30 @@ async function run() {
       return;
     }
 
-    // Trust Alpaca's account equity over the local compounding ledger when
-    // we're actually trading through them. This means the bot sizes against
-    // the real broker balance including fills, dividends, and FX.
+    // V2.2: size off the internal ledger, NOT Alpaca equity. The internal
+    // ledger represents the compounding $30k target equity for live; sizing
+    // against Alpaca's actual paper equity ($100k) inflates positions to
+    // ~3× what they should be. Internal-ledger sizing keeps paper positions
+    // representative of what the live account will actually do.
     if (preflight.equity > 0) {
-      CONFIG.accountUsd = preflight.equity;
-      console.log(`[Alpaca] Equity     : $${preflight.equity.toFixed(2)}  (used for position sizing this run)`);
-      console.log(`[Alpaca] Buying pwr : $${preflight.buyingPower.toFixed(2)}`);
-      console.log(`[Alpaca] Market open: ${preflight.marketOpen ? 'YES' : 'NO'}  next open: ${preflight.nextOpen}`);
+      console.log(`[Alpaca] Broker equity: $${preflight.equity.toFixed(2)}  (informational — NOT used for sizing)`);
+      console.log(`[Alpaca] Buying pwr  : $${preflight.buyingPower.toFixed(2)}`);
+      console.log(`[Alpaca] Market open : ${preflight.marketOpen ? 'YES' : 'NO'}  next open: ${preflight.nextOpen}`);
+      console.log(`[Sizing] V2.2 internal-ledger basis: $${CONFIG.accountUsd.toFixed(2)} (1% risk = $${(CONFIG.accountUsd * CONFIG.riskPct).toFixed(2)})`);
+
+      // PRE-LIVE GUARD (spec §7): when going live, halt if broker equity
+      // diverges from internal ledger by > 10% — catches funding gaps or
+      // residual paper-account contamination before any real-money entry.
+      if (CONFIG.tradingMode === 'live') {
+        const divergence = Math.abs(preflight.equity - CONFIG.accountUsd) / CONFIG.accountUsd;
+        if (divergence > 0.10) {
+          console.error(`\n🚫 LIVE GUARD — broker equity $${preflight.equity.toFixed(2)} diverges from ledger $${CONFIG.accountUsd.toFixed(2)} by ${(divergence*100).toFixed(1)}% (>10%).`);
+          console.error('   Refusing to submit entries. Reconcile the ledger before re-running.');
+          writeLog({ kind: 'live_guard_halt', brokerEquity: preflight.equity, ledger: CONFIG.accountUsd, divergencePct: divergence });
+          try { await tg.sendMessage(`🚫 SID LIVE GUARD halt — broker $${preflight.equity.toFixed(0)} vs ledger $${CONFIG.accountUsd.toFixed(0)} (${(divergence*100).toFixed(1)}% divergence). No entries until reconciled.`); } catch {}
+          return;
+        }
+      }
     }
 
     if (!preflight.marketOpen) {
@@ -1344,6 +1548,66 @@ async function run() {
             reasonKind:    'partial_external_fill',
             isFullClose:   false,
           });
+
+          // ── V2.2 TP1 fill detection ──────────────────────────────────────
+          // If this partial close was the resting TP1 limit firing on a V2.2
+          // position, mark tp1_hit + populate tp1_* fields on the live record
+          // in stillOpen. maintainV2_2BrokerOrders on the next checkPositions
+          // cycle will then refresh the broker stop to BE for the runner.
+          //
+          // Heuristic: posIsV2_2 + the partial close is ~50% of shares_total
+          // (matches CONFIG.tp1Portion). Robust for paper-validation purposes;
+          // would be tightened to client_order_id matching for live.
+          const livePos = stillOpen.find(p => p.id === pos.id);
+          if (livePos && isV2_2Position(livePos) && !livePos.tp1_hit) {
+            const expectedTp1Qty = Math.floor(livePos.shares_total * CONFIG.tp1Portion);
+            const tolerance = Math.max(1, Math.floor(expectedTp1Qty * 0.10)); // 10% slack on share count
+            if (Math.abs(deltaShares - expectedTp1Qty) <= tolerance) {
+              // Pull the best-guess fill price from Alpaca for the tp1_price field
+              let tp1FillPrice = livePos.entry;  // safe fallback
+              try {
+                const orders = await executor.client.listOrders({ symbols: pos.symbol, status: 'closed', limit: 50 });
+                const exitSide = livePos.side === 'long' ? 'sell' : 'buy';
+                const fills = (orders || []).filter(o =>
+                  o.side === exitSide &&
+                  o.status === 'filled' &&
+                  parseFloat(o.filled_qty || 0) > 0 &&
+                  typeof o.client_order_id === 'string' &&
+                  o.client_order_id.includes('-tp1')
+                );
+                if (fills.length > 0) {
+                  // Weighted-avg of -tp1 fills
+                  let tq = 0, tc = 0;
+                  for (const f of fills) {
+                    const q = parseFloat(f.filled_qty);
+                    const p = parseFloat(f.filled_avg_price);
+                    tq += q;
+                    tc += q * p;
+                  }
+                  if (tq > 0) tp1FillPrice = tc / tq;
+                }
+              } catch (_) { /* fall back to entry */ }
+              const tp1Pnl = livePos.side === 'long'
+                ? (tp1FillPrice - livePos.entry) * deltaShares
+                : (livePos.entry - tp1FillPrice) * deltaShares;
+              livePos.tp1_hit    = true;
+              livePos.tp1_date   = todayString();
+              livePos.tp1_price  = parseFloat(tp1FillPrice.toFixed(4));
+              livePos.tp1_shares = deltaShares;
+              livePos.tp1_pnl    = parseFloat(tp1Pnl.toFixed(2));
+              livePos.tp1_reason = 'rsi50_intraday';
+              livePos.stopLoss   = parseFloat(livePos.entry.toFixed(2));  // BE for runner
+              console.log(`  [V2.2] TP1 fill detected on ${livePos.symbol}: ${deltaShares}sh @ ~$${tp1FillPrice.toFixed(2)} → marking tp1_hit, stop migrates to BE next cycle`);
+              try {
+                await tg.sendMessage(
+                  `🎯 <b>SID V2.2 TP1 filled</b>\n\n` +
+                  `${livePos.symbol} ${livePos.side.toUpperCase()} ${deltaShares}sh @ $${tp1FillPrice.toFixed(2)}\n` +
+                  `Entry: $${livePos.entry.toFixed(2)}  P&amp;L: ${tp1Pnl >= 0 ? '+' : ''}$${tp1Pnl.toFixed(2)}\n` +
+                  `Runner ${livePos.shares_remaining}sh — stop migrates to BE this run.`
+                );
+              } catch (_) {}
+            }
+          }
         }
       }
 
@@ -1545,17 +1809,21 @@ async function run() {
     // In dry_run mode (executor=null) we just record the trade locally as before.
     // In paper/live mode we place a real order and use Alpaca's order ID as the
     // canonical identifier — this lets us reconcile later.
-    let orderId   = `SID-DRYRUN-${Date.now()}`;
-    let exchange  = 'Yahoo/DryRun';
-    let modeLabel = 'dry_run';
+    let orderId             = `SID-DRYRUN-${Date.now()}`;
+    let exchange            = 'Yahoo/DryRun';
+    let modeLabel           = 'dry_run';
+    let stopOrderId         = null;     // V2.2: broker GTC stop placed alongside entry
+    let clientOrderIdPrefix = null;     // V2.2: needed to find/refresh resting TP1 limit
 
     if (executor) {
       try {
-        const result = await executor.openEntry({ signal, sizing, symbol });
-        orderId   = result.entryOrderId;
-        exchange  = `Alpaca/${CONFIG.tradingMode}`;
-        modeLabel = CONFIG.tradingMode;
-        console.log(`    Order ID : ${orderId} (stop ${result.stopOrderId})`);
+        const result        = await executor.openEntry({ signal, sizing, symbol });
+        orderId             = result.entryOrderId;
+        stopOrderId         = result.stopOrderId;
+        clientOrderIdPrefix = result.clientOrderIdPrefix;
+        exchange            = `Alpaca/${CONFIG.tradingMode}`;
+        modeLabel           = CONFIG.tradingMode;
+        console.log(`    Order ID : ${orderId} (stop ${stopOrderId})`);
       } catch (err) {
         console.log(`    🚫 Alpaca entry FAILED: ${err.message}`);
         writeLog({
@@ -1609,6 +1877,9 @@ async function run() {
       openTime:         now.toISOString().slice(11, 19),
       mode:             modeLabel,
       strategy:         `${BOT_NAME} ${BOT_VERSION}`,
+      // V2.2: broker-order tracking for resting stop + intraday TP1 limit
+      brokerStopOrderId:   stopOrderId,
+      clientOrderIdPrefix: clientOrderIdPrefix,
     });
 
     // Fire Telegram alert (best-effort, never blocks trading)
