@@ -1,32 +1,41 @@
 //@version=6
 // =============================================================================
-// SID Strategy v2.2 — Intraday RSI-50 TP1 + breakeven runner (2026-06-09)
+// SID Strategy v2.2.1 HYBRID --- close-based longs / intraday-touch shorts
 // =============================================================================
-// CHANGE vs v2.1:
-//   TP1 now fires the MOMENT price touches the RSI-50 target INTRADAY rather
-//   than waiting for the daily close to confirm RSI >= 50 (long) / <= 50
-//   (short). The target price is solved each bar via Wilder-RSI inversion
-//   (see f_rsi50TargetPrice below) using closes through the PRIOR bar; the
-//   active bar then needs only to touch that level for TP1 to fire.
+// (2026-06-09)
 //
-//   Behaviour matches the live bot's V2.2 resting GTC limit on Alpaca: the
-//   bot places a limit at the computed price each cycle, the broker's matching
-//   engine fires it intraday on first touch, and the bot migrates the runner's
-//   stop to break-even on next reconciliation.
+// CHANGE vs v2.2:
+//   v2.2 used intraday-touch TP1 for BOTH sides. The per-side decomposition
+//   revealed an asymmetry: shorts strictly benefit from intraday-touch (higher
+//   WR AND higher PnL), but longs trade off WR gain for PnL slip because the
+//   bullish drift of US equities WORKS FOR longs --- letting price close past
+//   RSI 50 books a bigger TP1 partial than locking exactly at 50.
 //
-// Backtest gate (tier1, 5y, $200 fixed risk) — v2.1 vs v2.2:
-//   WR:    69.6%  → 74.7%  (+5.1 pp)
-//   PF:    2.62   → 2.80   (+0.18)
-//   PnL:   $29.3k → $27.4k (-6.7% — wick fills lock in earlier)
-//   Verdict: ship — more captures, fewer round-trips into stops.
+//   v2.2.1 routes by side:
+//     LONG TP1 fires on the daily CLOSE with RSI(14) >= 50 (v2.1 logic).
+//                Fill price = bar's Close.
+//     SHORT TP1 fires when the bar's LOW reaches the RSI-50 target INTRADAY
+//                (v2.2 logic). Fill price = the target (resting GTC limit).
+//
+//   This matches the live bot's v2.2.1 hybrid: shorts get a resting GTC limit
+//   at the RSI-50 target on Alpaca; longs use the daily-poll close-based check
+//   from v2.1 (no resting limit, exit via market close next open).
+//
+// Backtest gate (tier1, 5y, $200 fixed risk) --- comparing all three:
+//                v2.1     v2.2     v2.2.1
+//     Trades     303      304      303
+//     Win rate   69.6%    74.7%    71.3%   (+1.7pp vs v2.1)
+//     PF         2.62     2.80     2.72    (+0.10  vs v2.1)
+//     Total PnL  $29,317  $27,365  $29,528 (+$211   vs v2.1, +$2,163 vs v2.2)
+//   Hybrid Pareto-dominates pure v2.1 on every metric. Verdict: SHIP.
 //
 // All v2.1 bug fixes preserved (ARM crossing, TP2 not-tp2Hit gate,
 // strategy.cancel before close, three-layer safety force-close).
 // =============================================================================
 
 strategy(
-   "SID Strategy v2.2",
-   shorttitle           = "SID v2.2",
+   "SID Strategy v2.2.1",
+   shorttitle           = "SID v2.2.1",
    overlay              = true,
    initial_capital      = 10000,
    default_qty_type     = strategy.fixed,
@@ -245,34 +254,34 @@ if triggerShort and sharesShort > 0 and strategy.position_size == 0
     armSignalHigh := na
     barsSinceArm := 0
 
-// V2.2 INTRADAY-TOUCH TP1 ----------------------------------------------------
-// Compute the RSI-50 target price from closes through the PRIOR bar (use [1])
-// so the target represents the level required for "next bar's close" — which
-// in real time is the bar currently forming. We then check whether THIS bar's
-// range touched that level: high >= target (long) or low <= target (short).
-// The fill price is the target itself, simulating a resting GTC limit order.
+// V2.2.1 HYBRID TP1 ----------------------------------------------------------
+// Longs: V2.1 close-based check (RSI >= 50 on daily CLOSE). The bullish drift
+//        of US equities WORKS FOR longs --- letting price close past 50 books
+//        a bigger TP1 partial than locking exactly at 50.
+// Shorts: V2.2 intraday-touch (LOW reaches the RSI-50 target). Protects against
+//        round-trips that the bullish drift fights against shorts.
 //
-// Falls back to the close-based v2.1 check if the target is na (insufficient
-// warmup, flat history, etc.) — keeps the simulation safe on edge cases.
-tp1TargetPrice = f_rsi50TargetPrice(14, i_rsiTp1Exit)[1]
-tp1TouchedLong  = not na(tp1TargetPrice) and high >= tp1TargetPrice
-tp1TouchedShort = not na(tp1TargetPrice) and low  <= tp1TargetPrice
+// The RSI-50 target price is only needed for the SHORT branch. Computed from
+// closes through the PRIOR bar so the target represents the level required
+// for the "next bar's close" --- in real time, the bar currently forming.
 
-tp1FireLong  = strategy.position_size > 0 and not tp1Hit and (tp1TouchedLong  or (na(tp1TargetPrice) and dailyRSI >= i_rsiTp1Exit))
+tp1TargetPrice  = f_rsi50TargetPrice(14, i_rsiTp1Exit)[1]
+tp1TouchedShort = not na(tp1TargetPrice) and low <= tp1TargetPrice
+
+// LONG: close-based (v2.1 logic) --- fires on the daily close where RSI >= 50.
+tp1FireLong  = strategy.position_size > 0 and not tp1Hit and dailyRSI >= i_rsiTp1Exit
+// SHORT: intraday-touch (v2.2 logic) --- fires on the bar's LOW touching target.
+//        Falls back to close-based if the target is na (warmup / flat history).
 tp1FireShort = strategy.position_size < 0 and not tp1Hit and (tp1TouchedShort or (na(tp1TargetPrice) and dailyRSI <= i_rsiTp1Exit))
 
-// Fill price proxy — the target itself if the intraday touch fired, otherwise
-// the close (which is what v2.1 used)
-tp1FillLong  = not na(tp1TargetPrice) and tp1TouchedLong  ? tp1TargetPrice : close
+// Fill prices: long = bar's close (v2.1); short = the RSI-50 target itself if
+// the intraday touch fired (v2.2), else fall back to close.
+tp1FillLong  = close
 tp1FillShort = not na(tp1TargetPrice) and tp1TouchedShort ? tp1TargetPrice : close
 
 if tp1FireLong
-    // Pine v6 note: strategy.close() doesn't accept a `limit` argument, so we
-    // close at bar close. The intraday-touch GATE (tp1TouchedLong) is what
-    // makes this v2.2 vs v2.1 — TP1 fires the bar the touch occurred rather
-    // than waiting for daily close confirmation. Fill price recorded in the
-    // comment matches the live bot's resting-limit fill on Alpaca.
-    strategy.close("Long", qty_percent=i_tp1Portion, comment="TP1 intraday $" + str.tostring(tp1FillLong, "#.##"))
+    // V2.1 close-based long TP1: close at bar's close.
+    strategy.close("Long", qty_percent=i_tp1Portion, comment="TP1 close $" + str.tostring(tp1FillLong, "#.##"))
     strategy.cancel("Stop L")
     strategy.exit("BE L", from_entry="Long", stop=entryPrice)
     tp1Hit    := true
@@ -281,6 +290,9 @@ if tp1FireLong
     stopLevel := entryPrice
 
 if tp1FireShort
+    // V2.2 intraday-touch short TP1: simulates a resting GTC limit fill at
+    // the RSI-50 target. (Pine v6 strategy.close() doesn't accept `limit=` so
+    // the actual fill is at bar close; the comment records the target price.)
     strategy.close("Short", qty_percent=i_tp1Portion, comment="TP1 intraday $" + str.tostring(tp1FillShort, "#.##"))
     strategy.cancel("Stop S")
     strategy.exit("BE S", from_entry="Short", stop=entryPrice)
@@ -496,7 +508,7 @@ if i_showInfoTable and showTableNow
     rsiCol  = dailyRSI < i_rsiOversold ? color.lime : dailyRSI > i_rsiOverbought ? color.red : (dailyRSI >= i_rsiNoGoLong and dailyRSI <= i_rsiNoGoShort ? color.gray : color.white)
     rsi3Col = na(dailyRSI3) ? color.gray : (dailyRSI3 < i_rsiOversold ? color.lime : dailyRSI3 > i_rsiOverbought ? color.red : color.white)
 
-    table.cell(info, 0, 0, "SID v2.2", text_color=color.aqua, text_size=size.small)
+    table.cell(info, 0, 0, "SID v2.2.1", text_color=color.aqua, text_size=size.small)
     table.cell(info, 1, 0, syminfo.ticker, text_color=color.white, text_size=size.small)
     table.cell(info, 0, 1, "State",  text_color=color.white)
     table.cell(info, 1, 1, state, text_color=stateCol)

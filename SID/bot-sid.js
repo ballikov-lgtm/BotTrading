@@ -45,7 +45,7 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2'; // V2.2: intraday-touch RSI-50 TP1 + broker-enforced stops + internal-ledger compounding (paper trading, 2026-06-08)
+const BOT_VERSION = 'v2.2.1'; // V2.2.1 HYBRID: shorts use intraday-touch RSI-50 TP1, longs revert to v2.1 close-based TP1, both keep broker-enforced GTC stops + internal-ledger compounding (paper trading, 2026-06-09)
 // Version history:
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
@@ -540,7 +540,23 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
     }
   }
 
-  // ── Resting TP1 limit (only while tp1_hit === false) ────────────────────
+  // ── V2.2.1 HYBRID: resting TP1 limit is SHORT-only ─────────────────────
+  // Per-side backtest decomposition: shorts strictly benefit from intraday-touch
+  // TP1 (higher WR AND PnL), but longs gave up $2.3k of PnL on the v2.2 model
+  // because the bullish equity drift books a bigger TP1 partial when price
+  // closes past 50 than when it locks exactly at 50 intraday. So longs revert
+  // to v2.1 close-based TP1 (handled in checkPositions Branch A daily-poll):
+  if (pos.side === 'long') {
+    // Belt-and-braces: cancel any stale TP1 limit from v2.2-era state
+    const staleTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
+    if (staleTp1) {
+      console.log(`  [V2.2.1] Cancelling stale -tp1 limit for ${pos.symbol} (long uses v2.1 close-based TP1)`);
+      try { await client.cancelOrder(staleTp1.id); } catch (_) {}
+    }
+    return;
+  }
+
+  // ── Resting TP1 limit (SHORT only, while tp1_hit === false) ──────────────
   if (pos.tp1_hit) {
     // Belt-and-braces: kill any stale TP1 order if somehow still active
     const staleTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
@@ -1102,13 +1118,24 @@ async function checkPositions(executor = null) {
 
       // ── Branch A: TP1 not yet hit ─────────────────────────────────────────
       if (!pos.tp1_hit) {
-        // V2.2 SHORT-CIRCUIT: broker-side resting stop + intraday TP1 limit
-        // manage these exits. syncPositions detects the fills and updates state
-        // before we reach this point. Skip the v2.1 daily-close polling here
-        // so we don't accidentally double-fire on the same condition.
-        if (posIsV2_2) continue;
+        // V2.2.1 HYBRID routing:
+        //   SHORTS: broker-side resting GTC stop + resting GTC TP1 limit handle
+        //           both exits. syncPositions detects fills and updates state
+        //           before this point. Skip Branch A entirely.
+        //   LONGS:  broker-side resting GTC stop handles the stop. TP1 uses
+        //           v2.1 close-based daily-poll (no resting TP1 limit on Alpaca
+        //           per backtest evidence that close-based longs book bigger
+        //           partials in bullish markets). Skip the stop simulation
+        //           below but DO process the RSI 50 close-based TP1 check.
+        if (posIsV2_2 && pos.side === 'short') continue;
+        const skipStopSim = posIsV2_2;  // long v2.2 still needs TP1 check
 
         // Original stop check — full stop-out before TP1 = full loss on shares_total
+        // (Skipped for any v2.2 position — broker GTC stop fires intraday and
+        //  syncPositions records it. Re-doing it here would double-fire.)
+        if (skipStopSim) {
+          // Just process the TP1 close-based check below (longs only by now)
+        } else {
         const stopHit = pos.side === 'long'
           ? c.low  <= pos.stopLoss
           : c.high >= pos.stopLoss;
@@ -1174,8 +1201,10 @@ async function checkPositions(executor = null) {
           positionHandled = true;
           break;
         }
+        }  // end !skipStopSim
 
-        // RSI 50 check — TP1 trigger
+        // RSI 50 check — TP1 trigger (v2.1 close-based, fires for v2.1 positions
+        // and v2.2.1 LONGS — v2.2.1 SHORTS already `continue`d above)
         const rsi50Hit = pos.side === 'long' ? rsi >= 50 : rsi <= 50;
         if (!rsi50Hit) continue;
 
