@@ -178,25 +178,24 @@ class AlpacaExecutor {
   }
 
   /**
-   * Submits a market-entry order ONLY. Stop is bot-managed, not Alpaca-managed.
+   * Submits a market-entry order PLUS a GTC stop-loss in opposite direction.
    *
-   * PDT-IMMUNE DESIGN (v2.0+):
-   * We deliberately do NOT submit a stop-loss order to Alpaca alongside entry.
-   * The bot tracks the stop level locally and, on each daily run, checks the
-   * prior day's low against the stop. If hit, the bot submits a market sell
-   * at the NEXT trading day's open. This guarantees entry and exit are on
-   * different calendar days → no same-day round-trips → no day trades → no
-   * PDT classification, even at sub-$25K account sizes.
+   * V2.2 (2026-06-08): broker-enforced stop replaces the v2.0 PDT-immune
+   * design. Account is now treated as ≥ $25K so PDT doesn't apply. The
+   * resting stop fires intraday on touch (seconds), not next-morning open
+   * (~24h lag with 0-2% slippage). Same-day round-trips are fine.
    *
-   * Trade-off: stop fills at next morning's open price, not at the actual stop
-   * price. Slippage on a typical loser is ~0-2% of the stop distance in either
-   * direction (sometimes the gap helps, sometimes hurts).
+   * The TP1 resting limit is placed separately by checkPositions() — it's
+   * recomputed each run because the RSI-50 target price drifts daily.
+   *
+   * Returns BOTH order ids so the position can be reconciled later when
+   * the stop fills or the TP1 limit fills.
    *
    * @param {Object} args
    * @param {Object} args.signal    output of detectEntrySignal in bot-sid.js
    * @param {Object} args.sizing    output of calcPositionSize in bot-sid.js
    * @param {string} args.symbol
-   * @returns {{ entryOrderId: string }}
+   * @returns {{ entryOrderId: string, stopOrderId: string }}
    */
   async openEntry({ signal, sizing, symbol }) {
     if (!this.clock?.is_open) {
@@ -211,16 +210,16 @@ class AlpacaExecutor {
     }
 
     const side = signal.signal === 'long' ? 'buy' : 'sell';
+    const exitSide = side === 'buy' ? 'sell' : 'buy';
     const prefix = clientOrderIdPrefix({
       symbol,
       side: signal.signal,
       signalDate: signal.signalDate,
     });
 
-    this.log.log(`    [Alpaca:${this.mode}] Submitting ${side.toUpperCase()} ${sizing.shares} ${symbol} @ market (bot-managed stop: $${signal.stopLoss})`);
+    this.log.log(`    [Alpaca:${this.mode}] Submitting ${side.toUpperCase()} ${sizing.shares} ${symbol} @ market + GTC stop @ $${signal.stopLoss}`);
 
-    // Entry only — NO stop order. Bot will close the position on the NEXT
-    // daily run if yesterday's low breached the stop level.
+    // 1. Market entry
     const entryOrder = await this.client.submitOrder({
       symbol,
       qty: sizing.shares,
@@ -229,12 +228,31 @@ class AlpacaExecutor {
       time_in_force: 'day',
       client_order_id: `${prefix}-entry`,
     });
-
     this.log.log(`    [Alpaca:${this.mode}] Entry order ${entryOrder.id} submitted (status: ${entryOrder.status})`);
+
+    // 2. V2.2: GTC stop, opposite side, full qty, at signal.stopLoss
+    let stopOrderId = null;
+    try {
+      const stopOrder = await this.client.submitOrder({
+        symbol,
+        qty:             sizing.shares,
+        side:            exitSide,
+        type:            'stop',
+        stop_price:      signal.stopLoss,
+        time_in_force:   'gtc',
+        client_order_id: `${prefix}-stop`,
+      });
+      stopOrderId = stopOrder.id;
+      this.log.log(`    [Alpaca:${this.mode}] Stop order ${stopOrderId} placed at $${signal.stopLoss} (status: ${stopOrder.status})`);
+    } catch (err) {
+      // Don't bail the entry if the stop fails — log loudly so the bot's
+      // next-run safety net picks it up. The position exists either way.
+      this.log.error(`    [Alpaca:${this.mode}] ⚠ STOP ORDER FAILED for ${symbol}: ${err.message}. Position is UNPROTECTED on broker side — bot fallback will manage.`);
+    }
 
     return {
       entryOrderId: entryOrder.id,
-      stopOrderId:  null,        // PDT-immune: no Alpaca stop order
+      stopOrderId,
       clientOrderIdPrefix: prefix,
     };
   }
