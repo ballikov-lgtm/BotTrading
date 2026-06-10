@@ -101,6 +101,31 @@ Memory files are append-mostly journals. They should capture:
 
 ---
 
+## Public docs follow the code (mandatory ship-check)
+
+**Rule of thumb for every strategy in this domain:** whenever a strategy's bot logic, entry rules, exit rules, risk parameters, sizing, or any rule that affects how trades fire changes — the public-facing docs get updated in the SAME commit (or immediate follow-up before close-out). Not "next session." Not "when I get to it." The repo is public — anyone following the strategy needs the README + dashboard to reflect reality at all times.
+
+**The four artifacts that ALL get touched on every revision:**
+
+| Artifact | Per strategy | What gets updated |
+|---|---|---|
+| **Bot/config files** | `bot-sid.js`, `bot-ironclad.js`, `bot.js` (VWAP), etc. | The actual code change |
+| **Strategy README** | `SID/SID-README.md`, `IRONCLAD-README.md`, etc. | (a) Bump "Current version" line in the header. (b) Add a new row to the Version History table with date, summary of what changed, backtest delta, and what version it supersedes. |
+| **Strategy dashboard** | `docs/sid/index.html`, `docs/index.html` (Ironclad), `docs/<name>/index.html` for new ones | (a) Bump version markers in `<title>`, brand header, beta-banner, perf-note, footer. (b) **Add a new entry at the TOP of the Updates tab** with `<span class="update-date">YYYY-MM-DD</span>`, category badge (RELEASE / FIX / INFRA / TRADE), title, and summary paragraph. (c) Increment the change-log count badge in the tab button AND the panel title. |
+| **Strategy memory file** | `SID/CLAUDE.md`, `IRONCLAD-MEMORY.md`, etc. | Append what changed + why (per existing Memory-update convention) |
+
+**Categories on the dashboard Updates tab** (used across all strategies' dashboards for consistency):
+- **RELEASE** (orange `#ffaa00`) — version launch
+- **FIX** (green `#39ff14`) — bug or rule correction
+- **INFRA** (cyan `#00ffff`) — workflows / tooling / dashboard infra
+- **TRADE** (magenta `#ff1493`) — live execution event worth flagging
+
+**If any of these four artifacts are missed, the revision is NOT considered shipped.** Use this list as a pre-commit checklist any time you touch a strategy's bot file.
+
+**Why this is rule #1, not a nice-to-have:** the dashboard is public via GitHub Pages. Anyone following the strategy reads the dashboard's Updates tab + the README to understand what's currently deployed. If those say v2.1 but the bot is running v2.2.1, followers may copy stale rules into their own setup or misinterpret live results. Alan's standing instruction (2026-06-09): "Whenever we publish a revision change on the strategy, the dashboard also needs updating along with the README file for the strategy. On the Updates tab also. As this is on the public repo, anyone that's following that wants to try this strategy needs to be aware of every update as and when they are published."
+
+---
+
 ## Hard segregation rules (compact)
 
 Each strategy owns specific files. Full lists live in each strategy's memory file — this is the cross-strategy summary so any session knows the boundaries.
@@ -270,6 +295,8 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 
 ## Adding a new strategy
 
+Every new strategy in this domain ships with a dashboard from day one — no exceptions. The dashboard makes the strategy visible alongside the others at a glance (Alan's standing instruction, 2026-06-09: *"Whenever a new strategy is created by default, a dashboard should always be created to match the strategy in line with the others. This is so we can see at a glance everything that is happening."*). Skipping this on initial scaffold means the strategy is invisible to the public repo for whatever interval until someone backfills it — that interval has historically been weeks. Don't pay that tax.
+
 1. **Pick a layout:**
    - Subfolder (recommended) → `<NAME>/CLAUDE.md` inside it (Claude auto-loads)
    - Root-level → `<NAME>-MEMORY.md` alongside this hub (referenced from index)
@@ -283,11 +310,14 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
    - Bot file
    - Deep context link
 3. **Add entries to the [Find by attribute](#find-by-attribute) lookup** for any unique tags (new style, new asset, new market type)
-4. **Add a row to the segregation rules table** with the owned files
+4. **Add a row to the segregation rules table** with the owned files (including the new `docs/<name>/` path so future sessions know who owns it)
 5. **Add a row to the GitHub Actions inventory** if it ships a workflow
 6. **Seed the memory file** with: strategy summary, owned files, deployment, common gotchas, cross-references to root CLAUDE.md and any sibling memory files
+7. **Build the dashboard scaffold** at `docs/<strategy-slug>/index.html` — required from day one. Clone the structure from `docs/sid/index.html` (for swing strategies) or `docs/index.html` (for trend strategies) and customise. Minimum required sections: brand header with version, performance panel, **Updates tab with at least a v1.0 RELEASE entry**, footer with version. If the dashboard has dynamic data (e.g. trade counts, equity curve), also add `.github/workflows/<strategy>-dashboard.yml` to rebuild it on a schedule.
+8. **README scaffold** at `<NAME>/<NAME>-README.md` (or `<NAME>-README.md` at root). Minimum required sections: header with "Current version" line, "What Makes <NAME> Different" table, Core Logic walkthrough, Files table, **Version History table seeded with the v1.0 row**.
+9. **Add the dashboard URL to the Strategy Index row** so anyone scanning the hub can jump straight to it.
 
-The root CLAUDE.md is **the single source of truth** for "what strategies exist and where their context lives." Keep it accurate; the deep details go in the per-strategy files.
+The root CLAUDE.md is **the single source of truth** for "what strategies exist and where their context lives." Keep it accurate; the deep details go in the per-strategy files. **The dashboard + README are the source of truth for what the public sees** — see the "Public docs follow the code" section above for the ongoing maintenance rule.
 
 ---
 
