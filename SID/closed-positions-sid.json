@@ -76,5 +76,47 @@
     "realizedPnl": -691.08,
     "outcome": "LOSS",
     "accountAfter": 9351.16
+  },
+  {
+    "id": "b9b591df-ae20-49c4-822b-9af6c6712cbd",
+    "symbol": "GOOG",
+    "side": "short",
+    "entry": 381.8399963378906,
+    "stopLoss": 381.83,
+    "shares": 26,
+    "shares_total": 26,
+    "shares_remaining": 13,
+    "orig_stop": 405,
+    "tp1_hit": true,
+    "totalUsd": 9927.84,
+    "riskUsd": 602.16,
+    "signalDate": "2026-05-13",
+    "openDate": "2026-05-22",
+    "openTime": "16:44:00",
+    "mode": "paper",
+    "strategy": "SID v2.1",
+    "tp1_date": "2026-06-01",
+    "tp1_price": 372.5799865722656,
+    "tp1_shares": 13,
+    "tp1_pnl": 120.38,
+    "tp1_reason": "rsi50",
+    "tp1_rsi": 49.34,
+    "closeDate": "2026-06-11",
+    "closeTime": "17:50:36",
+    "exit_strategy": "full_external_fill",
+    "exit_price": 347.8346,
+    "exit_pnl": 442.07,
+    "exit_shares": 13,
+    "exit_fills": [
+      {
+        "orderId": "21a17589-81e3-41c3-9f57-13c5ffc2ac3b",
+        "filledAt": "2026-06-11T13:39:18.396826Z",
+        "qty": 13,
+        "price": 347.8346
+      }
+    ],
+    "total_pnl": 442.07,
+    "realizedPnl": 442.07,
+    "is_full_close": true
   }
 ]

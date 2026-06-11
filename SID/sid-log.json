@@ -1,5 +1,23 @@
 [
   {
+    "timestamp": "2026-06-11T17:50:36.503Z",
+    "kind": "external_close_recorded",
+    "symbol": "GOOG",
+    "sharesClosed": 13,
+    "exitPrice": 347.8346,
+    "pnl": 442.07,
+    "reason": "full_external_fill",
+    "isFullClose": true,
+    "fillsUsed": [
+      {
+        "orderId": "21a17589-81e3-41c3-9f57-13c5ffc2ac3b",
+        "filledAt": "2026-06-11T13:39:18.396826Z",
+        "qty": 13,
+        "price": 347.8346
+      }
+    ]
+  },
+  {
     "timestamp": "2026-06-10T17:42:37.094Z",
     "symbol": "XOM",
     "signal": null,
@@ -3040,11 +3058,5 @@
     "symbol": "MDLZ",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-05T16:59:52.058Z",
-    "symbol": "MCD",
-    "signal": null,
-    "reason": "V2 weekly direction: both weekly RSI (34.7) and MACD (-8.7724) falling — RED FLAG for long"
   }
 ]
