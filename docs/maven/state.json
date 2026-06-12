@@ -5,7 +5,19 @@
   "initialized": true,
   "start_equity": 1000,
   "equity": 1000,
-  "open": {},
+  "open": {
+    "HYPEUSDT": {
+      "symbol": "HYPEUSDT",
+      "entry_ts": 1781208000000,
+      "entry": 58.707,
+      "stop": 57.53286,
+      "stop_frac": 0.02,
+      "risk_amt": 20.0,
+      "notional": 1000.0,
+      "entry_time": "2026-06-11 20:00",
+      "opened_at": "2026-06-12 01:45 UTC"
+    }
+  },
   "closed": [],
   "seen_entries": {
     "ETHUSDT": [],
@@ -13,7 +25,9 @@
     "XRPUSDT": [],
     "SUIUSDT": [],
     "VIRTUALUSDT": [],
-    "HYPEUSDT": [],
+    "HYPEUSDT": [
+      1781208000000
+    ],
     "APTUSDT": [],
     "FETUSDT": [],
     "SEIUSDT": [],
@@ -148,6 +162,10 @@
     {
       "t": "2026-06-11 23:07 UTC",
       "equity": 1000
+    },
+    {
+      "t": "2026-06-12 01:46 UTC",
+      "equity": 1000
     }
   ],
   "watchlist": [
@@ -162,11 +180,13 @@
     "SEIUSDT",
     "TRXUSDT"
   ],
-  "last_run": "2026-06-11 23:07 UTC",
-  "events_last_run": [],
+  "last_run": "2026-06-12 01:46 UTC",
+  "events_last_run": [
+    "\ud83d\udfe2 HYPEUSDT ENTRY @ 58.71  stop 57.53  risk $20.00  (1/3 open)"
+  ],
   "stats": {
     "closed_trades": 0,
-    "open_trades": 0,
+    "open_trades": 1,
     "win_rate": 0.0,
     "profit_factor": 0.0,
     "net_usdt": 0,
@@ -174,9 +194,9 @@
   },
   "scan": {
     "ETHUSDT": {
-      "rsi": 42.2,
-      "price": 1621.59,
-      "gap_pct": 18.3,
+      "rsi": 52.7,
+      "price": 1673.5,
+      "gap_pct": 17.7,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -186,9 +206,9 @@
       "status": "GATED"
     },
     "SOLUSDT": {
-      "rsi": 39.4,
-      "price": 63.19,
-      "gap_pct": 20.0,
+      "rsi": 55.6,
+      "price": 66.92,
+      "gap_pct": 19.3,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -198,8 +218,8 @@
       "status": "GATED"
     },
     "XRPUSDT": {
-      "rsi": 38.7,
-      "price": 1.0969,
+      "rsi": 52.9,
+      "price": 1.1427,
       "gap_pct": 13.6,
       "rsi_floor": 35,
       "gate_open": false,
@@ -210,9 +230,9 @@
       "status": "GATED"
     },
     "SUIUSDT": {
-      "rsi": 41.9,
-      "price": 0.7265,
-      "gap_pct": 23.7,
+      "rsi": 51.4,
+      "price": 0.7547,
+      "gap_pct": 23.0,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -222,9 +242,9 @@
       "status": "GATED"
     },
     "VIRTUALUSDT": {
-      "rsi": 37.7,
-      "price": 0.543,
-      "gap_pct": 21.3,
+      "rsi": 53.7,
+      "price": 0.5856,
+      "gap_pct": 20.3,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -234,21 +254,21 @@
       "status": "GATED"
     },
     "HYPEUSDT": {
-      "rsi": 32.9,
-      "price": 53.308,
-      "gap_pct": 6.7,
+      "rsi": 51.6,
+      "price": 59.006,
+      "gap_pct": 3.5,
       "rsi_floor": 35,
       "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": true,
-      "status": "ARMED"
+      "status": "IN-TRADE"
     },
     "APTUSDT": {
-      "rsi": 34.4,
-      "price": 0.621,
-      "gap_pct": 28.0,
+      "rsi": 45.4,
+      "price": 0.646,
+      "gap_pct": 27.9,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -258,9 +278,9 @@
       "status": "GATED"
     },
     "FETUSDT": {
-      "rsi": 32.8,
-      "price": 0.184,
-      "gap_pct": 8.1,
+      "rsi": 44.1,
+      "price": 0.1928,
+      "gap_pct": 10.3,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -270,9 +290,9 @@
       "status": "GATED"
     },
     "SEIUSDT": {
-      "rsi": 38.7,
-      "price": 0.0465,
-      "gap_pct": 22.0,
+      "rsi": 52.6,
+      "price": 0.0494,
+      "gap_pct": 21.6,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -282,9 +302,9 @@
       "status": "GATED"
     },
     "TRXUSDT": {
-      "rsi": 36.9,
-      "price": 0.32102,
-      "gap_pct": 6.9,
+      "rsi": 35.7,
+      "price": 0.31694,
+      "gap_pct": 7.3,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
