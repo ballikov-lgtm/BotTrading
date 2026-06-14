@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-06-09",
+    "category": "release",
+    "title": "V2.2.1 HYBRID launch — broker-managed stops, side-asymmetric TP1 timing",
+    "summary": "Per-side decomposition of v2.2 revealed an asymmetry: shorts strictly benefit from intraday-touch TP1 (higher WR AND higher PnL), but longs lose $2.3k over 5y because the bullish drift of US equities WORKS FOR longs — letting price close past RSI 50 books a bigger TP1 partial than locking exactly at 50. V2.2.1 routes by side: longs use v2.1 close-based TP1 (RSI ≥ 50 on daily close), shorts use v2.2 intraday-touch TP1 (resting GTC limit at the RSI-50 target price computed via Wilder-RSI inversion). Both sides keep a broker-enforced GTC stop on Alpaca from the moment of entry — replaces v2.1's PDT-immune 'scan daily candle, close at next open' simulation. Sizing now compounds off the internal $9,351.16 ledger (1% risk = $93.51). Backtest gate (tier1, 5y, $200 fixed risk): WR 69.6% → 71.3% (+1.7pp), PF 2.62 → 2.72 (+0.10), Total PnL $29,317 → $29,528 (+$211). Hybrid Pareto-dominates v2.1 on every metric AND recovers $2,163 of the PnL pure v2.2 left on the table. First v2.2.1 entry (PYPL long, 23sh @ $41.40, signal 2026-06-05) opened 2026-06-12. Vault: SID/strategy-test-vault/v2.2.1-hybrid-shorts-intraday/."
+  },
+  {
     "date": "2026-06-02",
     "category": "fix",
     "title": "BE stop direction-aware penny rounding — no more small-loss BE exits",
@@ -46,12 +52,6 @@
     "category": "trade",
     "title": "First live paper trade: GOOG short fired",
     "summary": "Regular bot run picked up GOOG short (26sh @ $381.84, stop $405). 9-day signal-to-entry episode with the May 18 $404.47 high becoming the stop. PDT-immune by design — bot manages stops internally."
-  },
-  {
-    "date": "2026-05-22",
-    "category": "trade",
-    "title": "MCD hybrid S&D one-off trade",
-    "summary": "Off-strategy paper test using supply-and-demand levels (entry $281.67, TP1 $310.75, SL $272). Uses Alpaca-side OCO + standalone stop, not bot-managed. Pipeline-verification trade — proves cloud→Alpaca path works."
   },
   {
     "date": "2026-05-22",

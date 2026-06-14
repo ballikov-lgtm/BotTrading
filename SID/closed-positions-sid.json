@@ -1,46 +1,5 @@
 [
   {
-    "id": "44591e91-ff37-426a-a1c6-6ee07d774bae",
-    "symbol": "MCD",
-    "side": "long",
-    "entry": 281.67,
-    "shares_total": 8,
-    "shares_remaining": 0,
-    "tp1_hit": false,
-    "orig_stop": 272,
-    "stopLoss": 272,
-    "openDate": "2026-05-22",
-    "openTime": "17:03:53",
-    "closeDate": "2026-06-04",
-    "closeTime": "19:16:29",
-    "exit_strategy": "external_stop_fill",
-    "tp2_price": 271.9025,
-    "tp2_pnl": -78.14,
-    "tp2_reason": "Two Alpaca stop fills: 4sh @ $271.88 (May 26 09:01) + 4sh @ $271.925 (Jun 04 19:16). Standalone runner stop + OCO bracket stop both triggered at the $272 level on two separate days. Reconciled manually 2026-06-05 — bot's syncPositions detected MCD missing from Alpaca but the closedExternally path doesn't currently write to closed-positions/trades.csv/sid-account (see task #25 + new bug task).",
-    "total_pnl": -78.14,
-    "realizedPnl": -78.14,
-    "mode": "paper",
-    "strategy": "SID v2.1 (hybrid S&D — manual entry, Alpaca-side stops)",
-    "exit_fills": [
-      {
-        "date": "2026-05-26",
-        "time": "09:01:24",
-        "shares": 4,
-        "price": 271.88,
-        "pnl": -39.16,
-        "order": "standalone runner stop"
-      },
-      {
-        "date": "2026-06-04",
-        "time": "19:16:29",
-        "shares": 4,
-        "price": 271.925,
-        "pnl": -38.98,
-        "order": "OCO bracket SL leg"
-      }
-    ]
-  },
-  {
     "id": "fd464876-88d9-4c30-a1d2-72cc52caa0e7",
     "symbol": "UNH",
     "side": "short",
@@ -115,8 +74,8 @@
         "price": 347.8346
       }
     ],
-    "total_pnl": 442.07,
-    "realizedPnl": 442.07,
+    "total_pnl": 562.45,
+    "realizedPnl": 562.45,
     "is_full_close": true
   }
 ]
