@@ -123,6 +123,32 @@ export async function alertBotStatus({ openCount, newEntries, closedToday, accou
   return sendMessage(msg);
 }
 
+/**
+ * MANUAL-WATCH reminder. Fired when one or more open SHORT positions are on a
+ * long-term-bullish asset — the subset where the mechanical TP2 has a blind
+ * spot (RSI rarely reaches oversold before the bounce, and the SMA exit can
+ * round-trip to BE). Nudges the trader to eyeball support for a discretionary
+ * runner exit. `positions` = [{ symbol, entry, tp1_hit, reason }].
+ */
+export async function alertManualWatch({ positions = [], mode } = {}) {
+  if (!positions.length) return { sent: false, reason: 'no watch positions' };
+  const modeTag = formatModeTag(mode);
+  const lines = positions.map(p => {
+    const phase = p.tp1_hit ? 'RUNNER (post-TP1)' : 'pre-TP1';
+    return `  • <b>${escape(p.symbol)}</b> SHORT @ $${Number(p.entry)?.toFixed(2)} — ${phase}`;
+  });
+  const msg = [
+    `👁️ <b>SID MANUAL-WATCH</b> ${modeTag}`,
+    ``,
+    `Short${positions.length > 1 ? 's' : ''} on long-term-bullish asset${positions.length > 1 ? 's' : ''} — monitor support for a discretionary runner exit. RSI may never reach oversold before the bounce:`,
+    ``,
+    ...lines,
+    ``,
+    `<i>TP1 still banks mechanically; it's the runner half that needs your eye.</i>`,
+  ].join('\n');
+  return sendMessage(msg);
+}
+
 // ── Internals ───────────────────────────────────────────────────────────
 
 function formatModeTag(mode) {

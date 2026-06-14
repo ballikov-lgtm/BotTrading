@@ -29,24 +29,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.1';
-// v2.1 launched 2026-05-18 — V2 entry rules + TP1/TP2 partial exits with 30d
-// runner timeout. Backtests on tier1 80-ticker AUTO universe (matches the
-// universe the live bot auto-fires) over 5 years to 2026-05-18:
-//   Fixed $200 risk: 302 trades, 69.5% WR, PF 2.55, +$28,046 total P&L
-//   1% compounding : 429 trades on 113-ticker full universe, 63.9% WR,
-//                    $10K → $46,109 (+361%), CAGR 35.76%
+const STRATEGY_VERSION = '2.2.2';
+// v2.2.2 (2026-06-13) = v2.2.1 trade logic + the MANUAL-WATCH monitoring flag
+// (no change to how trades fire; it flags bullish-asset short runners for manual
+//  S/R review). Trade logic is the v2.2.1 HYBRID launched 2026-06-09:
+//   - LONG TP1: v2.1 close-based (RSI >= 50 on daily close)
+//   - SHORT TP1: v2.2 intraday-touch (resting GTC limit at the RSI-50 target)
+//   - both sides: broker-enforced GTC stop at entry; internal-ledger sizing.
+// Backtest (tier1 80-ticker AUTO, 5y, fixed $200 risk):
+//   303 trades, 71.3% WR, PF 2.72, +$29,528 — Pareto-dominates v2.1.
 // Currently PAPER TRADING — switch to live after live paper performance
 // crosses LIVE_TRADE_THRESHOLD (see below).
 
-// Headline backtest numbers for V2.1 (used as default until enough live data)
-const HEADLINE_BACKTEST_WR     = 69.5;   // V2.1 AUTO-tier 5y WR (matches what bot trades)
-const HEADLINE_BACKTEST_PNL    = 28046;  // 5y net P&L at fixed $200 risk, AUTO tier
-const HEADLINE_BACKTEST_TRADES = 302;    // AUTO-tier trade count for the same window
-const HEADLINE_BACKTEST_WINS   = 210;    // 69.5% of 302
-const HEADLINE_BACKTEST_LOSSES = 92;     // 302 - 210
-const HEADLINE_BACKTEST_CAGR   = 35.76;  // 1% compounding @ $10K → $46,109
-const HEADLINE_MAX_DD          = 7.95;   // From V2 baseline — V2.1 max DD not yet measured separately
+// Headline backtest numbers for V2.2.1 (used as default until enough live data)
+const HEADLINE_BACKTEST_WR     = 71.3;   // v2.2.1 AUTO-tier 5y WR (matches what bot trades)
+const HEADLINE_BACKTEST_PNL    = 29528;  // 5y net P&L at fixed $200 risk, AUTO tier
+const HEADLINE_BACKTEST_TRADES = 303;    // AUTO-tier trade count for the same window
+const HEADLINE_BACKTEST_WINS   = 216;    // 71.3% of 303
+const HEADLINE_BACKTEST_LOSSES = 87;     // 303 - 216
+const HEADLINE_BACKTEST_CAGR   = 35.76;  // carried from V2 baseline — v2.2.x CAGR not separately measured
+const HEADLINE_MAX_DD          = 7.95;   // carried from V2 baseline — v2.2.x max DD not separately measured
 const PAPER_TRADING_MODE       = true;   // Banner flag — flip to false after Alpaca live
 
 // Performance pie/tiles default to BACKTEST data until live closed-trade count
@@ -303,6 +305,11 @@ function renderOpenPositionsCards(rows) {
     const manualBadge = r._manual
       ? `<span class="pos-tag-manual" title="${esc(r._note || 'Manual hybrid trade')}">MANUAL · S&amp;D</span>`
       : '';
+    // MANUAL-WATCH: short on a long-term-bullish asset — mechanical TP2 blind spot,
+    // monitor support for a discretionary runner exit. Set by bot-sid.js.
+    const watchBadge = r.manual_watch
+      ? `<span class="pos-tag-watch" title="${esc(r.manual_watch_reason || 'Short on long-term-bullish asset — monitor support for the runner exit')}">👁 WATCH · S/R</span>`
+      : '';
     const tp1Line = r._manual && r._tp1_price
       ? `<span>TP1 <strong>$${Number(r._tp1_price).toFixed(2)}</strong></span>`
       : '';
@@ -312,6 +319,7 @@ function renderOpenPositionsCards(rows) {
           <span class="pos-symbol">${esc(r.symbol || '—')}</span>
           <span class="pos-side" style="color:${sideColor};text-shadow:0 0 6px ${sideColor}">${sideArrow} ${(r.side || '?').toUpperCase()}</span>
           ${manualBadge}
+          ${watchBadge}
         </div>
         <div class="pos-pnl" style="color:${pnlColor};text-shadow:0 0 8px ${pnlColor}">${inProfit ? '+' : ''}${pnlPct.toFixed(2)}%</div>
       </div>
@@ -1239,6 +1247,34 @@ const html = `<!DOCTYPE html>
     border-left-color: #ed6c02;
   }
 
+  /* ── MANUAL-WATCH BADGE — short on long-term-bullish asset ── */
+  .pos-tag-watch {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: rgba(0,255,255,0.08);
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    border-radius: 2px;
+    vertical-align: middle;
+    text-shadow: 0 0 4px #00ffff66;
+    cursor: help;
+    animation: watch-pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes watch-pulse {
+    0%, 100% { box-shadow: 0 0 3px #00ffff33; }
+    50%      { box-shadow: 0 0 9px #00ffff88; }
+  }
+  body.light-mode .pos-tag-watch {
+    background: rgba(2,136,209,0.08);
+    border-color: #0288d1;
+    color: #0288d1;
+    text-shadow: none;
+  }
+
   /* ── UPDATES TAB — scrolling list of strategy changes ────── */
   .update-list {
     list-style: none;
@@ -1311,7 +1347,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.1 DYNAMIC TP LAUNCH 2026-05-18 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.1 HYBRID LAUNCH 2026-06-09 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1319,7 +1355,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.1 DYNAMIC TP · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · ${HEADLINE_BACKTEST_CAGR}% CAGR · ${HEADLINE_MAX_DD}% MAX DD</div>
+      <div class="brand-sub">V2.2.1 HYBRID · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 2.72 · BROKER-ENFORCED STOPS</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1343,7 +1379,7 @@ ${PAPER_TRADING_MODE ? `
     <div class="msg">
       <strong>SID v${STRATEGY_VERSION} is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
-      V2.1 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+      V2.2.1 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
       Performance pie defaults to BACKTEST data until ${LIVE_TRADE_THRESHOLD} live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
@@ -1436,7 +1472,7 @@ ${PAPER_TRADING_MODE ? `
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.1 DYNAMIC TP · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.1 HYBRID · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-06-13",
+    "category": "infra",
+    "title": "MANUAL-WATCH flag (v2.2.2) — bullish-asset short runners flagged for S/R review",
+    "summary": "No change to how trades fire — a monitoring aid on top of v2.2.1. The bot now flags any open SHORT on a long-term-bullish asset (price > 200-day SMA AND 50-day SMA > 200-day SMA) as MANUAL-WATCH, because on those names the mechanical TP2 has a blind spot: RSI rarely reaches daily oversold before the bounce, and the SMA exit can round-trip to break-even (30% of runners do). Proven by the GOOG 2026-06 trade (runner RSI bottomed at 38.4, never near oversold) and the TP2-RSI experiment (rsi_oversold fired only 6 times across 89 shorts; replacing the SMA exit with RSI-extreme DOUBLED round-trips to BE — rejected). The flag now shows as a pulsing 👁 WATCH · S/R badge on the dashboard position card, prints a ⚠ MANUAL-WATCH line in the bot log, and sends a consolidated Telegram reminder each run. TP1 still banks mechanically; only the runner half needs the eye. Helper: longTermBullish() in bot-sid.js. Catalogue: SID/strategy-test-vault/tp2-rsi-experiment/."
+  },
+  {
     "date": "2026-06-09",
     "category": "release",
     "title": "V2.2.1 HYBRID launch — broker-managed stops, side-asymmetric TP1 timing",

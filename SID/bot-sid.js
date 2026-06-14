@@ -835,6 +835,50 @@ function weeklyDirection(candles) {
   };
 }
 
+// ── Long-term-bullish classification (for the MANUAL-WATCH short flag) ─────────
+// Identifies an asset in a stable long-term uptrend so we can flag SHORT runners
+// against it for manual S/R-level monitoring. Earned from the GOOG 2026-06 trade
+// + the TP2-RSI experiment (SID/strategy-test-vault/tp2-rsi-experiment/): shorts
+// on long-term-bullish names rarely reach daily oversold before bouncing, so the
+// mechanical TP2 (RSI never arrives, SMA can round-trip) has a blind spot. The
+// fix is a human eyeballing support — this flag tells the trader WHICH runners
+// need that attention.
+//
+// NOTE: the backtest's hybrid classifier uses WEEKLY EMA50/EMA200/MACD/SMA200
+// (needs ~5y of data for the weekly 200-bar windows). The live position monitor
+// only fetches 2y, so here we use a DAILY-trend proxy that is computable from
+// that window and stable through the kind of pullback you short into:
+//   price > daily SMA200  AND  daily SMA50 > daily SMA200  (golden-cross regime)
+// This is a reminder heuristic, not a P&L-routing decision, so the proxy is
+// appropriate. Deliberately omits a MACD term — the daily MACD line flips
+// negative during the very pullbacks we care about, which would suppress the
+// flag exactly when it's wanted (the weekly MACD the backtest uses does not).
+function longTermBullish(candles) {
+  if (!candles || candles.length < 200) {
+    return { bullish: false, enoughHistory: false };
+  }
+  const closes = candles.map(c => c.close);
+  const sma50  = calcSMA(closes, 50);
+  const sma200 = calcSMA(closes, 200);
+  const n = closes.length;
+  const price = closes[n - 1];
+  const s50   = sma50[n - 1];
+  const s200  = sma200[n - 1];
+  if (price == null || s50 == null || s200 == null) {
+    return { bullish: false, enoughHistory: false };
+  }
+  const priceAboveSma200 = price > s200;
+  const goldenCross      = s50 > s200;
+  return {
+    bullish: priceAboveSma200 && goldenCross,
+    enoughHistory: true,
+    priceAboveSma200,
+    goldenCross,
+    sma50: s50,
+    sma200: s200,
+  };
+}
+
 // ── Signal Detection ──────────────────────────────────────────────────────────
 // Returns a signal object or null.
 // Logic follows the SID V2 method checklist:
@@ -1047,6 +1091,7 @@ async function checkPositions(executor = null) {
   console.log(`\n── SID Position Monitor: ${openPositions.length} open position(s) ──  [Dynamic TP ${CONFIG.useDynamicTp ? 'ON' : 'OFF (v2.0 fallback)'}]`);
 
   const stillOpen = [];
+  const manualWatchList = [];   // bullish-asset SHORT runners that need manual S/R monitoring
   let numClosed = 0;
 
   for (const pos of openPositions) {
@@ -1070,6 +1115,27 @@ async function checkPositions(executor = null) {
       console.log(`candles unavailable — skipping (${err.message})`);
       stillOpen.push(pos);
       continue;
+    }
+
+    // ── MANUAL-WATCH flag: SHORT runner on a long-term-bullish asset ────────
+    // Computed every run so the flag stays current as the trend evolves. Only
+    // SHORTs get flagged — longs ride the bullish drift, shorts fight it (the
+    // dangerous subset where the mechanical TP2 has a blind spot). See
+    // longTermBullish() + SID/strategy-test-vault/tp2-rsi-experiment/README.md.
+    pos.manual_watch = false;
+    pos.manual_watch_reason = null;
+    if (pos.side === 'short') {
+      const ltb = longTermBullish(candles);
+      if (ltb.bullish) {
+        const phase = pos.tp1_hit
+          ? 'RUNNER — watch support for TP2 exit (RSI may never reach oversold)'
+          : 'bullish-asset short — plan an S/R exit for the runner after TP1';
+        pos.manual_watch = true;
+        pos.manual_watch_reason = phase;
+        manualWatchList.push({ symbol: pos.symbol, entry: pos.entry, tp1_hit: !!pos.tp1_hit, reason: phase });
+        console.log(`\n    ⚠ MANUAL-WATCH: ${pos.symbol} SHORT on long-term-bullish asset (price>$${ltb.sma200?.toFixed(2)} SMA200, 50>200). ${phase}`);
+        process.stdout.write(`  ▶ ${pos.symbol} (cont.) … `);
+      }
     }
 
     // Where do we start scanning post-position-state? If TP1 already fired,
@@ -1488,6 +1554,12 @@ async function checkPositions(executor = null) {
   saveOpenPositions(stillOpen);
   saveClosedPositions(closedPositions);
   console.log(`  ── ${numClosed} closed this run, ${stillOpen.length} still open ──`);
+
+  // MANUAL-WATCH Telegram reminder — one consolidated message per run so the
+  // trader is nudged to eyeball support on bullish-asset short runners.
+  if (manualWatchList.length) {
+    await tg.alertManualWatch({ positions: manualWatchList, mode: CONFIG.tradingMode }).catch(() => {});
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
