@@ -5,80 +5,194 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Maven — Live Paper Dashboard</title>
 <style>
-  :root{--bg:#0b0e14;--card:#141925;--card2:#1b2230;--ink:#e6edf3;--mut:#8b97a8;
-        --grn:#2ecc71;--red:#ff5c5c;--amb:#f5a623;--blu:#4aa8ff;--line:#222a38}
+  :root{
+    --bg:#06080f; --bg2:#0a0e1a;
+    --card:rgba(13,19,34,.72); --card2:rgba(17,26,46,.62);
+    --ink:#e6f0fb; --mut:#8aa0bd; --line:#1c2740;
+    --cyan:#25d8ff; --blu:#2f6bff; --gold:#f3b121; --chrome:#c8d2e0;
+    --grn:#2ee6a0; --red:#ff5c7a;
+    --cyan-soft:rgba(37,216,255,.14); --blu-soft:rgba(47,107,255,.16);
+    --gold-soft:rgba(243,177,33,.14);
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:1100px;margin:0 auto;padding:18px}
-  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px}
-  .logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#4aa8ff,#2ecc71);
-        display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#06223a}
-  h1{font-size:22px;margin:0;letter-spacing:.3px}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+  /* deep-space backdrop: subtle nebula glow + faint starfield */
+  body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(ellipse 80% 60% at 18% -10%, rgba(47,107,255,.12), transparent 60%),
+      radial-gradient(ellipse 70% 55% at 90% 8%, rgba(37,216,255,.10), transparent 55%),
+      radial-gradient(ellipse 90% 70% at 50% 120%, rgba(243,177,33,.05), transparent 60%),
+      linear-gradient(180deg,#06080f,#080b16 60%,#06080f);}
+  body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:
+      radial-gradient(1px 1px at 12% 22%, rgba(230,240,251,.7), transparent),
+      radial-gradient(1px 1px at 38% 64%, rgba(230,240,251,.5), transparent),
+      radial-gradient(1px 1px at 67% 18%, rgba(230,240,251,.6), transparent),
+      radial-gradient(1px 1px at 82% 72%, rgba(230,240,251,.45), transparent),
+      radial-gradient(1px 1px at 55% 40%, rgba(230,240,251,.4), transparent),
+      radial-gradient(1px 1px at 24% 88%, rgba(230,240,251,.5), transparent),
+      radial-gradient(1px 1px at 92% 36%, rgba(230,240,251,.45), transparent),
+      radial-gradient(1px 1px at 7% 54%, rgba(230,240,251,.4), transparent);}
+  .wrap{position:relative;z-index:2;max-width:1100px;margin:0 auto;padding:22px 18px 40px}
+
+  /* ── HEADER ─────────────────────────────────────── */
+  header{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;margin-bottom:6px;
+    padding:22px 20px 16px;border:1px solid var(--line);border-radius:16px;
+    background:linear-gradient(180deg,rgba(37,216,255,.06),rgba(13,19,34,.5));
+    backdrop-filter:blur(10px);box-shadow:0 8px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
+  .logo{display:block;width:min(380px,76vw);height:auto;margin:2px auto 0;
+    filter:drop-shadow(0 0 34px rgba(37,216,255,.42)) drop-shadow(0 0 14px rgba(47,107,255,.3))}
+  .hdr-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
+  h1{font-size:23px;margin:0;letter-spacing:1.5px;font-weight:800;
+    background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;display:flex;align-items:center;gap:10px}
   .sub{color:var(--mut);font-size:13px}
-  .pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
-  .pill.paper{background:#3a2d00;color:var(--amb)}
-  /* tabs */
-  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:8px 0 18px}
+  .pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;text-transform:uppercase;
+    letter-spacing:.6px;-webkit-text-fill-color:initial}
+  .pill.paper{background:var(--gold-soft);color:var(--gold);border:1px solid rgba(243,177,33,.4);
+    box-shadow:0 0 10px rgba(243,177,33,.18)}
+  .live{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--grn);margin-right:7px;
+    box-shadow:0 0 9px var(--grn),0 0 18px rgba(46,230,160,.5);animation:pulse 1.7s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.85)}}
+
+  /* ── TABS ───────────────────────────────────────── */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:16px 0 18px}
   .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--mut);
-       font:600 14px/1 inherit;padding:11px 14px;cursor:pointer}
-  .tab:hover{color:var(--ink)} .tab.active{color:var(--blu);border-bottom-color:var(--blu)}
-  .pane{display:none} .pane.active{display:block}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
-  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-  .stat .k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
-  .stat .v{font-size:24px;font-weight:700;margin-top:4px}
-  .v.pos{color:var(--grn)} .v.neg{color:var(--red)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
-  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:0 0 12px}
+       font:700 13.5px/1 inherit;letter-spacing:.4px;padding:12px 16px;cursor:pointer;
+       transition:color .2s,text-shadow .2s}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 10px rgba(37,216,255,.5)}
+  .tab.active{box-shadow:0 2px 16px -6px var(--cyan)}
+  .pane{display:none;animation:fadein .3s ease} .pane.active{display:block}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ── CARDS / GLASS PANELS ───────────────────────── */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;
+    backdrop-filter:blur(12px);
+    box-shadow:0 10px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04)}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1.4px;color:var(--cyan);margin:0 0 14px;
+    font-weight:700;display:flex;align-items:center;gap:9px;text-shadow:0 0 8px rgba(37,216,255,.3)}
+  .card h2::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--gold);
+    box-shadow:0 0 8px var(--gold);flex:0 0 8px}
   .card p{margin:0 0 10px} .card b{color:var(--ink)}
+
+  /* ── STAT GRID ──────────────────────────────────── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .stat{background:linear-gradient(160deg,var(--card2),rgba(10,14,26,.5));border:1px solid var(--line);
+    border-radius:14px;padding:15px 17px;position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+  .stat::after{content:'';position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(135deg,transparent 55%,rgba(37,216,255,.10) 160%)}
+  .stat .k{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+  .stat .v{font-size:25px;font-weight:800;margin-top:5px;letter-spacing:.4px;position:relative}
+  .v.pos{color:var(--grn);text-shadow:0 0 14px rgba(46,230,160,.35)}
+  .v.neg{color:var(--red);text-shadow:0 0 14px rgba(255,92,122,.35)}
+
+  /* ── DONUT (win/loss) ───────────────────────────── */
+  .donut-card{display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center}
+  .donut-wrap{display:flex;align-items:center;gap:26px;flex-wrap:wrap;justify-content:center}
+  .donut-svg{width:170px;height:170px;flex:0 0 170px;overflow:visible;transform:rotate(-90deg)}
+  .donut-legend{display:flex;flex-direction:column;gap:12px;min-width:160px}
+  .legend-item{display:flex;justify-content:space-between;align-items:center;gap:18px;font-size:13px}
+  .legend-item .lbl{display:flex;align-items:center;gap:9px;color:var(--mut);letter-spacing:.4px}
+  .legend-swatch{width:11px;height:11px;border-radius:3px;box-shadow:0 0 8px currentColor}
+  .legend-item .num{font-weight:800;font-size:16px}
+
+  /* ── TABLES ─────────────────────────────────────── */
   table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-  th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-  .tag{font-weight:700} .tag.win{color:var(--grn)} .tag.loss{color:var(--red)}
-  .reason{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--card2)}
-  .empty{color:var(--mut);text-align:center;padding:26px;font-style:italic}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+  tr:hover td{background:rgba(37,216,255,.035)}
+  .tag{font-weight:700;color:var(--cyan)} .tag.win{color:var(--grn)} .tag.loss{color:var(--red)}
+  .reason{font-size:11px;font-weight:700;padding:2px 8px;border-radius:7px;background:var(--card2);
+    border:1px solid var(--line);color:var(--chrome)}
+  .empty{color:var(--mut);text-align:center;padding:26px;font-style:italic;
+    border:1px dashed var(--line);border-radius:12px;background:rgba(10,14,26,.35)}
+
+  /* ── CHIPS ──────────────────────────────────────── */
   .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px}
-  .evt{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
-  ul.check{list-style:none;padding:0;margin:0} ul.check li{display:flex;gap:10px;padding:7px 0;align-items:flex-start}
-  .ck{flex:0 0 20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
-  .ck.done{background:#0d3320;color:var(--grn)} .ck.now{background:#0d2f4d;color:var(--blu)} .ck.todo{background:#222a38;color:var(--mut)}
+  .chip{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 13px;
+    font-size:13px;color:var(--chrome);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+
+  /* ── EVENTS ─────────────────────────────────────── */
+  .evt{font-size:13px;padding:7px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+
+  /* ── BUILD CHECKLIST ────────────────────────────── */
+  ul.check{list-style:none;padding:0;margin:0}
+  ul.check li{display:flex;gap:11px;padding:8px 0;align-items:flex-start}
+  .ck{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;border:1px solid transparent}
+  .ck.done{background:rgba(46,230,160,.12);color:var(--grn);border-color:rgba(46,230,160,.4);box-shadow:0 0 10px rgba(46,230,160,.2)}
+  .ck.now{background:var(--cyan-soft);color:var(--cyan);border-color:rgba(37,216,255,.4);box-shadow:0 0 10px rgba(37,216,255,.25)}
+  .ck.todo{background:var(--card2);color:var(--mut);border-color:var(--line)}
   ul.check small{display:block;color:var(--mut);font-size:12px}
-  .upd{border-left:2px solid var(--line);padding:2px 0 2px 14px;margin:0 0 14px}
-  .upd .d{color:var(--blu);font-size:12px;font-weight:700} .upd p{margin:3px 0 0;font-size:14px}
-  .disc{background:#1a1205;border:1px solid #4a3a10;border-radius:12px;padding:14px 16px;color:#e9d9b0;font-size:12.5px;line-height:1.6}
-  .disc b{color:var(--amb)}
-  footer{color:var(--mut);font-size:12px;text-align:center;margin:22px 0 8px}
-  .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--grn);margin-right:6px;animation:pulse 1.6s infinite}
-  @keyframes pulse{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
-  .radar-row{display:grid;grid-template-columns:84px 92px 1fr 70px;align-items:center;gap:12px;padding:8px 4px;border-bottom:1px solid var(--line)}
-  .rsym{font-weight:700}
-  .rbadge{font-size:10px;font-weight:800;letter-spacing:.5px;text-align:center;padding:3px 0;border-radius:6px}
+
+  /* ── UPDATES ────────────────────────────────────── */
+  .upd{border-left:2px solid var(--line);padding:2px 0 2px 15px;margin:0 0 14px;position:relative}
+  .upd::before{content:'';position:absolute;left:-5px;top:5px;width:8px;height:8px;border-radius:50%;
+    background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .upd .d{color:var(--cyan);font-size:12px;font-weight:700;letter-spacing:.5px}
+  .upd p{margin:3px 0 0;font-size:14px}
+
+  /* ── DISCLAIMER ─────────────────────────────────── */
+  .disc{background:linear-gradient(180deg,rgba(243,177,33,.06),rgba(13,19,34,.4));
+    border:1px solid rgba(243,177,33,.3);border-radius:14px;padding:16px 18px;color:#ecdcb6;
+    font-size:12.5px;line-height:1.65}
+  .disc b{color:var(--gold)}
+  footer{color:var(--mut);font-size:12px;text-align:center;margin:24px 0 8px;line-height:1.6}
+
+  /* ── RADAR ──────────────────────────────────────── */
+  .radar-row{display:grid;grid-template-columns:84px 92px 1fr 70px;align-items:center;gap:12px;
+    padding:9px 4px;border-bottom:1px solid var(--line)}
+  .rsym{font-weight:700;color:var(--chrome)}
+  .rbadge{font-size:10px;font-weight:800;letter-spacing:.6px;text-align:center;padding:4px 0;border-radius:7px;border:1px solid transparent}
   .rbar{position:relative;height:14px;background:var(--card2);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
-  .rzone{position:absolute;left:0;top:0;bottom:0;background:rgba(245,166,35,.16)}
+  .rzone{position:absolute;left:0;top:0;bottom:0;background:rgba(243,177,33,.16)}
   .rtick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--mut)}
-  .rdot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #0b0e14}
-  .rrsi{font-size:12px;color:var(--mut);text-align:right}
-  .radar-row.intrade .rbadge{background:#0d2f4d;color:var(--blu)}   .radar-row.intrade .rdot{background:var(--blu)}
-  .radar-row.armed   .rbadge{background:#3a2d00;color:var(--amb)}   .radar-row.armed   .rdot{background:var(--amb);box-shadow:0 0 8px var(--amb)}
-  .radar-row.armed   {background:rgba(245,166,35,.05)}
-  .radar-row.watching .rbadge{background:#13283a;color:var(--blu)}  .radar-row.watching .rdot{background:var(--blu);opacity:.7}
-  .radar-row.gated   {opacity:.45} .radar-row.gated .rbadge{background:#222a38;color:var(--mut)} .radar-row.gated .rdot{background:var(--mut)}
+  .rdot{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);border:2px solid #06080f}
+  .rrsi{font-size:12px;color:var(--mut);text-align:right;font-variant-numeric:tabular-nums}
+  .radar-row.intrade .rbadge{background:var(--cyan-soft);color:var(--cyan);border-color:rgba(37,216,255,.4)} .radar-row.intrade .rdot{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .radar-row.armed   .rbadge{background:var(--gold-soft);color:var(--gold);border-color:rgba(243,177,33,.4)} .radar-row.armed   .rdot{background:var(--gold);box-shadow:0 0 10px var(--gold)}
+  .radar-row.armed   {background:rgba(243,177,33,.05)}
+  .radar-row.watching .rbadge{background:var(--blu-soft);color:#7fb0ff;border-color:rgba(47,107,255,.4)}  .radar-row.watching .rdot{background:var(--blu);opacity:.85;box-shadow:0 0 7px var(--blu)}
+  .radar-row.gated   {opacity:.5} .radar-row.gated .rbadge{background:var(--card2);color:var(--mut);border-color:var(--line)} .radar-row.gated .rdot{background:var(--mut)}
+
+  /* ── RESEARCH ───────────────────────────────────── */
+  .pill.regime{background:var(--blu-soft);color:#7fb0ff;border:1px solid rgba(47,107,255,.4)}
+  .pill.regime.bearish{background:rgba(255,92,122,.12);color:var(--red);border-color:rgba(255,92,122,.4)}
+  .pill.regime.chop{background:var(--card2);color:var(--mut);border-color:var(--line)}
+  .pill.regime.bullish-early,.pill.regime.bullish{background:rgba(46,230,160,.12);color:var(--grn);border-color:rgba(46,230,160,.4)}
+  .pill.rot{background:var(--gold-soft);color:var(--gold);border:1px solid rgba(243,177,33,.4);margin-left:6px}
+  .pill.appr{background:var(--gold-soft);color:var(--gold);border:1px solid rgba(243,177,33,.4)}
+  .nrow{display:grid;grid-template-columns:120px 132px 1fr 64px;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .dir{font-size:11px;font-weight:800;letter-spacing:.5px}
+  .dir.acc{color:var(--grn)} .dir.dec{color:var(--red)} .dir.flat{color:var(--mut)} .dir.new{color:var(--cyan)}
+  .nbar{position:relative;height:14px;background:var(--card2);border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .nfill{position:absolute;top:0;bottom:0;left:0;border-radius:7px}
+  .nfill.pos{background:linear-gradient(90deg,rgba(46,230,160,.35),rgba(46,230,160,.6))}
+  .nfill.neg{background:linear-gradient(90deg,rgba(255,92,122,.35),rgba(255,92,122,.6))}
+  .rs{font-size:10px;font-weight:800;padding:3px 8px;border-radius:7px;border:1px solid transparent}
+  .rs.STRONG{background:rgba(46,230,160,.12);color:var(--grn);border-color:rgba(46,230,160,.4)}
+  .rs.AVERAGE{background:var(--blu-soft);color:#7fb0ff;border-color:rgba(47,107,255,.4)}
+  .rs.WEAK{background:rgba(255,92,122,.12);color:var(--red);border-color:rgba(255,92,122,.4)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">M</div>
-    <div>
-      <h1>MAVEN <span class="pill paper">Paper</span></h1>
-      <div class="sub" id="sub">loading…</div>
+    <img class="logo" src="./maven-logo.png" alt="MAVEN — Crypto AI Trading">
+    <div class="hdr-meta">
+      <span class="pill paper">Paper</span>
+      <span class="sub"><span class="live"></span><span id="lastrun">—</span></span>
     </div>
-    <div style="margin-left:auto" class="sub"><span class="live"></span><span id="lastrun">—</span></div>
+    <div class="sub" id="sub">loading…</div>
   </header>
 
   <nav class="tabs">
     <button class="tab active" data-pane="live">📡 Live</button>
+    <button class="tab" data-pane="research">🧠 Research</button>
     <button class="tab" data-pane="strategy">🧭 Strategy</button>
     <button class="tab" data-pane="status">⚙️ Status &amp; Updates</button>
     <button class="tab" data-pane="about">⚠️ Disclaimer</button>
@@ -87,13 +201,26 @@
   <!-- LIVE -->
   <section id="pane-live" class="pane active">
     <div class="grid" id="stats"></div>
+    <div class="card"><h2>Win / Loss record</h2>
+      <div class="donut-card" id="donut"></div></div>
     <div class="card"><h2>Radar — coming into range</h2>
-      <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--amb)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--blu)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
+      <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--gold)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--cyan)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
       <div id="radar"></div></div>
     <div class="card"><h2>Open positions</h2><div id="open"></div></div>
     <div class="card"><h2>Watchlist</h2><div class="chips" id="watch"></div></div>
     <div class="card"><h2>Recent activity</h2><div id="events"></div></div>
     <div class="card"><h2>Closed trades</h2><div id="closed"></div></div>
+  </section>
+
+  <!-- RESEARCH -->
+  <section id="pane-research" class="pane">
+    <div class="card"><h2>Narrative research</h2>
+      <div id="research-meta" class="sub" style="margin:-4px 0 10px">loading…</div>
+      <div class="sub" style="margin:0 0 12px">Which sectors are <b style="color:var(--grn)">accelerating</b> in capital + attention right now (ranked by score). Stage-only — a shortlist, never auto-traded.</div>
+      <div id="narratives"></div></div>
+    <div class="card"><h2>New coins by narrative — why they're getting attention</h2>
+      <div class="sub" style="margin:-4px 0 12px">When a manual-trade alert hits Telegram, check here: the narrative + relative strength behind it. <span class="pill appr">approve</span> = needs your sign-off (not on the pre-approved list).</div>
+      <div id="candidates"></div></div>
   </section>
 
   <!-- STRATEGY -->
@@ -111,7 +238,7 @@
       <p><b>Risk:</b> 2% per trade, max 3 concurrent, 3× leverage cap, compounding from $1,000.</p></div>
     <div class="card"><h2>Watchlist — curated by relative strength</h2>
       <p>A coin earns a slot when it's <b>outperforming Bitcoin on the trend</b> (the ALT/BTC ratio rising) — Maven wants the leaders. Reviewed periodically; coins that lose strength are dropped.</p>
-      <p class="sub">Backtest (portfolio sim, 2023–2026, curated watchlist): ~+60% on $1,000, ~4.6% max drawdown, ~70% win rate, PF ~4.4. <b style="color:var(--amb)">Backtested — not a forecast.</b></p></div>
+      <p class="sub">Backtest (portfolio sim, 2023–2026, curated watchlist): ~+60% on $1,000, ~4.6% max drawdown, ~70% win rate, PF ~4.4. <b style="color:var(--gold)">Backtested — not a forecast.</b></p></div>
   </section>
 
   <!-- STATUS & UPDATES -->
@@ -130,7 +257,7 @@
     <div class="card"><h2>Data &amp; runtime</h2>
       <p><b>Data:</b> Bitget public klines (4h / 1h / daily) — keyless, no account access.</p>
       <p><b>Runtime:</b> GitHub Actions cron (cloud, ~every 30 min) — PC-independent. State + dashboard committed each run.</p>
-      <p><b>Mode:</b> <span style="color:var(--amb)">PAPER (simulated)</span> — no real orders, no money at risk.</p></div>
+      <p><b>Mode:</b> <span style="color:var(--gold)">PAPER (simulated)</span> — no real orders, no money at risk.</p></div>
   </section>
 
   <!-- DISCLAIMER -->
@@ -147,7 +274,7 @@
 
   <footer>
     Maven runs on a cloud schedule — this page updates automatically. A calm board means the strategy is <b>armed and waiting</b> for a real setup (it's low-frequency by design).<br>
-    <span style="color:var(--amb)">⚠️ Not financial advice · paper trading · for research/education only · past performance ≠ future results.</span>
+    <span style="color:var(--gold)">⚠️ Not financial advice · paper trading · for research/education only · past performance ≠ future results.</span>
   </footer>
 </div>
 
@@ -161,6 +288,48 @@ document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); document.getElementById('pane-'+b.dataset.pane).classList.add('active');
 }));
+
+// ── Win/Loss donut (SVG stroke-dasharray technique) ──
+function renderDonut(closed){
+  const el=document.getElementById('donut'); if(!el) return;
+  const trades=closed||[];
+  const wins=trades.filter(t=>Number(t.pnl)>0).length;
+  const losses=trades.filter(t=>Number(t.pnl)<=0).length;
+  const total=wins+losses;
+  if(total===0){
+    el.innerHTML='<div class="empty" style="width:100%">No closed trades yet — armed and waiting.</div>';
+    return;
+  }
+  const wr=(wins/total*100);
+  // geometry: r=70, circumference C; stroke-dasharray draws each arc segment
+  const r=70, C=2*Math.PI*r, gap=total>1?2:0; // tiny visual gap when both present
+  const wLen=Math.max(0,(wins/total)*C-(wins&&losses?gap:0));
+  const lLen=Math.max(0,(losses/total)*C-(wins&&losses?gap:0));
+  const GRN='#2ee6a0', RED='#ff5c7a';
+  el.innerHTML=
+    '<div class="donut-wrap">'
+    +'<svg class="donut-svg" viewBox="0 0 170 170" xmlns="http://www.w3.org/2000/svg">'
+      +'<circle cx="85" cy="85" r="'+r+'" fill="none" stroke="#1c2740" stroke-width="20"/>'
+      // wins arc (starts at 0deg = top after the -90 rotate)
+      +'<circle cx="85" cy="85" r="'+r+'" fill="none" stroke="'+GRN+'" stroke-width="20" '
+        +'stroke-linecap="round" stroke-dasharray="'+wLen+' '+(C-wLen)+'" stroke-dashoffset="0" '
+        +'style="filter:drop-shadow(0 0 5px rgba(46,230,160,.6))"/>'
+      // losses arc (offset by wins length)
+      +'<circle cx="85" cy="85" r="'+r+'" fill="none" stroke="'+RED+'" stroke-width="20" '
+        +'stroke-linecap="round" stroke-dasharray="'+lLen+' '+(C-lLen)+'" stroke-dashoffset="'+(-(wins/total)*C)+'" '
+        +'style="filter:drop-shadow(0 0 5px rgba(255,92,122,.6))"/>'
+    +'</svg>'
+    +'<div class="donut-center-overlay"></div>'
+    +'<div class="donut-legend">'
+      +'<div style="text-align:center;margin-bottom:4px">'
+        +'<div style="font-size:30px;font-weight:800;color:var(--cyan);text-shadow:0 0 16px rgba(37,216,255,.4)">'+fmt(wr,1)+'%</div>'
+        +'<div class="sub" style="font-size:11px;letter-spacing:.8px;text-transform:uppercase">Win rate · '+total+' trades</div>'
+      +'</div>'
+      +'<div class="legend-item"><span class="lbl"><span class="legend-swatch" style="background:'+GRN+';color:'+GRN+'"></span>Wins</span><span class="num" style="color:'+GRN+'">'+wins+'</span></div>'
+      +'<div class="legend-item"><span class="lbl"><span class="legend-swatch" style="background:'+RED+';color:'+RED+'"></span>Losses</span><span class="num" style="color:'+RED+'">'+losses+'</span></div>'
+    +'</div>'
+    +'</div>';
+}
 
 async function load(){
   let s;
@@ -176,6 +345,8 @@ async function load(){
     ['Win rate',fmt(st.win_rate,1)+'%',''],['Profit factor',fmt(st.profit_factor,2),''],
     ['Trades',(st.closed_trades||0)+' closed · '+(st.open_trades||0)+' open',''],
   ].map(([k,v,c])=>`<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+  renderDonut(s.closed||[]);
 
   const ORD={'IN-TRADE':0,'ARMED':1,'WATCHING':2,'GATED':3}; const scan=s.scan||{};
   const rr=Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||(a[1].rsi-b[1].rsi));
@@ -200,7 +371,37 @@ async function load(){
       <td class="sub">${esc(t.entry_time)}</td><td class="sub">${esc(t.closed_at)}</td></tr>`).join('')}</table>`
     :`<div class="empty">No closed trades yet.</div>`;
 }
-load(); setInterval(load,60000);
+async function loadResearch(){
+  let r;
+  try{ r=await (await fetch('./research.json?_='+Date.now())).json(); }
+  catch(e){ document.getElementById('research-meta').textContent='';
+            document.getElementById('narratives').innerHTML='<div class="empty">No research run yet — the narrative agent posts here daily once enabled.</div>';
+            document.getElementById('candidates').innerHTML=''; return; }
+  const DIR={accelerating:['acc','▲'],decelerating:['dec','▼'],flat:['flat','→'],'new':['new','✦']};
+  const reg=r.btc_regime||'—';
+  document.getElementById('research-meta').innerHTML=
+    `Run ${esc(r.run_date||'—')} · BTC regime <span class="pill regime ${esc(reg)}">${esc(reg)}</span>`
+    + (r.rotation_event?`<span class="pill rot">ROTATION ${esc(r.rotation_event.from)} → ${esc(r.rotation_event.to)}</span>`:'');
+  const nr=r.narratives_ranked||[];
+  const maxAbs=Math.max(1,...nr.map(n=>Math.abs(n.score||0)));
+  document.getElementById('narratives').innerHTML=nr.length?nr.map(n=>{
+    const [c,arrow]=DIR[n.direction]||['flat','→'];
+    const w=Math.round(Math.abs(n.score||0)/maxAbs*100), pos=(n.score||0)>=0;
+    return `<div class="nrow"><div class="rsym">${esc(n.narrative)}</div>
+      <div class="dir ${c}">${arrow} ${esc(n.direction)}</div>
+      <div class="nbar"><div class="nfill ${pos?'pos':'neg'}" style="width:${w}%"></div></div>
+      <div class="rrsi">${(n.score>=0?'+':'')+fmt(n.score,2)}</div></div>`;}).join('')
+    :`<div class="empty">No narratives scored yet.</div>`;
+  const ca=r.candidate_adds||[];
+  document.getElementById('candidates').innerHTML=ca.length?`<table><tr><th>Coin</th><th>Narrative</th><th>RS</th><th>Conf</th><th>Why it's getting attention</th></tr>
+    ${ca.map(c=>`<tr><td class="tag">${esc(c.symbol)}${c.young?' <span class="reason">young</span>':''}${c.needs_approval?' <span class="pill appr">approve</span>':''}</td>
+      <td><span class="chip">${esc(c.narrative)}</span></td>
+      <td><span class="rs ${esc(c.rs)}">${esc(c.rs)}</span></td>
+      <td class="${c.confidence==='high'?'tag win':'sub'}">${esc(c.confidence)}</td>
+      <td class="sub">${esc(c.reason)}</td></tr>`).join('')}</table>`
+    :`<div class="empty">No new candidates — BTC gate defensive or nothing qualified today.</div>`;
+}
+load(); loadResearch(); setInterval(()=>{load();loadResearch();},60000);
 </script>
 </body>
 </html>
