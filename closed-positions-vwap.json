@@ -1385,5 +1385,43 @@
     "closeDate": "2026-06-14",
     "closeTime": "14:30:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1781298714728",
+    "symbol": "BTCUSDT",
+    "side": "long",
+    "entry": 63571,
+    "stopLoss": 62731.6071,
+    "takeProfit": 64830.0893,
+    "qty": 0.000079,
+    "totalUsd": 5.02,
+    "openDate": "2026-06-12",
+    "openTime": "21:11:54",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.2983,
+    "exitLevel": "tp1",
+    "exitPrice": 64830.0893,
+    "closeDate": "2026-06-14",
+    "closeTime": "21:15:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1781471098846",
+    "symbol": "SPCXUSDT",
+    "side": "long",
+    "entry": 166.86,
+    "stopLoss": 163.2686,
+    "takeProfit": 172.2471,
+    "qty": 0.029965,
+    "totalUsd": 5,
+    "openDate": "2026-06-14",
+    "openTime": "21:04:58",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.4843,
+    "exitLevel": "tp1",
+    "exitPrice": 172.2471,
+    "closeDate": "2026-06-15",
+    "closeTime": "07:15:00",
+    "outcome": "WIN"
   }
 ]
