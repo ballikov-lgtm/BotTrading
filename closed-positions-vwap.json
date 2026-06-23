@@ -1632,5 +1632,24 @@
     "closeDate": "2026-06-18",
     "closeTime": "04:15:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1782158844283",
+    "symbol": "CRVUSDT",
+    "side": "long",
+    "entry": 0.21,
+    "stopLoss": 0.2064,
+    "takeProfit": 0.2159,
+    "qty": 23.78687,
+    "totalUsd": 5,
+    "openDate": "2026-06-22",
+    "openTime": "20:07:24",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.2571,
+    "exitLevel": "sl",
+    "exitPrice": 0.2064,
+    "closeDate": "2026-06-23",
+    "closeTime": "06:15:00",
+    "outcome": "LOSS"
   }
 ]
