@@ -1,5 +1,23 @@
 [
   {
+    "timestamp": "2026-06-24T16:37:37.872Z",
+    "kind": "external_close_recorded",
+    "symbol": "GLD",
+    "sharesClosed": 2,
+    "exitPrice": 366.39,
+    "pnl": -61.16,
+    "reason": "full_external_fill",
+    "isFullClose": true,
+    "fillsUsed": [
+      {
+        "orderId": "1b78aaab-680f-4f97-9fcd-1e622d01409f",
+        "filledAt": "2026-06-24T13:33:13.64059Z",
+        "qty": 2,
+        "price": 366.39
+      }
+    ]
+  },
+  {
     "timestamp": "2026-06-17T17:29:33.877Z",
     "symbol": "UNH",
     "signal": "short",
@@ -3080,12 +3098,6 @@
   {
     "timestamp": "2026-06-09T17:08:32.785Z",
     "symbol": "IWM",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:32.234Z",
-    "symbol": "INTC",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }

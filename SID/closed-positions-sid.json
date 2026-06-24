@@ -77,5 +77,43 @@
     "total_pnl": 562.45,
     "realizedPnl": 562.45,
     "is_full_close": true
+  },
+  {
+    "id": "fc060148-5173-4cc3-a128-69a8be45a4c9",
+    "symbol": "GLD",
+    "side": "long",
+    "entry": 396.9700012207031,
+    "stopLoss": 371,
+    "shares": 2,
+    "shares_total": 2,
+    "shares_remaining": 2,
+    "orig_stop": 371,
+    "tp1_hit": false,
+    "totalUsd": 793.94,
+    "riskUsd": 51.94,
+    "signalDate": "2026-06-10",
+    "openDate": "2026-06-15",
+    "openTime": "18:50:23",
+    "mode": "paper",
+    "strategy": "SID v2.2.1",
+    "brokerStopOrderId": "1b78aaab-680f-4f97-9fcd-1e622d01409f",
+    "clientOrderIdPrefix": "SID-GLD-20260610-long",
+    "closeDate": "2026-06-24",
+    "closeTime": "16:37:37",
+    "exit_strategy": "full_external_fill",
+    "exit_price": 366.39,
+    "exit_pnl": -61.16,
+    "exit_shares": 2,
+    "exit_fills": [
+      {
+        "orderId": "1b78aaab-680f-4f97-9fcd-1e622d01409f",
+        "filledAt": "2026-06-24T13:33:13.64059Z",
+        "qty": 2,
+        "price": 366.39
+      }
+    ],
+    "total_pnl": -61.16,
+    "realizedPnl": -61.16,
+    "is_full_close": true
   }
 ]
