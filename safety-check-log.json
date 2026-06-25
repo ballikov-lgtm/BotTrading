@@ -1,5 +1,209 @@
 [
   {
+    "timestamp": "2026-06-25T02:56:46.357Z",
+    "symbol": "JUPUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 0.2169,
+      "ema8": 0.21231553129350944,
+      "rsi3": 65.30612244897961,
+      "vwap": 0.2191,
+      "vwapDist": 1.00410771337288,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:46.231Z",
+    "symbol": "ONDOUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 0.3152,
+      "ema8": 0.31039782671602306,
+      "rsi3": 100,
+      "vwap": 0.3161,
+      "vwapDist": 0.2847200253084505,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:46.103Z",
+    "symbol": "APTUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 0.6253,
+      "ema8": 0.6293517306878984,
+      "rsi3": 64.78873239436619,
+      "vwap": 0.6275000000000001,
+      "vwapDist": 0.35059760956176744,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.974Z",
+    "symbol": "VIRTUALUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 0.5489,
+      "ema8": 0.5555014743026219,
+      "rsi3": 57.2207084468666,
+      "vwap": 0.5508666666666667,
+      "vwapDist": 0.3570131913348672,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.851Z",
+    "symbol": "HYPEUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 63.232,
+      "ema8": 62.56648395514411,
+      "rsi3": 85.0552721088435,
+      "vwap": 63.37800000000001,
+      "vwapDist": 0.23036384865411955,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.724Z",
+    "symbol": "LINKUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 7.395,
+      "ema8": 7.468753933595174,
+      "rsi3": 54.98489425981864,
+      "vwap": 7.403333333333332,
+      "vwapDist": 0.1125619090499711,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.606Z",
+    "symbol": "XRPUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 1.0704,
+      "ema8": 1.0805178861662523,
+      "rsi3": 81.99999999999977,
+      "vwap": 1.0721999999999998,
+      "vwapDist": 0.16787912702852098,
+      "isTrending": false
+    },
+    "direction": "short",
+    "passed": true,
+    "reasons": [],
+    "action": "short",
+    "order": {
+      "orderId": "PAPER-1782356205606",
+      "paper": true
+    },
+    "stopLoss": 1.0887,
+    "takeProfit": 1.0429,
+    "rr": 1.5
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.479Z",
+    "symbol": "SOLUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 67.651,
+      "ema8": 68.2961725320633,
+      "rsi3": 55.145631067961084,
+      "vwap": 67.76566666666668,
+      "vwapDist": 0.1692105638548708,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.356Z",
+    "symbol": "ETHUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 1618.05,
+      "ema8": 1636.155338470017,
+      "rsi3": 50.481026189203654,
+      "vwap": 1619.1499999999999,
+      "vwapDist": 0.06793688046196518,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
+    "timestamp": "2026-06-25T02:56:45.204Z",
+    "symbol": "BTCUSDT",
+    "timeframe": "4h",
+    "indicators": {
+      "price": 60705.4,
+      "ema8": 61411.2652379961,
+      "rsi3": 62.70758527827652,
+      "vwap": 60836.56666666667,
+      "vwapDist": 0.21560497880387425,
+      "isTrending": false
+    },
+    "direction": "neutral",
+    "passed": false,
+    "reasons": [
+      "No clear directional signal from VWAP/EMA8/RSI3"
+    ],
+    "action": null,
+    "order": null
+  },
+  {
     "timestamp": "2026-06-24T23:00:28.062Z",
     "symbol": "ETHFIUSDT",
     "timeframe": "4h",
@@ -1822,207 +2026,6 @@
       "rsi3": 0,
       "vwap": 1.0866966648055274,
       "vwapDist": 1.8769418795609825,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:31:30.150Z",
-    "symbol": "SOLUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 68.279,
-      "ema8": 69.5366349150641,
-      "rsi3": 20.993439550140792,
-      "vwap": 69.2559320624501,
-      "vwapDist": 1.4106113849845745,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:31:29.987Z",
-    "symbol": "ETHUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 1640.32,
-      "ema8": 1670.1021884356499,
-      "rsi3": 25.029331247555916,
-      "vwap": 1662.3814821798037,
-      "vwapDist": 1.3271010544989688,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:31:29.814Z",
-    "symbol": "BTCUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 60772.9,
-      "ema8": 62414.47529201452,
-      "rsi3": 10.582421173011141,
-      "vwap": 62025.69444878845,
-      "vwapDist": 2.0197991492426026,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "Price 2.02% from VWAP (max 2.0%) — overextended",
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:26.072Z",
-    "symbol": "AVAXUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 6.308,
-      "ema8": 6.360061762207399,
-      "rsi3": 25.471698113207594,
-      "vwap": 6.398360366742022,
-      "vwapDist": 1.4122425365677336,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.942Z",
-    "symbol": "JUPUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 0.2148,
-      "ema8": 0.21076585708339102,
-      "rsi3": 75.24752475247521,
-      "vwap": 0.21379063051291544,
-      "vwapDist": 0.4721298986129196,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.812Z",
-    "symbol": "ONDOUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 0.3014,
-      "ema8": 0.3099514548372532,
-      "rsi3": 0,
-      "vwap": 0.30551636621575845,
-      "vwapDist": 1.3473472032759888,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.678Z",
-    "symbol": "APTUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 0.6256,
-      "ema8": 0.6394869144938002,
-      "rsi3": 18.367346938775412,
-      "vwap": 0.6357410184034465,
-      "vwapDist": 1.595149299775231,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.551Z",
-    "symbol": "VIRTUALUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 0.5516,
-      "ema8": 0.5677695409454845,
-      "rsi3": 5.527638190954718,
-      "vwap": 0.562284114590749,
-      "vwapDist": 1.9001274113043933,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.418Z",
-    "symbol": "HYPEUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 60.723,
-      "ema8": 62.41891001926168,
-      "rsi3": 40.63731931668857,
-      "vwap": 61.6624754327518,
-      "vwapDist": 1.523577226114409,
-      "isTrending": false
-    },
-    "direction": "neutral",
-    "passed": false,
-    "reasons": [
-      "No clear directional signal from VWAP/EMA8/RSI3"
-    ],
-    "action": null,
-    "order": null
-  },
-  {
-    "timestamp": "2026-06-24T15:18:25.286Z",
-    "symbol": "LINKUSDT",
-    "timeframe": "4h",
-    "indicators": {
-      "price": 7.471,
-      "ema8": 7.610996617527521,
-      "rsi3": 22.77227722772257,
-      "vwap": 7.56146474707898,
-      "vwapDist": 1.1963918381544627,
       "isTrending": false
     },
     "direction": "neutral",
