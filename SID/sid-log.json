@@ -1,5 +1,51 @@
 [
   {
+    "timestamp": "2026-06-26T16:32:09.220Z",
+    "symbol": "ADBE",
+    "signal": "long",
+    "entry": 200.77999877929688,
+    "stopLoss": 190,
+    "shares": 4,
+    "totalUsd": 803.12,
+    "riskUsd": 43.12,
+    "rsiAtSignal": 28.14,
+    "rsiAtEntry": 35.34,
+    "signalDate": "2026-06-17",
+    "earningsDates": [],
+    "orderId": "272fa6a4-1384-4b1c-83fc-9149b7350328",
+    "reason": "RSI oversold (28.14) on 2026-06-17 → RSI(35.3) & MACD both pointing up"
+  },
+  {
+    "timestamp": "2026-06-26T16:32:08.719Z",
+    "symbol": "ABT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-06-26T16:32:08.307Z",
+    "symbol": "ABBV",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-06-26T16:32:07.920Z",
+    "symbol": "AAPL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-06-26T16:32:07.474Z",
+    "symbol": "AAL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-06-26T16:32:07.038Z",
+    "kind": "tp1_close_fail",
+    "symbol": "PYPL",
+    "error": "Alpaca DELETE /v2/positions/PYPL?qty=11 failed: insufficient qty available for order (requested: 11, available: 0)"
+  },
+  {
     "timestamp": "2026-06-25T16:40:23.323Z",
     "kind": "external_close_recorded",
     "symbol": "UNH",
@@ -3074,42 +3120,6 @@
   {
     "timestamp": "2026-06-09T17:08:35.918Z",
     "symbol": "LCID",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:35.505Z",
-    "symbol": "KOLD",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:35.168Z",
-    "symbol": "KHC",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:34.667Z",
-    "symbol": "JPM",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:34.146Z",
-    "symbol": "JNUG",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:33.692Z",
-    "symbol": "JNJ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-09T17:08:33.200Z",
-    "symbol": "IYR",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
