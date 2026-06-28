@@ -36,6 +36,13 @@ jobs:
         with:
           node-version: '22'
 
+      # scan-sid.js imports 'technicalindicators' — without this the scan step
+      # crashes (ERR_MODULE_NOT_FOUND) and, being continue-on-error, silently
+      # leaves scanner-sid.json stale. (Root cause of the 6-week stale-price bug
+      # discovered 2026-06-28: this workflow set up node but never installed deps.)
+      - name: Install Node deps
+        run: npm install
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
