@@ -86,6 +86,7 @@ i_showSmaTargets  = input.bool(true, "Plot 50-day + 200-day SMAs", group=g_visua
 i_showInfoTable   = input.bool(true, "Show info table", group=g_visual)
 i_showStopLine    = input.bool(true, "Show stop/BE line while in trade", group=g_visual)
 i_showEntryLine   = input.bool(true, "Show entry-price line while in trade", group=g_visual)
+i_showEntryFlags  = input.bool(true, "Show entry flags (GREEN=mechanical, AMBER=manual-watch)", group=g_visual)
 
 inVisualWindow = bar_index > last_bar_index - i_visualLookback
 
@@ -206,6 +207,12 @@ weeklyOkShort = not i_useWeeklyDirection or (not weeklyRsiRising) or (not weekly
 triggerLong  = armDir == "LONG"  and rsiRising  and macdRising  and nogoOkLong  and weeklyOkLong  and not earningsBlackout
 triggerShort = armDir == "SHORT" and rsiFalling and macdFalling and nogoOkShort and weeklyOkShort and not earningsBlackout
 
+// MANUAL-WATCH classification --- mirrors bot-sid.js longTermBullish() daily proxy.
+// A SHORT on a long-term-bullish asset (price > SMA200 AND SMA50 > SMA200) is
+// the dangerous counter-trend subset the bot flags for human S/R judgment. On
+// the chart these get an AMBER entry flag; clean mechanical entries get GREEN.
+ltBullish = not na(sma200) and not na(sma50) and close > sma200 and sma50 > sma200
+
 // -- POSITION SIZING ---------------------------------------------------------
 riskAmount       = i_accountSize * (i_riskPct / 100.0)
 stopLongLevel    = na(armSignalLow)  ? na : math.floor(armSignalLow)
@@ -311,7 +318,7 @@ barsSinceEntry = not na(entryBarIdx) ? bar_index - entryBarIdx : na
 // the position (it's a stop order at entryPrice). We just observe and flip
 // tp2Hit so future TP2 evaluations stop. No strategy.close needed.
 //
-// tp2LongSma50 / Sma200 / Timeout DO need strategy.close — but they must
+// tp2LongSma50 / Sma200 / Timeout DO need strategy.close --- but they must
 // FIRST cancel the pending BE L exit (which would otherwise block the close
 // from going through and leave the position stuck forever).
 
@@ -326,7 +333,7 @@ tp2ShortBe      = inShort and tp1Hit and not tp2Hit and not na(stopLevel) and hi
 tp2ShortTimeout = inShort and tp1Hit and not tp2Hit and not na(barsSinceTp1) and barsSinceTp1 >= i_tp2TimeoutBars
 
 if tp2LongBe
-    // FIX 2026-05-22: don't rely on strategy.exit("BE L") to close — it
+    // FIX 2026-05-22: don't rely on strategy.exit("BE L") to close --- it
     // doesn't reliably fire after the TP1 partial close (Pine v6 quirk).
     // Explicitly cancel + close to guarantee the runner exits at BE.
     strategy.cancel("BE L")
@@ -346,7 +353,7 @@ else if tp2LongTimeout
     tp2Hit := true
 
 if tp2ShortBe
-    // FIX 2026-05-22: don't rely on strategy.exit("BE S") to close — it
+    // FIX 2026-05-22: don't rely on strategy.exit("BE S") to close --- it
     // doesn't reliably fire after the TP1 partial close (Pine v6 quirk).
     // Explicitly cancel + close to guarantee the runner exits at BE.
     strategy.cancel("BE S")
@@ -379,7 +386,7 @@ else if tp2ShortTimeout
 if (inLong or inShort) and na(entryBarIdx)
     entryBarIdx := bar_index
 
-// (b) Safety on barsSinceEntry — original check, now reliable since (a)
+// (b) Safety on barsSinceEntry --- original check, now reliable since (a)
 //     initializes entryBarIdx for legacy positions.
 if (inLong or inShort) and not na(barsSinceEntry) and barsSinceEntry > i_safetyMaxBars
     strategy.cancel("Stop L")
@@ -389,7 +396,7 @@ if (inLong or inShort) and not na(barsSinceEntry) and barsSinceEntry > i_safetyM
     strategy.close_all(comment="Safety A: held " + str.tostring(barsSinceEntry) + " bars")
     tp2Hit := true
 
-// (c) Extra safety on barsSinceTp1 — catches any position where TP1 has
+// (c) Extra safety on barsSinceTp1 --- catches any position where TP1 has
 //     fired but TP2 hasn't closed it within i_safetyMaxBars bars. This is
 //     the belt-and-braces check that catches the 4H UNH "12797/30" case.
 if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_safetyMaxBars
@@ -405,6 +412,16 @@ if not inLong and not inShort
     entryBarIdx := na
 
 // -- VISUAL MARKUP -----------------------------------------------------------
+
+// Entry-type flags: GREEN = clean mechanical entry (any long, or a short on a
+// non-bullish asset). AMBER = manual-watch entry (a short on a long-term-bullish
+// asset --- the counter-trend subset the bot flags for human S/R judgment).
+entryIsLong  = triggerLong  and sharesLong  > 0 and strategy.position_size[1] == 0
+entryIsShort = triggerShort and sharesShort > 0 and strategy.position_size[1] == 0
+mechEntry    = (entryIsLong or (entryIsShort and not ltBullish)) and inVisualWindow
+manualEntry  = (entryIsShort and ltBullish) and inVisualWindow
+plotshape(i_showEntryFlags and mechEntry,   title="Mechanical entry (green)", style=shape.flag, location=location.belowbar, color=color.new(color.green, 0),  size=size.small)
+plotshape(i_showEntryFlags and manualEntry, title="Manual-watch entry (amber)", style=shape.flag, location=location.abovebar, color=color.new(#ffaa00, 0), size=size.small)
 
 if i_showArmLines and shouldArmLong and inVisualWindow
     line.new(bar_index, yBot, bar_index, yTop, xloc=xloc.bar_index,
@@ -494,7 +511,7 @@ plot(i_showEntryLine and strategy.position_size != 0 ? strategy.position_avg_pri
 plot(i_showStopLine  and strategy.position_size != 0 ? stopLevel                   : na, "Stop / BE",   color=color.new(tp1Hit ? color.gray : color.red, 30), style=plot.style_linebr, linewidth=2)
 
 // -- INFO TABLE --------------------------------------------------------------
-// FIX 2026-05-22: gate was `barstate.islast` only — on UNH 1D this never
+// FIX 2026-05-22: gate was `barstate.islast` only --- on UNH 1D this never
 // fired (labels + lines drew fine, but table block was skipped). Switched
 // to a broader gate that fires on either the last confirmed historical
 // bar OR the realtime bar OR within 1 bar of last_bar_index, so the table
