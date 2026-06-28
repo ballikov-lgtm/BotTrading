@@ -1,0 +1,69 @@
+name: SID Price Alert — UNH $440
+
+# Cloud-fired price-level alert (PC-independent, per the repo's cloud-first rule).
+# Pings Telegram once when UNH's day-high touches $440 (Alan's previous-support-
+# now-resistance level, flagged 2026-06-28 with price at $427.89). State is
+# committed back so it fires exactly once. Delete this file after it fires.
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Send a TEST Telegram ping now (does not touch fire state)'
+        type: boolean
+        default: false
+  schedule:
+    # Every 15 min during US market hours (~14:00-21:59 UTC), weekdays.
+    - cron: '*/15 14-21 * * 1-5'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sid-price-alert-unh-440
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+
+      - name: Year guard (one-shot safety)
+        run: |
+          year=$(date -u '+%Y')
+          if [ "$year" != "2026" ]; then
+            echo "Year $year != 2026 — UNH $440 watch expired, exiting cleanly."
+            exit 0
+          fi
+
+      - name: Check price level
+        working-directory: SID
+        env:
+          ALERT_ID:  unh-440-resistance
+          SYMBOL:    UNH
+          THRESHOLD: '440'
+          DIRECTION: above
+          LABEL:     'UNH previous support now acting as resistance ($440) - the waiting-game level'
+          TEST_MODE: ${{ github.event.inputs.test_mode }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:        ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ALERTS_ENABLED: ${{ secrets.TELEGRAM_ALERTS_ENABLED }}
+        run: node price-alert.js
+
+      - name: Commit fire-state if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SID/price-alert-state.json || true
+          if git diff --staged --quiet; then
+            echo "No state change — nothing to commit."
+          else
+            git commit -m "SID price-alert fired $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git pull --rebase --autostash origin main || true
+            git push origin main || true
+          fi
