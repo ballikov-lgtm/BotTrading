@@ -8,6 +8,15 @@ import * as tg from './telegram-alerts.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+// Parse an integer env var, falling back to `def` when unset/blank/non-numeric.
+// Unlike `parseInt(x) || def`, this correctly preserves a legitimate 0 value
+// (needed for rearmCooldownLong, whose validated value IS 0).
+function intEnv(raw, def) {
+  if (raw === undefined || raw === null || raw === '') return def;
+  const v = parseInt(raw, 10);
+  return Number.isNaN(v) ? def : v;
+}
+
 const CONFIG = {
   // V2.2: accountUsd is set per-run from the internal ledger (loadAccount)
   // for compounding sizing. The SID_ACCOUNT_USD env var becomes a fallback
@@ -27,7 +36,25 @@ const CONFIG = {
   tp1Portion:       parseFloat(process.env.SID_TP1_PORTION)      || 0.50,   // V2.1: fraction of position closed at TP1 (RSI 50)
   tp2TimeoutDays:   parseInt(process.env.SID_TP2_TIMEOUT_DAYS)   || 30,     // V2.1: max trading days to hold remaining 50% after TP1
   useDynamicTp:     process.env.SID_DYNAMIC_TP !== 'false',                  // V2.1: enable TP1+TP2 partial exits (default ON). Set false to revert to v2.0 single-exit behaviour.
+  // ── ENTRY ARM state-machine parameters (parity with backtest-sid-bot-parity.py) ──
+  // These bring detectEntrySignal into EXACT agreement with the validated
+  // backtest config (tier1, 5y → 280 trades / 73.9% WR / PF 3.19 / +$31,426
+  // at $200 fixed risk). The old "episode scan" had no arm timeout, no RSI(3)
+  // confirmation and no weekly-SMA arm gate — far too loose. See the bar-by-bar
+  // replay in detectEntrySignal().
+  armTimeoutDays:     intEnv(process.env.SID_ARM_TIMEOUT_DAYS,    3),       // arm expires this many trading days after the oversold/overbought signal if no entry triggers
+  rearmCooldownLong:  intEnv(process.env.SID_REARM_COOLDOWN_LONG, 0),       // trading-day lockout before a LONG can re-arm after its arm expires unfired (0 = free re-arm)
+  rearmCooldownShort: intEnv(process.env.SID_REARM_COOLDOWN_SHORT,5),       // trading-day lockout before a SHORT can re-arm after its arm expires unfired
+  armReplayBars:      intEnv(process.env.SID_ARM_REPLAY_BARS,     40),      // how many trailing daily bars to replay the arm machine over (>> 3d arm + 5d cooldown so today's state is fully determined)
 };
+
+// ── RSI thresholds (named to match backtest-sid-bot-parity.py constants) ─────
+// These were previously inline literals throughout the bot. Naming them keeps
+// detectEntrySignal's replay byte-for-byte readable against the backtest.
+const RSI_PERIOD     = 14;   // daily/weekly RSI lookback (Wilder)
+const RSI3_PERIOD    = 3;    // RSI(3) rebound confirmation lookback
+const RSI_OVERSOLD   = 30;   // long arm: daily RSI < 30  (and RSI(3) < 30)
+const RSI_OVERBOUGHT = 70;   // short arm: daily RSI > 70 (and RSI(3) > 70)  [LOCKED core rule]
 
 // ── V2 Approval Tiers (see SID/docs/V2-TELEGRAM-APPROVAL-SPEC.md) ────────────
 // AUTO: 80 tickers proven via 5y V1 backtest — bot fires automatically
@@ -835,6 +862,120 @@ function weeklyDirection(candles) {
   };
 }
 
+// ── Weekly series aligned to daily bars (EXACT backtest parity) ───────────────
+// The validated backtest (backtest-sid-bot-parity.py) derives four daily-aligned
+// weekly booleans that gate the ARM and TRIGGER of detectEntrySignal. They use
+// TWO different W-FRI reindex conventions which must be replicated exactly:
+//
+//   1. Weekly SMA50/200 ARM gate  (sma_long_ok / sma_short_ok)
+//        weekly_close = Close.resample('W-FRI').last()
+//        wfast/wslow  = rolling(50/200).mean()
+//        (wfast > wslow).reindex(daily, ffill)        ← NO index shift
+//      → a daily bar uses the most recent COMPLETED W-FRI week (Mon-Thu use the
+//        prior Friday; a Friday uses its own week). No intra-week lookahead.
+//
+//   2. Weekly RSI/MACD TRIGGER direction (wk_rsi_rising / wk_macd_rising)
+//        w_rsi/w_macd rising = value > value.shift(1)  on weekly bars
+//        index shifted back 4 days (Fri→Mon) THEN reindex(daily, ffill)
+//      → a daily bar Mon-Fri uses THIS week's Friday value (this matches the
+//        live weeklyDirection() result at the final bar: in-progress week vs
+//        prior completed week).
+//
+// `requires >= 200 weekly bars for the SMA gate (else default true, as backtest)
+// and >= 30 for the direction gate (else default false, as backtest).
+// Returns arrays indexed 1:1 with `candles`.
+function buildWeeklyDailyAligned(candles) {
+  const n = candles.length;
+  const smaLongOk  = new Array(n).fill(true);   // backtest default when <200 weekly bars
+  const smaShortOk = new Array(n).fill(true);
+  const wkRsiRising  = new Array(n).fill(false); // backtest default when <30 weekly bars
+  const wkMacdRising = new Array(n).fill(false);
+
+  // ── Resample to W-FRI weekly buckets: key = the Friday ending each week. ──
+  // Match pandas 'W-FRI': each daily bar belongs to the week ending on the
+  // next (or same) Friday. Bucket value = last daily close in that week.
+  // We track each bucket's Friday date (ms) and its last close.
+  const buckets = []; // { friMs, monMs, close }
+  const byFri = new Map();
+  for (const c of candles) {
+    if (c.close === null || c.close === undefined || isNaN(c.close)) continue;
+    const d = new Date(c.date + 'T00:00:00Z');
+    const dow = d.getUTCDay();             // 0=Sun .. 6=Sat
+    // days until that week's Friday (5). Sat(6)/Sun(0) belong to the NEXT Friday.
+    let addToFri;
+    if (dow === 6)      addToFri = 6;      // Sat → +6 (next Fri)
+    else if (dow === 0) addToFri = 5;      // Sun → +5 (next Fri)
+    else                addToFri = 5 - dow; // Mon..Fri → this week's Fri
+    const fri = new Date(d);
+    fri.setUTCDate(fri.getUTCDate() + addToFri);
+    const friMs = fri.getTime();
+    const monMs = friMs - 4 * 86400000;    // Fri→Mon shift (the -4d the backtest applies)
+    if (byFri.has(friMs)) {
+      byFri.get(friMs).close = c.close;    // chronological → last close in week wins
+    } else {
+      const b = { friMs, monMs, close: c.close };
+      byFri.set(friMs, b);
+      buckets.push(b);
+    }
+  }
+  buckets.sort((a, b) => a.friMs - b.friMs);
+  const W = buckets.length;
+  const wCloses = buckets.map(b => b.close);
+
+  // ── (1) Weekly SMA50/200 arm gate (no shift) ──
+  if (W >= 200) {
+    const wSma50  = calcSMA(wCloses, 50);
+    const wSma200 = calcSMA(wCloses, 200);
+    const longOkW  = wCloses.map((_, i) =>
+      (wSma50[i] != null && wSma200[i] != null) ? (wSma50[i] > wSma200[i]) : null);
+    const shortOkW = wCloses.map((_, i) =>
+      (wSma50[i] != null && wSma200[i] != null) ? (wSma50[i] < wSma200[i]) : null);
+    // ffill weekly→daily on the Friday (no-shift) anchor: a daily bar takes the
+    // most recent weekly bucket whose Friday date <= the daily bar's date.
+    let wi = -1;
+    for (let i = 0; i < n; i++) {
+      const dMs = new Date(candles[i].date + 'T00:00:00Z').getTime();
+      while (wi + 1 < W && buckets[wi + 1].friMs <= dMs) wi++;
+      if (wi >= 0 && longOkW[wi] != null) {
+        smaLongOk[i]  = longOkW[wi];
+        smaShortOk[i] = shortOkW[wi];
+      } else {
+        // Before the first valid weekly SMA → pandas NaN → .fillna(False)
+        smaLongOk[i]  = false;
+        smaShortOk[i] = false;
+      }
+    }
+  }
+  // else: leave defaults (true) — matches backtest's <200 branch.
+
+  // ── (2) Weekly RSI/MACD rising trigger gate (shift -4d = Mon anchor) ──
+  if (W >= 30) {
+    const wRsi  = calcRSI(wCloses, RSI_PERIOD);
+    const { macdLine: wMacd } = calcMACD(wCloses);
+    const rsiRiseW  = wCloses.map((_, i) =>
+      (i > 0 && wRsi[i]  != null && wRsi[i - 1]  != null) ? (wRsi[i]  > wRsi[i - 1])  : null);
+    const macdRiseW = wCloses.map((_, i) =>
+      (i > 0 && wMacd[i] != null && wMacd[i - 1] != null) ? (wMacd[i] > wMacd[i - 1]) : null);
+    // ffill on the Monday (shifted) anchor: a daily bar takes the most recent
+    // weekly bucket whose Monday date <= the daily bar's date.
+    let wi = -1;
+    for (let i = 0; i < n; i++) {
+      const dMs = new Date(candles[i].date + 'T00:00:00Z').getTime();
+      while (wi + 1 < W && buckets[wi + 1].monMs <= dMs) wi++;
+      if (wi >= 0 && rsiRiseW[wi] != null) {
+        wkRsiRising[i]  = rsiRiseW[wi];
+        wkMacdRising[i] = macdRiseW[wi] != null ? macdRiseW[wi] : false;
+      } else {
+        wkRsiRising[i]  = false;   // pandas NaN → .fillna(False)
+        wkMacdRising[i] = false;
+      }
+    }
+  }
+  // else: leave defaults (false) — matches backtest's <30 branch (both False).
+
+  return { smaLongOk, smaShortOk, wkRsiRising, wkMacdRising };
+}
+
 // ── Long-term-bullish classification (for the MANUAL-WATCH short flag) ─────────
 // Identifies an asset in a stable long-term uptrend so we can flag SHORT runners
 // against it for manual S/R-level monitoring. Earned from the GOOG 2026-06 trade
@@ -880,137 +1021,189 @@ function longTermBullish(candles) {
 }
 
 // ── Signal Detection ──────────────────────────────────────────────────────────
-// Returns a signal object or null.
-// Logic follows the SID V2 method checklist:
-//   1. RSI went below 30 (oversold signal) — note the signal date
-//   2. RSI & MACD both pointing in same direction today
-//   3. V2: RSI at entry < 45 (long) / > 55 (short) — no-go zone
-//   4. V2: Weekly RSI OR Weekly MACD aligned with trade direction
-//   5. Stop = lowest low (signal date → entry date) rounded to whole dollar
-//   6. Take profit: RSI reaches 50 (monitored separately)
+// Returns a signal object, a {signal:null, rejectReason} log object, or null.
+//
+// ⚠ REWRITTEN 2026-06-29 to be an EXACT bar-by-bar replay of the validated
+// backtest's arm/trigger/cooldown state machine (backtest-sid-bot-parity.py,
+// SID_BOT_PARITY=false SID_REARM_COOLDOWN_LONG=0 SID_REARM_COOLDOWN_SHORT=5 →
+// 280 trades / 73.9% WR / PF 3.19 / +$31,426 over 5y tier1, $200 fixed risk).
+//
+// The OLD implementation was a one-shot "episode scan" with NO arm timeout, NO
+// RSI(3) confirmation and NO weekly-SMA arm gate — far too loose. It would, for
+// example, still fire ADBE's 2026-06-17 signal as a 2026-06-26 entry even though
+// the 3-day arm has long since expired. The replay fixes this.
+//
+// detectEntrySignal is called ONCE per run, only when the bot is FLAT on this
+// ticker, with ~2y of daily candles. Its job: "does an entry TRIGGER on the
+// LAST (today's) bar?" We answer it by replaying the backtest arm machine over
+// the trailing CONFIG.armReplayBars bars from a clean state (armDir=null,
+// rearmCooldown=0). 40 bars >> the 3-day arm + 5-day short cooldown, so today's
+// arm/cooldown state is fully determined regardless of the seed.
+//
+// State machine (verbatim from the backtest), per bar in order:
+//   ARM   — re-arm cooldown countdown (only while disarmed); compute RSI(3)
+//           and weekly-SMA50/200 arm gates; arm LONG (rsi<30) or SHORT (rsi>70)
+//           if eligible and not side-blocked; else, if already armed, age the
+//           arm (days_since_arm++, accumulate arm low/high) and expire it after
+//           ARM_TIMEOUT_DAYS — on expiry, set the side-specific re-arm cooldown.
+//   TRIGGER — for the active arm side, require RSI+MACD aligned, no-go zone OK,
+//           and the weekly RSI-OR-MACD direction filter. On fire: stop =
+//           floor(armLow) / ceil(armHigh), entry = close, reset arm.
+//
+// PARITY NOTES:
+//   • Earnings/PPI/VIX gates are NOT applied here — the CALLER applies them
+//     after this returns (unchanged behaviour). The backtest folds earnings
+//     into arming/expiry; the bot deliberately keeps it in the caller. Net
+//     effect on the entry set is negligible (an earnings-blocked trigger is
+//     skipped by the caller anyway), and verified against the backtest CSV.
+//   • Cooldown is applied on arm EXPIRY only (matches the backtest); a
+//     successful trigger just resets the arm with no cooldown.
+//   • A trigger on a NON-final bar means the backtest would have been holding a
+//     position there → the bot would not be scanning today → we reset arm and
+//     keep replaying, but only a FINAL-bar trigger returns a signal.
 
 function detectEntrySignal(candles) {
   const closes = candles.map(c => c.close);
-  const rsiArr = calcRSI(closes);
-  const { macdLine } = calcMACD(closes);
-
   const n = closes.length;
-  const rsiNow  = rsiArr[n - 1];
-  const rsiPrev = rsiArr[n - 2];
-  const macdNow  = macdLine[n - 1];
-  const macdPrev = macdLine[n - 2];
+  if (n < 40) return null;
 
-  if (!rsiNow || !rsiPrev || !macdNow || !macdPrev) return null;
+  const rsiArr   = calcRSI(closes, RSI_PERIOD);
+  const rsi3Arr  = calcRSI(closes, RSI3_PERIOD);
+  const { macdLine } = calcMACD(closes);
+  const wk = buildWeeklyDailyAligned(candles);
 
-  // ── Long setup: RSI was oversold (<30), now both RSI and MACD pointing UP ───
-  // Find the most recent oversold episode start (RSI crossing below 30)
-  let oversoldIdx = null;
-  for (let i = n - 1; i >= 1; i--) {
-    if (rsiArr[i] === null) continue;
-    // If RSI is back above 50, the episode is over — stop looking
-    if (rsiArr[i] >= 50 && i < n - 1) { oversoldIdx = null; break; }
-    if (rsiArr[i] < 30 && (rsiArr[i - 1] === null || rsiArr[i - 1] >= 30)) {
-      oversoldIdx = i; // First candle of the oversold episode
-      break;
+  const ARM_TIMEOUT  = CONFIG.armTimeoutDays;
+  const CD_LONG      = CONFIG.rearmCooldownLong;
+  const CD_SHORT     = CONFIG.rearmCooldownShort;
+
+  // Replay window: trailing armReplayBars, but never start before index 1.
+  const start = Math.max(1, n - CONFIG.armReplayBars);
+
+  // Seed prev from the bar immediately before the window (the backtest's prev is
+  // always the previous PROCESSED bar). If that bar's indicators are null we
+  // fall back to per-bar warmup handling inside the loop.
+  let prevRsi  = (start - 1 >= 0) ? rsiArr[start - 1]   : null;
+  let prevMacd = (start - 1 >= 0) ? macdLine[start - 1] : null;
+
+  // Arm state (clean initial state, per the replay design).
+  let armDir = null;            // 'long' | 'short' | null
+  let armLow = null, armHigh = null;
+  let armSignalIdx = null;      // bar index where the active arm was set (= signalDate)
+  let daysSinceArm = 0;
+  let rearmCooldown = 0;        // trading-day lockout after an arm expires unfired
+  let cooldownSide = null;      // 'long' | 'short' — which side the lockout applies to
+
+  let finalSignal = null;       // set only if a trigger fires on the LAST bar
+
+  for (let i = start; i < n; i++) {
+    const rsi  = rsiArr[i];
+    const m    = macdLine[i];
+    const rsi3 = rsi3Arr[i];
+
+    // Warmup-skip (mirrors the backtest: needs current RSI/MACD AND a prev).
+    if (rsi == null || m == null || prevRsi == null || prevMacd == null) {
+      prevRsi = rsi; prevMacd = m;
+      continue;
     }
-  }
 
-  if (oversoldIdx !== null && rsiNow > rsiPrev && macdNow > macdPrev) {
-    // Both RSI and MACD pointing up — valid long entry (V1 logic)
-    // V2 no-go zone: reject if RSI already too close to RSI 50 (instructor S2_Ep3)
-    if (rsiNow >= CONFIG.rsiNoGoLong) {
-      return {
-        signal: null,
-        rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} >= ${CONFIG.rsiNoGoLong} for long entry (too close to RSI 50 TP)`,
-      };
+    const rsiRising   = rsi > prevRsi;
+    const rsiFalling  = rsi < prevRsi;
+    const macdRising  = m   > prevMacd;
+    const macdFalling = m   < prevMacd;
+
+    const isLast = (i === n - 1);
+
+    // ── ARM (verbatim from backtest) ──────────────────────────────────────
+    const rsi3OkLong  = rsi3 != null && rsi3 < RSI_OVERSOLD;
+    const rsi3OkShort = rsi3 != null && rsi3 > RSI_OVERBOUGHT;
+    const wkLong  = wk.smaLongOk[i];   // weekly SMA50 > SMA200 (no-shift ffill)
+    const wkShort = wk.smaShortOk[i];  // weekly SMA50 < SMA200
+
+    // Re-arm cooldown countdown — only ticks while disarmed (matches backtest).
+    if (armDir === null && rearmCooldown > 0) {
+      rearmCooldown -= 1;
+      if (rearmCooldown === 0) cooldownSide = null;
     }
-    // V2 weekly direction (OR mode): require weekly RSI OR weekly MACD rising.
-    // Best WR/PF/CAGR combo in the backtest (v2-weekly-or = 64.9% WR over 5y).
-    if (CONFIG.useWeeklyDirection) {
-      const wk = weeklyDirection(candles);
-      if (!wk.enoughHistory) {
-        return {
-          signal: null,
-          rejectReason: `V2 weekly direction: insufficient weekly history (need 30+ weeks)`,
-        };
+
+    const armLongGate  = rsi3OkLong  && wkLong;
+    const armShortGate = rsi3OkShort && wkShort;
+    const longBlocked  = rearmCooldown > 0 && cooldownSide === 'long';
+    const shortBlocked = rearmCooldown > 0 && cooldownSide === 'short';
+
+    if (armDir === null) {
+      if (rsi < RSI_OVERSOLD && armLongGate && !longBlocked) {
+        armDir = 'long';
+        armLow = candles[i].low; armHigh = candles[i].high;
+        armSignalIdx = i; daysSinceArm = 0;
+      } else if (rsi > RSI_OVERBOUGHT && armShortGate && !shortBlocked) {
+        armDir = 'short';
+        armLow = candles[i].low; armHigh = candles[i].high;
+        armSignalIdx = i; daysSinceArm = 0;
       }
-      if (!(wk.rsiRising || wk.macdRising)) {
-        return {
-          signal: null,
-          rejectReason: `V2 weekly direction: both weekly RSI (${wk.weeklyRsi?.toFixed(1)}) and MACD (${wk.weeklyMacd?.toFixed(4)}) falling — RED FLAG for long`,
-        };
-      }
-    }
-    const signalDate  = candles[oversoldIdx].date;
-    const episodeCandles = candles.slice(oversoldIdx); // Signal date → today
-    const lowestLow   = Math.min(...episodeCandles.map(c => c.low));
-    const stopLoss    = Math.floor(lowestLow);         // Rounded DOWN to whole dollar
-
-    return {
-      signal:     'long',
-      entry:      closes[n - 1],
-      stopLoss,
-      signalDate,
-      entryDate:  candles[n - 1].date,
-      rsiAtEntry: rsiNow,
-      rsiAtSignal: rsiArr[oversoldIdx],
-      reason:     `RSI oversold (${rsiArr[oversoldIdx]}) on ${signalDate} → RSI(${rsiNow.toFixed(1)}) & MACD both pointing up`,
-    };
-  }
-
-  // ── Short setup: RSI was overbought (>70), now both RSI and MACD pointing DOWN
-  let overboughtIdx = null;
-  for (let i = n - 1; i >= 1; i--) {
-    if (rsiArr[i] === null) continue;
-    if (rsiArr[i] <= 50 && i < n - 1) { overboughtIdx = null; break; }
-    if (rsiArr[i] > 70 && (rsiArr[i - 1] === null || rsiArr[i - 1] <= 70)) {
-      overboughtIdx = i;
-      break;
-    }
-  }
-
-  if (overboughtIdx !== null && rsiNow < rsiPrev && macdNow < macdPrev) {
-    // V2 no-go zone: reject if RSI too close to RSI 50 (mirror of long check)
-    if (rsiNow <= CONFIG.rsiNoGoShort) {
-      return {
-        signal: null,
-        rejectReason: `V2 no-go zone: RSI ${rsiNow.toFixed(1)} <= ${CONFIG.rsiNoGoShort} for short entry (too close to RSI 50 TP)`,
-      };
-    }
-    // V2 weekly direction (OR mode): require weekly RSI OR weekly MACD FALLING.
-    if (CONFIG.useWeeklyDirection) {
-      const wk = weeklyDirection(candles);
-      if (!wk.enoughHistory) {
-        return {
-          signal: null,
-          rejectReason: `V2 weekly direction: insufficient weekly history (need 30+ weeks)`,
-        };
-      }
-      if (!((!wk.rsiRising) || (!wk.macdRising))) {
-        return {
-          signal: null,
-          rejectReason: `V2 weekly direction: both weekly RSI (${wk.weeklyRsi?.toFixed(1)}) and MACD (${wk.weeklyMacd?.toFixed(4)}) rising — RED FLAG for short`,
-        };
+    } else {
+      daysSinceArm += 1;
+      armLow  = Math.min(armLow,  candles[i].low);
+      armHigh = Math.max(armHigh, candles[i].high);
+      const expired = daysSinceArm > ARM_TIMEOUT;
+      if (expired) {
+        const cd = (armDir === 'long') ? CD_LONG : CD_SHORT;
+        if (cd > 0) { rearmCooldown = cd; cooldownSide = armDir; }
+        armDir = null; armLow = null; armHigh = null; armSignalIdx = null;
       }
     }
-    const signalDate  = candles[overboughtIdx].date;
-    const episodeCandles = candles.slice(overboughtIdx);
-    const highestHigh = Math.max(...episodeCandles.map(c => c.high));
-    const stopLoss    = Math.ceil(highestHigh);        // Rounded UP to whole dollar
 
-    return {
-      signal:     'short',
-      entry:      closes[n - 1],
-      stopLoss,
-      signalDate,
-      entryDate:  candles[n - 1].date,
-      rsiAtEntry: rsiNow,
-      rsiAtSignal: rsiArr[overboughtIdx],
-      reason:     `RSI overbought (${rsiArr[overboughtIdx]}) on ${signalDate} → RSI(${rsiNow.toFixed(1)}) & MACD both pointing down`,
-    };
+    // ── TRIGGER (v2-weekly-or, verbatim from backtest) ────────────────────
+    if (armDir === 'long') {
+      const nogoOk   = rsi < CONFIG.rsiNoGoLong;
+      const weeklyOk = !CONFIG.useWeeklyDirection || (wk.wkRsiRising[i] || wk.wkMacdRising[i]);
+      if (rsiRising && macdRising && nogoOk && weeklyOk) {
+        const stop = Math.floor(armLow);
+        const ep   = closes[i];
+        if (ep > stop) {
+          if (isLast) {
+            finalSignal = {
+              signal:     'long',
+              entry:      ep,
+              stopLoss:   stop,
+              signalDate: candles[armSignalIdx].date,
+              entryDate:  candles[i].date,
+              rsiAtEntry: rsi,
+              rsiAtSignal: rsiArr[armSignalIdx],
+              reason:     `RSI armed long (RSI ${rsiArr[armSignalIdx]?.toFixed(1)}) on ${candles[armSignalIdx].date} → RSI(${rsi.toFixed(1)}) & MACD both up, ${daysSinceArm}d into 3d arm`,
+            };
+          }
+          // reset arm (no cooldown on a successful trigger — matches backtest)
+          armDir = null; armLow = null; armHigh = null; armSignalIdx = null;
+        }
+      }
+    } else if (armDir === 'short') {
+      const nogoOk   = rsi > CONFIG.rsiNoGoShort;
+      const weeklyOk = !CONFIG.useWeeklyDirection || ((!wk.wkRsiRising[i]) || (!wk.wkMacdRising[i]));
+      if (rsiFalling && macdFalling && nogoOk && weeklyOk) {
+        const stop = Math.ceil(armHigh);
+        const ep   = closes[i];
+        if (stop > ep) {
+          if (isLast) {
+            finalSignal = {
+              signal:     'short',
+              entry:      ep,
+              stopLoss:   stop,
+              signalDate: candles[armSignalIdx].date,
+              entryDate:  candles[i].date,
+              rsiAtEntry: rsi,
+              rsiAtSignal: rsiArr[armSignalIdx],
+              reason:     `RSI armed short (RSI ${rsiArr[armSignalIdx]?.toFixed(1)}) on ${candles[armSignalIdx].date} → RSI(${rsi.toFixed(1)}) & MACD both down, ${daysSinceArm}d into 3d arm`,
+            };
+          }
+          armDir = null; armLow = null; armHigh = null; armSignalIdx = null;
+        }
+      }
+    }
+
+    prevRsi = rsi; prevMacd = m;
   }
 
-  return null;
+  return finalSignal; // null if no trigger fires on today's bar
 }
 
 // ── Position Sizing ───────────────────────────────────────────────────────────
@@ -1812,13 +2005,16 @@ async function run() {
     // Fetch daily candles
     // BUG-FIX 2026-05-21: was `fetchDailyCandles(symbol)` (default '6mo'),
     // which resamples to ~26-28 weekly bars — below the weekly-direction
-    // check's required 30. Many AUTO-tier tickers (NVDA, COST, GOOG, INTC,
-    // MCD, UNH, LMT, RTX, LCID) were being rejected with "insufficient
-    // weekly history" before their signal could be evaluated.
-    // `2y` matches what checkPositions() already uses on line 744.
+    // check's required 30.
+    // BUG-FIX 2026-06-28: bumped 2y → 5y. The v2.3 entry overhaul added a
+    // weekly SMA50/200 ARM gate which needs ≥200 weekly bars (~4y). With only
+    // 2y (~104 weekly bars) that gate silently defaults to TRUE (inert), making
+    // the live bot LOOSER than the validated backtest — it would arm longs in
+    // weekly downtrends the backtest rejects. 5y (~260 weekly bars) seasons the
+    // weekly SMA200/RSI/MACD so detectEntrySignal matches the backtest live.
     let candles;
     try {
-      candles = await fetchDailyCandles(symbol, '2y');
+      candles = await fetchDailyCandles(symbol, '5y');
       await new Promise(r => setTimeout(r, 300)); // Polite rate limit for Yahoo
     } catch (err) {
       console.log(`Data unavailable (${err.message})`);
@@ -2033,7 +2229,27 @@ async function run() {
   }).catch(() => {});
 }
 
-run().catch(err => {
-  console.error('Fatal error:', err.message);
-  process.exit(1);
-});
+// Only auto-run the bot when this file is executed directly (e.g. `node
+// bot-sid.js`, which is how sid.yml invokes it). When imported (e.g. by a test
+// harness), skip the side-effecting run() so the pure functions can be unit
+// tested in isolation.
+import { pathToFileURL } from 'url';
+const _isDirectRun = import.meta.url === pathToFileURL(process.argv[1] || '').href;
+if (_isDirectRun) {
+  run().catch(err => {
+    console.error('Fatal error:', err.message);
+    process.exit(1);
+  });
+}
+
+// Exports for test harnesses (do NOT affect the direct-run path above).
+export {
+  detectEntrySignal,
+  buildWeeklyDailyAligned,
+  weeklyDirection,
+  longTermBullish,
+  calcRSI,
+  calcMACD,
+  calcSMA,
+  CONFIG,
+};

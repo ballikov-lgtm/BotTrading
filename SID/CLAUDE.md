@@ -173,6 +173,78 @@ The following live in the parent `Trading Setup/` folder and are shared with Iro
 
 These are the gotchas paid for in past sessions. Read them before starting work on SID — they save you hours.
 
+### detectEntrySignal rewritten to a bar-by-bar arm replay (2026-06-29) — NOT YET PUSHED
+The live bot's `detectEntrySignal` was a one-shot "episode scan" (find most-recent
+RSI-cross-into-extreme, then check today for RSI+MACD alignment). It had **NO arm
+timeout, NO RSI(3) confirmation, NO weekly-SMA arm gate** — far looser than the
+validated strategy. Concretely it would still fire ADBE's 2026-06-17 oversold
+signal as a 2026-06-26 entry (9 calendar days later) because the episode never
+expired. That stale ADBE long is the live position the rewrite fixes.
+
+**What changed (working-tree only — review pending, do NOT assume pushed):**
+- Replaced `detectEntrySignal(candles)` with a **bounded bar-by-bar replay** of
+  the backtest's arm/trigger/cooldown state machine. It replays the trailing
+  `CONFIG.armReplayBars` (default 40) bars from clean state and returns a signal
+  ONLY if a trigger fires on the final (today's) bar.
+- New CONFIG knobs: `armTimeoutDays=3`, `rearmCooldownLong=0`,
+  `rearmCooldownShort=5`, `armReplayBars=40` (all env-overridable via
+  `SID_ARM_TIMEOUT_DAYS` / `SID_REARM_COOLDOWN_LONG` / `SID_REARM_COOLDOWN_SHORT`
+  / `SID_ARM_REPLAY_BARS`). Added an `intEnv()` helper so a legitimate `0`
+  (rearmCooldownLong) survives — `parseInt(x)||def` would have clobbered it.
+- Named RSI constants `RSI_PERIOD=14 / RSI3_PERIOD=3 / RSI_OVERSOLD=30 /
+  RSI_OVERBOUGHT=70` (were inline literals) so the replay reads 1:1 vs the .py.
+- New `buildWeeklyDailyAligned(candles)` — replicates the backtest's TWO distinct
+  W-FRI reindex conventions (see next note). Used for the weekly arm + trigger gates.
+- Added a `import.meta.url` main-guard + named `export {…}` block at the bottom so
+  the module's pure functions can be unit-tested without triggering `run()`. The
+  GHA workflow runs `node bot-sid.js` directly, so the guard is true there and
+  the bot runs exactly as before.
+
+**Source of truth:** `SID/backtest-sid-bot-parity.py` with
+`SID_BOT_PARITY=false SID_REARM_COOLDOWN_LONG=0 SID_REARM_COOLDOWN_SHORT=5`
+→ 280 trades / 73.9% WR / PF 3.19 / +$31,426 (tier1, 5y, $200 fixed risk). Arm
+block ~L509-548, trigger block ~L550-600. Reference entries CSV:
+`strategy-test-vault/bot-parity-experiment/backtest-bot-parity-report-rearmcdL0S5.csv`.
+
+**Verified:** ported function reproduces the backtest entry set EXACTLY (date+side+
+entry+stop) for UNH/ADBE/GOOG/AAPL/META once the (intentionally relocated) earnings
+gate is folded back into the replica — 18/18 matched, 0 missed, 0 false-extra. The
+only production-path residual is held-position days the real bot never scans (it
+calls detectEntrySignal only when flat). Confirmed ADBE no longer fires on 2026-06-26.
+
+**Two parity gotchas earned here (read before touching this again):**
+
+1. **The backtest uses TWO different weekly reindex conventions — don't conflate.**
+   - Weekly **SMA50/200 ARM gate** (`sma_long_ok`/`sma_short_ok`): W-FRI resample,
+     `(wfast>wslow).reindex(daily, ffill)` with **NO index shift**. A daily bar uses
+     the most recent COMPLETED week (Mon-Thu → prior Friday; Friday → its own week).
+     No intra-week lookahead.
+   - Weekly **RSI/MACD TRIGGER direction** (`wk_rsi_rising`/`wk_macd_rising`):
+     `compute_weekly_direction` shifts the weekly index back 4 days (Fri→Mon) BEFORE
+     ffill, so a daily bar Mon-Fri uses THIS week's Friday value (a deliberate
+     1-day intra-week lookahead the validated strategy accepts). `buildWeeklyDailyAligned`
+     replicates both: it tracks each bucket's `friMs` (no-shift anchor) and `monMs`
+     (shifted anchor) and ffills each gate on its own anchor.
+
+2. **Earnings is the reason the bot's flat-replay can't 1:1 the backtest's entries.**
+   Per spec, earnings/PPI/VIX stay in the CALLER (`run()`), NOT in `detectEntrySignal`.
+   But the backtest folds the 14-day earnings blackout INTO the arm machine — it
+   expires an active arm early AND blocks arming during the window. That shifts the
+   re-arm-cooldown phase by a bar, which cascades. Example: ADBE earnings 2023-06-15
+   → blackout from 06-01 expires the 05-26 short arm a bar early, and the cooldown
+   chain then lands a clean re-arm on 06-16 → trigger on 06-20 (a validated entry my
+   earnings-less port misses by one bar). This is NOT a port bug — folding earnings
+   into a verification replica reproduces the entry exactly. If you ever need
+   bit-exact backtest parity inside detectEntrySignal you'd have to pass earnings in,
+   but DON'T — the caller's hard-skip on the trigger bar is the agreed design and the
+   net entry-set delta is negligible (an earnings-blocked trigger is skipped anyway).
+
+**Queued:** user to review the diff + run the full parity backtest before shipping.
+On ship: bump version (entry-rule change → at least v2.2.2→v2.3 or v2.2.x per the
+versioning rule), update SID-README Version History + dashboard Updates tab (entry
+logic changed — this is a public-docs-follow-the-code revision), and move any
+rejected cooldown variants (rearmcd5, L0S3, L0S7) into the vault index.
+
 ### V2.1 backtest warmup bug (2026-05-18)
 The V2.1 backtest's `main()` initially downloaded only 5y of price data. Wilder RSI and weekly resamples weren't fully converged at the start of the trade window, silently rejecting **~75% of ARM/TRIGGER signals** in years 1-3.
 
