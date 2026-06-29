@@ -29,24 +29,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.2.2';
-// v2.2.2 (2026-06-13) = v2.2.1 trade logic + the MANUAL-WATCH monitoring flag
-// (no change to how trades fire; it flags bullish-asset short runners for manual
-//  S/R review). Trade logic is the v2.2.1 HYBRID launched 2026-06-09:
-//   - LONG TP1: v2.1 close-based (RSI >= 50 on daily close)
-//   - SHORT TP1: v2.2 intraday-touch (resting GTC limit at the RSI-50 target)
-//   - both sides: broker-enforced GTC stop at entry; internal-ledger sizing.
+const STRATEGY_VERSION = '2.2.3';
+// v2.2.3 (2026-06-28) = ENTRY OVERHAUL. Brought the live bot's entry back into
+// line with the validated backtest (it had drifted loose) + an Alan refinement:
+//   - 3-day arm timeout (was none — bot took stale signals like the ADBE entry
+//     6 trading days after the oversold signal)
+//   - RSI(3) extreme confirmation required to arm (was missing live)
+//   - weekly SMA50/200 arm gate (was missing live; needs 5y of data — scan
+//     fetch bumped 2y -> 5y so the gate actually applies)
+//   - free-rearm LONGS / shorts-only 5-day re-arm cooldown (Alan: bullish names
+//     V-recover, so longs re-arm fast; shorts wait out the recovery)
+// Exit logic unchanged from the v2.2.1 HYBRID (close-based long TP1 / intraday
+// short TP1, broker GTC stops, internal-ledger sizing) + the v2.2.2 MANUAL-WATCH flag.
 // Backtest (tier1 80-ticker AUTO, 5y, fixed $200 risk):
-//   303 trades, 71.3% WR, PF 2.72, +$29,528 — Pareto-dominates v2.1.
+//   280 trades, 73.9% WR, PF 3.19, +$31,426 — Pareto-dominates v2.2.1
+//   (+$2,091, +0.50 PF, +2.9pp WR); short WR cleaned 62.9% -> 72.3%.
 // Currently PAPER TRADING — switch to live after live paper performance
 // crosses LIVE_TRADE_THRESHOLD (see below).
 
-// Headline backtest numbers for V2.2.1 (used as default until enough live data)
-const HEADLINE_BACKTEST_WR     = 71.3;   // v2.2.1 AUTO-tier 5y WR (matches what bot trades)
-const HEADLINE_BACKTEST_PNL    = 29528;  // 5y net P&L at fixed $200 risk, AUTO tier
-const HEADLINE_BACKTEST_TRADES = 303;    // AUTO-tier trade count for the same window
-const HEADLINE_BACKTEST_WINS   = 216;    // 71.3% of 303
-const HEADLINE_BACKTEST_LOSSES = 87;     // 303 - 216
+// Headline backtest numbers for V2.2.3 (used as default until enough live data)
+const HEADLINE_BACKTEST_WR     = 73.9;   // v2.2.3 AUTO-tier 5y WR (matches what bot trades)
+const HEADLINE_BACKTEST_PNL    = 31426;  // 5y net P&L at fixed $200 risk, AUTO tier
+const HEADLINE_BACKTEST_TRADES = 280;    // AUTO-tier trade count for the same window
+const HEADLINE_BACKTEST_WINS   = 207;    // 73.9% of 280
+const HEADLINE_BACKTEST_LOSSES = 73;     // 280 - 207
 const HEADLINE_BACKTEST_CAGR   = 35.76;  // carried from V2 baseline — v2.2.x CAGR not separately measured
 const HEADLINE_MAX_DD          = 7.95;   // carried from V2 baseline — v2.2.x max DD not separately measured
 const PAPER_TRADING_MODE       = true;   // Banner flag — flip to false after Alpaca live
@@ -1347,7 +1353,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.1 HYBRID LAUNCH 2026-06-09 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.3 ENTRY OVERHAUL 2026-06-28 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1355,7 +1361,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.2.1 HYBRID · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 2.72 · BROKER-ENFORCED STOPS</div>
+      <div class="brand-sub">V2.2.3 ENTRY OVERHAUL · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · 3-DAY ARM + SHORTS COOLDOWN</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1379,7 +1385,7 @@ ${PAPER_TRADING_MODE ? `
     <div class="msg">
       <strong>SID v${STRATEGY_VERSION} is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
-      V2.2.1 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+      V2.2.3 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
       Performance pie defaults to BACKTEST data until ${LIVE_TRADE_THRESHOLD} live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
@@ -1472,7 +1478,7 @@ ${PAPER_TRADING_MODE ? `
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.2.1 HYBRID · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.3 ENTRY OVERHAUL · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

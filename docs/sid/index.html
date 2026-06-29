@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.2.2 TERMINAL</title>
+<title>SID // v2.2.3 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -817,15 +817,15 @@
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.1 HYBRID LAUNCH 2026-06-09 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.3 ENTRY OVERHAUL 2026-06-28 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.2.2 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2.2.1 HYBRID · 71.3% BACKTEST WR · PF 2.72 · BROKER-ENFORCED STOPS</div>
+      <div class="brand">SID // v2.2.3 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.2.3 ENTRY OVERHAUL · 73.9% BACKTEST WR · PF 3.19 · 3-DAY ARM + SHORTS COOLDOWN</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -838,7 +838,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 13:46:12</span>
+        <span>SYS · 00:45:33</span>
       </div>
     </div>
   </header>
@@ -847,9 +847,9 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.2.2 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.2.3 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
-      V2.2.1 backtest results (71.3% WR, 303 trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+      V2.2.3 backtest results (73.9% WR, 280 trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
       Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
@@ -866,7 +866,7 @@
     <div class="stat-tile" style="--accent:var(--magenta)">
       <div class="stat-label">TRADES</div>
       <div class="stat-value">
-        <span class="perf-only-backtest">303</span>
+        <span class="perf-only-backtest">280</span>
         <span class="perf-only-live">4</span>
       </div>
       <div class="stat-sub">
@@ -878,7 +878,7 @@
     <div class="stat-tile" style="--accent:var(--green)">
       <div class="stat-label">WIN RATE</div>
       <div class="stat-value">
-        <span class="perf-only-backtest">71.3%</span>
+        <span class="perf-only-backtest">73.9%</span>
         <span class="perf-only-live">25.0%</span>
       </div>
       <div class="stat-sub">
@@ -890,7 +890,7 @@
     <div class="stat-tile" style="--accent:var(--green)">
       <div class="stat-label">NET P&L</div>
       <div class="stat-value">
-        <span class="perf-only-backtest">+$29,528</span>
+        <span class="perf-only-backtest">+$31,426</span>
         <span class="perf-only-live">-$208.75</span>
       </div>
       <div class="stat-sub">
@@ -916,14 +916,14 @@
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(16)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(17)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-06-28 13:46:12 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-06-29 00:45:33 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -965,7 +965,7 @@
         <span>QTY <strong>4</strong></span>
         <span>RISK <strong>$43.12</strong></span>
         <span>TO STOP <strong>6.3%</strong></span>
-        <span>DAYS <strong>2</strong></span>
+        <span>DAYS <strong>3</strong></span>
         <span>OPEN <strong>2026-06-26</strong></span>
       </div>
     </div><div class="position-card">
@@ -982,7 +982,7 @@
       <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
         <defs>
           <linearGradient id="grad-c95dc605-4b56-47c3-bd84-be5265e9405b" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="25%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="25%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="100%" stop-color="#39ff14" stop-opacity="0.05"/>
+            <stop offset="0%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="-50%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="-50%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="100%" stop-color="#39ff14" stop-opacity="0.05"/>
           </linearGradient>
         </defs>
         <!-- background band showing profit / loss zones -->
@@ -993,23 +993,23 @@
         <line x1="12" y1="18" x2="12" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
         <text x="12" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
         <!-- entry marker -->
-        <line x1="76" y1="16" x2="76" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="76" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
+        <line x1="-116" y1="16" x2="-116" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
+        <text x="-116" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
         <!-- current price pulsing dot -->
-        <circle cx="208.81718171899226" cy="28" r="5" fill="#39ff14" style="filter: drop-shadow(0 0 6px #39ff14)">
+        <circle cx="268" cy="28" r="5" fill="#39ff14" style="filter: drop-shadow(0 0 6px #39ff14)">
           <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
         </circle>
-        <text x="208.81718171899226" y="18" text-anchor="middle" font-size="9" fill="#39ff14" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #39ff14)">$44.29</text>
+        <text x="268" y="18" text-anchor="middle" font-size="9" fill="#39ff14" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #39ff14)">$44.29</text>
       </svg>
       <div class="pos-meta">
         <span>ENTRY <strong>$41.40</strong></span>
-        <span>STOP <strong>$40.00</strong></span>
+        <span>STOP <strong>$41.41</strong></span>
         <span title="Snapshot from last scanner run (3×/day) — may lag real-time. Compare against your broker for live P&amp;L.">SNAPSHOT <strong>$44.29</strong></span>
         
         <span>QTY <strong>23</strong></span>
         <span>RISK <strong>$32.09</strong></span>
-        <span>TO STOP <strong>9.7%</strong></span>
-        <span>DAYS <strong>16</strong></span>
+        <span>TO STOP <strong>6.5%</strong></span>
+        <span>DAYS <strong>17</strong></span>
         <span>OPEN <strong>2026-06-12</strong></span>
       </div>
     </div></div>
@@ -1212,16 +1212,16 @@
           <div class="perf-only-backtest">
             <div class="donut-wrap">
               <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    <path d="M 110 22 A 88 88 0 1 1 24.383755380913513 130.34351634611735 L 56.917928336166376 122.61298013459276 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 24.383755380913513 130.34351634611735 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 56.917928336166376 122.61298013459276 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
+    <path d="M 110 22 A 88 88 0 1 1 22.199330995911865 115.9196724938595 L 55.56358521746535 113.67019694619289 A 54.56 54.56 0 1 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 22.199330995911865 115.9196724938595 A 88 88 0 0 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 0 0 55.56358521746535 113.67019694619289 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
     <circle cx="110" cy="110" r="52.56" fill="#000"/>
-    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">71.3%</text>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">73.9%</text>
     <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">BACKTEST WR</text>
   </svg>
               <div class="donut-legend">
-                <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">216</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">87</span></div>
+                <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">207</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">73</span></div>
               </div>
             </div>
-            <div class="perf-note">V2.2.1 HYBRID · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.3 ENTRY OVERHAUL · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
@@ -1909,7 +1909,7 @@
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (16)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (17)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1917,6 +1917,13 @@
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-06-28</span>
+        <span class="update-cat" style="color:#ffaa00;border-color:#ffaa00">RELEASE</span>
+      </div>
+      <div class="update-title">V2.2.3 ENTRY OVERHAUL — bot entry realigned to the validated backtest + shorts-only re-arm cooldown</div>
+      <div class="update-summary">The live bot's entry had silently drifted loose from the validated strategy: it had NO arm timeout, NO RSI(3) confirmation, and NO weekly-SMA arm gate — so it was taking stale, low-quality signals the backtest never measured (caught via a live ADBE long entered 6 trading days after its oversold signal, after price had already slid $233-&gt;$202). A bot-parity backtest quantified the drift: the loose live model ran at 66.1% WR / PF 1.91 vs the validated 71.0% / PF 2.69. The fix restores all three gates AND adds an Alan refinement found by sweep: a SHORTS-ONLY 5-day re-arm cooldown (longs re-arm freely to catch bullish V-shaped recoveries; shorts wait out the recovery so they don't re-fire low-quality counter-trend repeats). The short cooldown has a clean optimum at 5 days (short WR 62.9% -&gt; 72.3%; falls off at 3 and 7). Final config: 3-day arm timeout + RSI(3) + weekly SMA50/200 gate + free-rearm longs / shorts-only 5-day cooldown = 280 trades, 73.9% WR, PF 3.19, +$31,426 — Pareto-dominates v2.2.1 (+$2,091, +0.50 PF, +2.9pp WR) with the short side cleaned up. detectEntrySignal was rewritten as a faithful bar-by-bar replay of the validated arm machine; the scan data fetch was bumped 2y-&gt;5y so the weekly-SMA gate (needs ~200 weekly bars) actually applies live. Verified: reproduces the backtest's entries exactly (GOOG, AAPL), and the stale ADBE entry no longer fires. Exit logic (v2.2.1 hybrid TP1/TP2, broker stops) and the v2.2.2 MANUAL-WATCH flag are unchanged. Full investigation: SID/strategy-test-vault/bot-parity-experiment/.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-06-13</span>
         <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
@@ -2034,10 +2041,10 @@
 
   <!-- DISCLAIMER -->
   <div class="disclaimer">
-    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 71.3% win rate is from a 5-year simulated backtest (303 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
+    <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.2.2 // PRIVATE TERMINAL // GENERATED 2026-06-28 13:46:12 UTC</footer>
+  <footer>SID v2.2.3 // PRIVATE TERMINAL // GENERATED 2026-06-29 00:45:33 UTC</footer>
 
 </div>
 

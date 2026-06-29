@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-06-28",
+    "category": "release",
+    "title": "V2.2.3 ENTRY OVERHAUL — bot entry realigned to the validated backtest + shorts-only re-arm cooldown",
+    "summary": "The live bot's entry had silently drifted loose from the validated strategy: it had NO arm timeout, NO RSI(3) confirmation, and NO weekly-SMA arm gate — so it was taking stale, low-quality signals the backtest never measured (caught via a live ADBE long entered 6 trading days after its oversold signal, after price had already slid $233->$202). A bot-parity backtest quantified the drift: the loose live model ran at 66.1% WR / PF 1.91 vs the validated 71.0% / PF 2.69. The fix restores all three gates AND adds an Alan refinement found by sweep: a SHORTS-ONLY 5-day re-arm cooldown (longs re-arm freely to catch bullish V-shaped recoveries; shorts wait out the recovery so they don't re-fire low-quality counter-trend repeats). The short cooldown has a clean optimum at 5 days (short WR 62.9% -> 72.3%; falls off at 3 and 7). Final config: 3-day arm timeout + RSI(3) + weekly SMA50/200 gate + free-rearm longs / shorts-only 5-day cooldown = 280 trades, 73.9% WR, PF 3.19, +$31,426 — Pareto-dominates v2.2.1 (+$2,091, +0.50 PF, +2.9pp WR) with the short side cleaned up. detectEntrySignal was rewritten as a faithful bar-by-bar replay of the validated arm machine; the scan data fetch was bumped 2y->5y so the weekly-SMA gate (needs ~200 weekly bars) actually applies live. Verified: reproduces the backtest's entries exactly (GOOG, AAPL), and the stale ADBE entry no longer fires. Exit logic (v2.2.1 hybrid TP1/TP2, broker stops) and the v2.2.2 MANUAL-WATCH flag are unchanged. Full investigation: SID/strategy-test-vault/bot-parity-experiment/."
+  },
+  {
     "date": "2026-06-13",
     "category": "infra",
     "title": "MANUAL-WATCH flag (v2.2.2) — bullish-asset short runners flagged for S/R review",
