@@ -479,6 +479,31 @@ Never call `pine_new` to "recover" — it's only for genuinely creating a brand-
 
 If duplicates are already in the account, the TV MCP has no `pine_delete` tool — the user must manually right-click each duplicate in their saved-scripts list and Delete. Apologise and explain rather than leaving them.
 
+### Pitfall: saving a BRAND-NEW (untitled) script needs the "Save script" name dialog confirmed
+
+Earned 2026-06-29 pushing SID v2.2.3 into an untitled tab the user left open for me.
+The runbook's Step 5 says `pine_smart_compile` "persists the script in one call" —
+that's true for an ALREADY-NAMED script (it Ctrl+S in place). For an **untitled**
+script it is NOT: the Save click opens a modal **"Save script"** dialog with a name
+field (pre-filled from the `strategy()` / `indicator()` title) and Cancel / Save
+buttons. The compile returns `has_errors:false` but the script is **not actually
+saved** until you confirm the dialog. Press Enter (`ui_keyboard {key:"Enter"}`) or
+click the dialog's Save — the pre-filled name (e.g. "SID Strategy v2.2.3") is what
+you want, so Enter is safest.
+
+**Verification gotcha:** `pine_list_scripts` reads an `internal_api` cache that can
+LAG — right after the save it still showed the old 14-script list with no v2.2.3.
+The reliable confirmations are: (a) the **editor tab title** flips from "Untitled
+script" to the saved name (screenshot), (b) `chart_get_state` shows the study in
+`studies` after the Add-to-chart step, and (c) `data_get_pine_tables
+{study_filter:"<name>"}` returns the info table. Don't trust `pine_list_scripts`
+alone immediately post-save.
+
+**Add-to-chart is a SEPARATE action:** `pine_smart_compile` returns
+`study_added:false` for a fresh script — saving ≠ adding to chart. Click the editor's
+**Add to chart** button (locate via `ui_find_element {query:"Add", strategy:"text"}`
+→ take the button rect → `ui_mouse_click` at its centre) to render it on the chart.
+
 ### Pitfall: `barstate.islast` doesn't always fire on 1D charts — broaden the gate
 
 Confirmed 2026-05-22 on UNH 1D chart. The SID v2.1 info table was rendering on 4h but NOT on 1D, despite:
