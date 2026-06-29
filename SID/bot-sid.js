@@ -72,8 +72,59 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2.1'; // V2.2.1 HYBRID: shorts use intraday-touch RSI-50 TP1, longs revert to v2.1 close-based TP1, both keep broker-enforced GTC stops + internal-ledger compounding (paper trading, 2026-06-09)
+const BOT_VERSION = 'v2.2.3'; // V2.2.3 ENTRY OVERHAUL: detectEntrySignal rewritten as a bounded bar-by-bar arm replay of the validated backtest — 3-day arm timeout + RSI(3) confirm + weekly SMA50/200 arm gate + free-rearm longs / shorts-only 5-day re-arm cooldown. EXITS UNCHANGED from v2.2.1 HYBRID. Backtest 280 trades / 73.9% WR / PF 3.19 / +$31,426 (tier1, 5y, $200 fixed) (paper trading, 2026-06-28)
 // Version history:
+//   v2.2.3 V2.2.3 ENTRY OVERHAUL (2026-06-28, paper trading):
+//        - detectEntrySignal rewritten from a loose one-shot "episode scan"
+//          (no arm timeout / no RSI(3) confirm / no weekly-SMA gate — it fired
+//          stale signals like a UNH/ADBE long entered days after its oversold
+//          signal) into a BOUNDED BAR-BY-BAR REPLAY of the validated backtest's
+//          arm/trigger/cooldown state machine. Replays the trailing
+//          CONFIG.armReplayBars (default 40) bars from clean state and returns a
+//          signal ONLY if a trigger fires on the final (today's) bar.
+//        - Restores the three missing entry gates: 3-day arm timeout, RSI(3)
+//          rebound confirmation, weekly SMA50/200 arm gate. Adds an Alan
+//          refinement from a cooldown sweep — FREE-REARM longs (catch bullish
+//          V-shaped recoveries) but a SHORTS-ONLY 5-DAY re-arm cooldown (wait out
+//          the recovery so shorts don't re-fire low-quality counter-trend
+//          repeats; clean optimum at 5d — short WR 62.9%→72.3%).
+//        - New CONFIG knobs (env-overridable): armTimeoutDays=3,
+//          rearmCooldownLong=0, rearmCooldownShort=5, armReplayBars=40. intEnv()
+//          helper preserves a legitimate 0 (rearmCooldownLong).
+//        - The scan data fetch was bumped 2y→5y so the weekly-SMA gate (needs
+//          ~200 weekly bars) actually applies live.
+//        - EXITS UNCHANGED — still the v2.2.1 HYBRID model (close-based long TP1,
+//          intraday-touch short TP1, broker GTC stops). Only the ENTRY changed.
+//        - Backtest (SID/backtest-sid-bot-parity.py, tier1, 5y, $200 fixed risk):
+//            280 trades, 73.9% WR, PF 3.19, +$31,426 — Pareto-dominates v2.2.1
+//            (+$2,091 / +0.50 PF / +2.9pp WR). Investigation + reference entries
+//            CSV: SID/strategy-test-vault/bot-parity-experiment/.
+//   v2.2.2 V2.2.2 MANUAL-WATCH FLAG (2026-06-13, paper trading):
+//        - Monitoring aid ONLY — no trade-logic change. The bot now flags any
+//          open SHORT on a long-term-bullish asset (price > 200-day SMA AND
+//          50-day SMA > 200-day SMA) for manual S/R review, because on bullish
+//          names the mechanical TP2 has a blind spot (RSI rarely reaches daily
+//          oversold before the bounce; the SMA exit can round-trip to BE).
+//        - Surfaces three ways: a dashboard WATCH badge, a ⚠ MANUAL-WATCH bot-log
+//          line, and a consolidated Telegram reminder each run. TP1 still banks
+//          mechanically; only the runner half needs the eye. Helper:
+//          longTermBullish() in bot-sid.js. Trade logic + backtest identical to
+//          v2.2.1.
+//   v2.2.1 V2.2.1 HYBRID (2026-06-09, paper trading):
+//        - Side-asymmetric TP1. Per-side decomposition of v2.2 showed shorts
+//          strictly benefit from intraday-touch (+WR AND +PnL — the bullish drift
+//          of US equities punishes shorts that round-trip through 50), but longs
+//          LOSE PnL under pure v2.2 because the bullish drift WORKS FOR longs
+//          (letting price CLOSE past 50 books a bigger TP1 partial).
+//          • LONGS  → revert to v2.1 close-based TP1 (RSI(14) ≥ 50 on daily close).
+//          • SHORTS → keep v2.2 intraday-touch TP1 via a resting GTC limit at the
+//            solved RSI-50 target price (SID/rsi-target-price.js).
+//          Both sides keep the broker-enforced GTC stop on Alpaca from entry.
+//        - Sizing compounds off an internal sid-account.json ledger rather than
+//          Alpaca paper equity. Pine sister: SID/pine/sid-strategy-v2.2.1-hybrid.pine.
+//        - Backtest: 303 trades, 71.3% WR, PF 2.72, +$29,528 — Pareto-dominates
+//          v2.1 on every metric (+1.7pp WR / +0.10 PF / +$211 PnL / same trades).
+//          Vault: SID/strategy-test-vault/v2.2.1-hybrid-shorts-intraday/.
 //   v1.0 initial RSI(14) + MACD(12,26,9), daily, US stocks/ETFs
 //   v1.1 15-min intraday entry confirmation
 //   v1.2 instructor-aligned: sticky RSI signal, MACD direction-align entry

@@ -14,7 +14,7 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 
 | Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
 |----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
-| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.1) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
+| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.2.3) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
 | **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 | **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |

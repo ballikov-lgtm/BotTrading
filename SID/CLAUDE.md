@@ -12,9 +12,9 @@ There are TWO `SID/` folders on disk and they are NOT the same:
 | Path | What it is | git branch | Use? |
 |---|---|---|---|
 | `Trading Setup/SID/` (parent) | **Stale snapshot** — older v1.0 code | `claude/silly-robinson-abcf6c` | ❌ **DO NOT EDIT.** Anything here is out of date. |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — current v2.1 deployment | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
+| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — current v2.2.3 deployment | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
 
-**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (currently **v2.1** — dynamic TP1+TP2) is in the worktree's `bot-sid.js`. Entry rules are validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; V2.1 exits validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
+**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (currently **v2.2.3** — entry overhaul: bar-by-bar arm replay, EXITS still the v2.2.1 HYBRID model) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
 
 **Rule of thumb before editing anything:**
 1. Run `git status` to confirm which branch you're on.
@@ -173,7 +173,7 @@ The following live in the parent `Trading Setup/` folder and are shared with Iro
 
 These are the gotchas paid for in past sessions. Read them before starting work on SID — they save you hours.
 
-### detectEntrySignal rewritten to a bar-by-bar arm replay (2026-06-29) — NOT YET PUSHED
+### detectEntrySignal rewritten to a bar-by-bar arm replay (2026-06-29) — MERGED TO MAIN (commit 48579f7e)
 The live bot's `detectEntrySignal` was a one-shot "episode scan" (find most-recent
 RSI-cross-into-extreme, then check today for RSI+MACD alignment). It had **NO arm
 timeout, NO RSI(3) confirmation, NO weekly-SMA arm gate** — far looser than the
@@ -181,7 +181,7 @@ validated strategy. Concretely it would still fire ADBE's 2026-06-17 oversold
 signal as a 2026-06-26 entry (9 calendar days later) because the episode never
 expired. That stale ADBE long is the live position the rewrite fixes.
 
-**What changed (working-tree only — review pending, do NOT assume pushed):**
+**What changed (SHIPPED — merged to main commit 48579f7e, merge cf972f64):**
 - Replaced `detectEntrySignal(candles)` with a **bounded bar-by-bar replay** of
   the backtest's arm/trigger/cooldown state machine. It replays the trailing
   `CONFIG.armReplayBars` (default 40) bars from clean state and returns a signal
@@ -239,11 +239,12 @@ calls detectEntrySignal only when flat). Confirmed ADBE no longer fires on 2026-
    but DON'T — the caller's hard-skip on the trigger bar is the agreed design and the
    net entry-set delta is negligible (an earnings-blocked trigger is skipped anyway).
 
-**Queued:** user to review the diff + run the full parity backtest before shipping.
-On ship: bump version (entry-rule change → at least v2.2.2→v2.3 or v2.2.x per the
-versioning rule), update SID-README Version History + dashboard Updates tab (entry
-logic changed — this is a public-docs-follow-the-code revision), and move any
-rejected cooldown variants (rearmcd5, L0S3, L0S7) into the vault index.
+**SHIPPED (2026-06-28):** version bumped to **v2.2.3** (entry-rule change per the
+versioning rule). SID-README "Current version" line + Version History row updated,
+dashboard (`docs/sid/index.html` + `sid-dashboard.js` STRATEGY_VERSION='2.2.3',
+headline 73.9 / 280 / +$31,426) updated, and the TradingView Pine visualiser pushed
++ saved as "SID Strategy v2.2.3" (`SID/pine/sid-strategy-v2.2.3.pine`). Rejected
+cooldown variants (rearmcd5, L0S3, L0S7) live in `strategy-test-vault/bot-parity-experiment/`.
 
 ### V2.1 backtest warmup bug (2026-05-18)
 The V2.1 backtest's `main()` initially downloaded only 5y of price data. Wilder RSI and weekly resamples weren't fully converged at the start of the trade window, silently rejecting **~75% of ARM/TRIGGER signals** in years 1-3.
