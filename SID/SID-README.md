@@ -293,4 +293,5 @@ BitGet offers a small number of US stock CFDs (AAPL, TSLA, MSFT, NVDA, GOOGL, ME
 | `open-positions-sid.json` | Active positions being monitored |
 | `closed-positions-sid.json` | Closed positions with realized P&L |
 | `SID-README.md` | This file |
+| `SID-DEPLOY-PROMPT.md` | **Deploy your own (guided)** — paste into a fresh Claude session for a step-by-step, pause-after-each-step first-run setup (Alpaca PAPER + GitHub Actions + dashboard) |
 | `research/SID/` | Original strategy source images |
