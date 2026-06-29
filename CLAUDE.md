@@ -153,6 +153,20 @@ Always: `git fetch origin main` → `git pull --rebase --autostash origin main` 
 
 **Never push to `main` without explicit user approval.** The auto-mode classifier blocks silent pushes.
 
+### Git credential hygiene — never embed a PAT in the remote URL
+Fixed 2026-06-29. The `origin` URL had a classic PAT (`bot-push`, repo+workflow, **no expiry**) embedded in plaintext (`https://<token>@github.com/...`). It lived in `.git/config` — not committed, so never leaked to the repo, but readable by anything with disk access.
+
+**Correct setup (now in place on Alan's machine):** clean remote URL + **Git Credential Manager**, which is already the active helper system-wide (`C:/Program Files/Git/etc/gitconfig`, `credential.helper=manager`). GCM reads a stored GitHub credential from Windows Credential Manager and authenticates pushes silently — interactive AND non-interactive. The migration was just: `git remote set-url origin https://github.com/ballikov-lgtm/BotTrading.git` (no helper config needed — GCM was already system-wide).
+- **Never re-embed a token in a remote URL.** If auth breaks, the next push pops a one-time GCM sign-in; complete it once and it re-saves.
+- `cmdkey /list` can show NOTHING from a sandboxed shell even when credentials exist — shell-context limitation, not an empty vault. Verify from a normal terminal (`cmdkey /list | findstr github`) or the Credential Manager GUI.
+- The `bot-push` PAT is **pending rotation** (no expiry). Rotating invalidates the GCM-stored copy too → next push re-prompts (expected). Check Railway (`GITHUB_TOKEN`) / other machines for the same token BEFORE regenerating. (Cross-session note: user-memory `reference-git-credential-setup`.)
+
+### OneDrive stale `.git/config.lock` blocks config writes
+Sister issue to the stale `rebase-merge` dir. OneDrive can leave a stale `.git/config.lock` (repo root is `Trading Setup/.git`) that makes `git config` / `git remote set-url` fail with `could not lock config file ... File exists` — even when **no git.exe is running** (check `tasklist | grep -i git.exe`). If no git process is active, the lock is stale: `rm -f .git/config.lock` and retry. Seen 2026-06-29 with a 3-week-old lock.
+
+### Stash hygiene — `pull --rebase --autostash` accumulates leftover stashes
+When `git pull --rebase --autostash` re-applies its autostash and the dirty working-tree files (bot-state JSON/CSV) conflict with the incoming cloud commits, git **keeps the autostash as a leftover stash** and leaves `UU` conflict markers. Resolution: bot-state files are **cloud-authoritative** — `git restore --source=HEAD --worktree <state files>` (take origin's version), never push local state over the cloud's. These autostashes pile up over time (9 found on 2026-06-29). Safe-prune method: a guarded loop that drops a stash ONLY if it's labelled `autostash` AND contains no source/other-strategy files (`grep -qiE 'bot-sid\.js|alpaca-executor|\.pine|ironclad|maven|rules-'`) — so it physically can't nuke real uncommitted work or another strategy's WIP. Keep any stash with source or another strategy's files for review.
+
 ### Worktree vs parent folder (SID-specific but symptomatic of the pattern)
 The SID worktree lives at `.claude/worktrees/silly-robinson-abcf6c/SID/`. The parent `Trading Setup/SID/` folder is a stale snapshot. **Run `git worktree list` from the repo root to verify which paths are live.**
 
