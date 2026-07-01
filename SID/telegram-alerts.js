@@ -149,6 +149,46 @@ export async function alertManualWatch({ positions = [], mode } = {}) {
   return sendMessage(msg);
 }
 
+/**
+ * SHORT APPROVAL GATE alert (v2.2.4). Fired when a mechanical SHORT signal on a
+ * long-term-bullish asset is DETECTED but NOT auto-executed — Alan approves it
+ * manually (firing it into the right supply zone) via the manual one-shot flow.
+ *
+ * This is a live execution-discipline overlay, NOT a change to the signal logic
+ * (RSI 30/70, MACD alignment, RSI-50 exit are all untouched). The v2.2.x
+ * backtests still fire these shorts mechanically; the gate only affects what the
+ * LIVE bot auto-executes.
+ *
+ * @param {Object} p
+ * @param {string} p.symbol
+ * @param {string} p.signalDate  — the arm/signal date (YYYY-MM-DD)
+ * @param {number} p.currentPrice — proposed mechanical entry (today's close)
+ * @param {number} p.proposedEntry — same as the bot's would-be entry
+ * @param {number} p.proposedStop  — the bot's computed stop (ceil of arm high)
+ * @param {number} [p.shares]      — the size the bot WOULD have taken (informational)
+ * @param {string} [p.reason]      — the detector's reason string
+ * @param {string} [p.mode]
+ */
+export async function alertShortApprovalNeeded({ symbol, signalDate, currentPrice, proposedEntry, proposedStop, shares, reason, mode }) {
+  const modeTag = formatModeTag(mode);
+  const msg = [
+    `⏸️ <b>SID SHORT — APPROVAL REQUIRED</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> SHORT on a long-term-bullish asset was <b>NOT auto-fired</b>.`,
+    `Bullish-asset shorts now need your approval — fire it manually when the level is right (e.g. into the supply zone above), not mechanically below it.`,
+    ``,
+    `Signal date:  ${escape(signalDate || '—')}`,
+    `Current price: $${Number(currentPrice)?.toFixed(2)}`,
+    `Proposed entry: $${Number(proposedEntry)?.toFixed(2)}   Stop: $${Number(proposedStop)?.toFixed(2)}`,
+    shares != null ? `Would-be size: ${shares} sh` : '',
+    reason ? `\n<i>${escape(reason)}</i>` : '',
+    ``,
+    `Approve by firing it yourself via the manual one-shot:`,
+    `<code>gh workflow run sid-manual-trade.yml -f ticker=${escape(symbol)} -f side=short -f shares=N -f tp1_price=RSI50_TARGET -f sl_price=STOP</code>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
 // ── Internals ───────────────────────────────────────────────────────────
 
 function formatModeTag(mode) {

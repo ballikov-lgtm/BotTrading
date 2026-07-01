@@ -29,7 +29,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.2.3';
+const STRATEGY_VERSION = '2.2.4';
+// v2.2.4 (2026-07-01) = SHORT APPROVAL GATE. A LIVE execution-discipline overlay,
+// NOT a signal-logic change: a mechanical SHORT on a long-term-bullish asset
+// (price>SMA200 AND SMA50>SMA200) is no longer auto-fired — it is logged +
+// Telegram-alerted for Alan to fire manually into the right level (e.g. a supply
+// zone) via the manual one-shot flow. Motivated by UNH auto-shorting at $416.52
+// on 2026-06-30, far below its 439-440 supply zone (v2.2.2's MANUAL-WATCH flag
+// only flagged it post-entry; this gates it pre-entry). NO canon rule changed
+// (RSI 30/70, MACD alignment, RSI-50 exit untouched). The HEADLINE backtest below
+// is UNCHANGED — the v2.2.x backtests still fire these shorts mechanically, so
+// LIVE performance will deliberately diverge from the pure backtest on this
+// subset. Toggle: SID_SHORT_APPROVAL_GATE=false. Details below carried from —
 // v2.2.3 (2026-06-28) = ENTRY OVERHAUL. Brought the live bot's entry back into
 // line with the validated backtest (it had drifted loose) + an Alan refinement:
 //   - 3-day arm timeout (was none — bot took stale signals like the ADBE entry
@@ -1353,7 +1364,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.3 ENTRY OVERHAUL 2026-06-28 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.4 SHORT APPROVAL GATE 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1361,7 +1372,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.2.3 ENTRY OVERHAUL · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · 3-DAY ARM + SHORTS COOLDOWN</div>
+      <div class="brand-sub">V2.2.4 SHORT APPROVAL GATE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · BULLISH-ASSET SHORTS NEED APPROVAL</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1385,7 +1396,7 @@ ${PAPER_TRADING_MODE ? `
     <div class="msg">
       <strong>SID v${STRATEGY_VERSION} is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
-      V2.2.3 backtest results (${HEADLINE_BACKTEST_WR}% WR, ${HEADLINE_BACKTEST_TRADES} trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y backtest comes from a simulated run; live performance will differ. Note (v2.2.4): the backtest still fires bullish-asset shorts mechanically, but LIVE now GATES them for manual approval (a discipline overlay, not a rule change) — so live results deliberately diverge from the pure backtest on that subset.
       Performance pie defaults to BACKTEST data until ${LIVE_TRADE_THRESHOLD} live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
@@ -1478,7 +1489,7 @@ ${PAPER_TRADING_MODE ? `
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.2.3 ENTRY OVERHAUL · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.4 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

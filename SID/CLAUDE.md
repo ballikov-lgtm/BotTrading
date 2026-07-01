@@ -334,6 +334,84 @@ The bot flags any open SHORT on a long-term-bullish asset for manual S/R review.
 - **Validation:** flags GOOG ✓ and UNH ✓ (both bullish-asset shorts — UNH was
   the −$691 loss), correctly skips PYPL (a long, downtrend name).
 
+### SHORT APPROVAL GATE — bullish-asset shorts need manual approval (v2.2.4, 2026-07-01)
+v2.2.2's MANUAL-WATCH flag only FLAGGED bullish-asset shorts for post-TP1 runner
+review — it did NOT block entry. Consequence: UNH auto-shorted at $416.52 (opened
+2026-06-30 16:37 UTC, stamped SID v2.2.3, `manual_watch=true`), far below the
+439-440 supply zone Alan wanted. Alan decided bullish-asset shorts should no
+longer auto-fire.
+
+**What changed (WORKING TREE, not yet committed as of this write-up):**
+- `bot-sid.js`:
+  - New `CONFIG.shortApprovalGate` (env `SID_SHORT_APPROVAL_GATE`, default ON /
+    `!== 'false'`).
+  - New gate in `run()`, placed AFTER the AUTO/HUMAN tier routing and BEFORE
+    sizing/earnings/PPI/VIX. When the signal is a SHORT and
+    `longTermBullish(candles).bullish` is true, the bot does NOT size/execute —
+    it logs a `short_approval_required` entry to `sid-log.json` and fires
+    `tg.alertShortApprovalNeeded(...)`, then `continue`s. `candles` is the 5y
+    scan fetch already in scope; `longTermBullish` reuses the existing daily
+    proxy (`price>SMA200 AND SMA50>SMA200`).
+  - `BOT_VERSION` → `v2.2.4` + version-history comment block.
+- `telegram-alerts.js`: new `alertShortApprovalNeeded({symbol, signalDate,
+  currentPrice, proposedEntry, proposedStop, shares, reason, mode})`.
+- Dashboard (`sid-dashboard.js`): `STRATEGY_VERSION='2.2.4'`; banner / brand-sub /
+  perf-note markers bumped; beta-banner now states the live-vs-backtest
+  divergence. HEADLINE_* consts UNCHANGED (see divergence note). New Updates-tab
+  entry at the top of `SID/strategy-updates.json` (category `fix`). Regenerated
+  `docs/sid/index.html` locally to verify (18 updates, v2.2.4 markers present).
+- `SID-README.md`: Current-version line + a new v2.2.4 Version History row.
+
+**Alan approves + fires manually** via the EXISTING manual one-shot flow —
+`SID/manual-trade.js` + `sid-manual-trade.yml` already accept an arbitrary
+`ticker/side/shares/tp1_price/sl_price/note`, so a discretionary UNH short into
+the 439-440 zone is fully supported with NO code change (side=short, tp1_price=
+the RSI-50 target or a discretionary limit, sl_price=stop). No auto-fire, no
+reply-to-approve infra for v1.
+
+**⚠ BACKTEST DIVERGENCE (say this to anyone comparing live to backtest):** the
+v2.2.3 backtest (280 trades / 73.9% WR / PF 3.19 / +$31,426, tier1 5y $200 fixed)
+INCLUDES these bullish-asset shorts firing MECHANICALLY. Gating them is a LIVE
+execution-discipline overlay, NOT a signal-logic change — no canon rule is
+touched (RSI 30/70, MACD alignment, RSI-50 exit all untouched). So the headline
+backtest numbers are deliberately UNCHANGED, and LIVE performance will diverge
+from the pure backtest on the bullish-asset-short subset. Documented in
+README + dashboard + this file so followers don't misread the difference. Revert
+with `SID_SHORT_APPROVAL_GATE=false` (restores fully-mechanical bullish-asset
+shorts = pure-backtest behaviour).
+
+**Pine:** the v2.2.1 visualiser already distinguishes green=mechanical /
+amber=manual-watch (since v2.2.1). No urgent Pine change — the amber flag now
+corresponds to "approval-required, not auto-fired." (Update the Pine legend text
+next time it's pushed.)
+
+### One-shot UNH close tool (built 2026-07-01, NOT run)
+Built to flatten the open UNH short (id d9bca959-…, 2 sh, entry 416.52, broker
+stop cf53c7ad-…, paper) on Alan's approval:
+- `SID/manual-close.js` — env-driven (`CLOSE_POS_ID` / `CLOSE_SYMBOL` /
+  `CLOSE_STOP_ORDER_ID` / `CLOSE_REASON`), same `resolveTradingMode()` gating +
+  market-hours guard + dry_run default as `manual-trade.js`. When run
+  (paper/live): cancels the broker stop, sweeps any lingering open orders on the
+  symbol, submits a market cover (`buy` for a short), polls for fill, then
+  reconciles state — removes from `open-positions-sid.json`, appends to
+  `closed-positions-sid.json` (+ v2.0-compat dashboard fields), appends to
+  `trades-sid.csv`, updates `sid-account.json`, writes a `manual_close`
+  `sid-log.json` entry, and Telegram-confirms. Aborts safely (no Alpaca call, no
+  state change) if the position isn't found locally — will NOT blind-flatten the
+  symbol.
+- `.github/workflows/sid-oneshot-close-unh-2026-07-01.yml` — `workflow_dispatch`
+  ONLY (no cron → can't self-fire), year-guarded, `contents: write` so it commits
+  the reconciled state back to main. Hardcodes the UNH id/symbol/stop.
+- IMPORTANT: the UNH short is NOT in the worktree's local
+  `open-positions-sid.json` (worktree HEAD predates the 2026-06-30 open) — it
+  lives on `origin/main` (cloud state is ahead). So `manual-close.js` MUST run
+  against the current cloud checkout (which the workflow does via
+  `actions/checkout`), where UNH will be present. Verified the resolver against
+  `origin/main`'s state in an isolated copy: correctly targeted UNH by id,
+  computed `BUY 2 UNH @ market`, and dry-ran without touching anything.
+- How Alan fires it: `gh workflow run sid-oneshot-close-unh-2026-07-01.yml`
+  (during US RTH). Delete the workflow file after it fires.
+
 ### Dashboard performance toggle (2026-05-19)
 Donut + WIN RATE/TRADES/NET P&L tiles support BACKTEST ↔ LIVE toggle. Default = BACKTEST until `closed-positions-sid.json` reaches `LIVE_TRADE_THRESHOLD = 10` closed trades, then auto-flips to LIVE. User manual override persists in `localStorage` under `sid-perf-view`.
 

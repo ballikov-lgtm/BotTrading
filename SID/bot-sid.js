@@ -46,6 +46,15 @@ const CONFIG = {
   rearmCooldownLong:  intEnv(process.env.SID_REARM_COOLDOWN_LONG, 0),       // trading-day lockout before a LONG can re-arm after its arm expires unfired (0 = free re-arm)
   rearmCooldownShort: intEnv(process.env.SID_REARM_COOLDOWN_SHORT,5),       // trading-day lockout before a SHORT can re-arm after its arm expires unfired
   armReplayBars:      intEnv(process.env.SID_ARM_REPLAY_BARS,     40),      // how many trailing daily bars to replay the arm machine over (>> 3d arm + 5d cooldown so today's state is fully determined)
+  // ── V2.2.4 SHORT APPROVAL GATE ─────────────────────────────────────────────
+  // Live execution-discipline overlay (NOT a signal-logic change). When ON
+  // (default), a mechanical SHORT signal on a long-term-bullish asset
+  // (longTermBullish(): price>SMA200 AND SMA50>SMA200) is NOT auto-executed —
+  // it is logged + Telegram-alerted for Alan to fire manually at the right level
+  // (e.g. into a supply zone), via the existing manual one-shot flow. Longs and
+  // non-bullish-asset shorts are UNAFFECTED and still auto-fire. Set
+  // SID_SHORT_APPROVAL_GATE=false to revert to fully-mechanical bullish-asset shorts.
+  shortApprovalGate:  process.env.SID_SHORT_APPROVAL_GATE !== 'false',
 };
 
 // ── RSI thresholds (named to match backtest-sid-bot-parity.py constants) ─────
@@ -72,8 +81,39 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2.3'; // V2.2.3 ENTRY OVERHAUL: detectEntrySignal rewritten as a bounded bar-by-bar arm replay of the validated backtest — 3-day arm timeout + RSI(3) confirm + weekly SMA50/200 arm gate + free-rearm longs / shorts-only 5-day re-arm cooldown. EXITS UNCHANGED from v2.2.1 HYBRID. Backtest 280 trades / 73.9% WR / PF 3.19 / +$31,426 (tier1, 5y, $200 fixed) (paper trading, 2026-06-28)
+const BOT_VERSION = 'v2.2.4'; // V2.2.4 SHORT APPROVAL GATE: bullish-asset shorts (price>SMA200 AND SMA50>SMA200) no longer auto-fire — they are logged + Telegram-alerted for manual approval (Alan fires them into the right level via the manual one-shot flow). Live execution-discipline overlay ONLY — no canon rule change (RSI 30/70, MACD alignment, RSI-50 exit untouched). Backtest numbers UNCHANGED (the v2.2.x backtests still fire these shorts mechanically — live now intentionally diverges). Toggle: SID_SHORT_APPROVAL_GATE=false. (paper trading, 2026-07-01)
 // Version history:
+//   v2.2.4 V2.2.4 SHORT APPROVAL GATE (2026-07-01, paper trading):
+//        - PRE-ENTRY discipline overlay. A mechanical SHORT signal on a
+//          long-term-bullish asset (longTermBullish(): daily price>SMA200 AND
+//          SMA50>SMA200) is NO LONGER auto-executed. Instead the bot logs a
+//          `short_approval_required` entry to sid-log.json and sends a
+//          `tg.alertShortApprovalNeeded()` Telegram alert (symbol, signal date,
+//          current price, proposed entry+stop, would-be size, and how to fire it
+//          manually). Alan approves by firing the trade himself at the right
+//          level (e.g. into a supply zone) via the existing manual one-shot flow
+//          (manual-trade.js + sid-manual-trade.yml) — no auto-fire, no
+//          reply-to-approve infra for v1.
+//        - Motivation: v2.2.2's MANUAL-WATCH flag only FLAGGED bullish-asset
+//          shorts for post-TP1 runner review — it did not block entry. So UNH
+//          auto-shorted at $416.52 (2026-06-30) far below its 439-440 supply
+//          zone. This turns that post-entry flag into a pre-entry gate so
+//          discretion is applied BEFORE the position is opened.
+//        - Gated in run() AFTER the AUTO/HUMAN tier routing, BEFORE
+//          sizing/earnings/PPI/VIX — evaluated via longTermBullish(candles) at
+//          signal/entry time. Longs and non-bullish-asset shorts are
+//          UNAFFECTED and still auto-fire.
+//        - NO SIGNAL-LOGIC CHANGE. RSI 30/70 thresholds, RSI+MACD alignment, the
+//          RSI-50 TP1 trigger, the 14-day earnings blackout and the AUTO-tier
+//          80-ticker universe are ALL untouched. The v2.2.x backtests
+//          (280 trades / 73.9% WR / PF 3.19 / +$31,426) INCLUDE these
+//          bullish-asset shorts firing mechanically — gating them is a LIVE
+//          execution-discipline overlay, so LIVE performance will DELIBERATELY
+//          diverge from the pure backtest on this subset. Documented in the
+//          README/dashboard/CLAUDE.md so followers understand live != backtest.
+//        - Toggle: SID_SHORT_APPROVAL_GATE=false reverts to fully-mechanical
+//          bullish-asset shorts (matches the pure backtest). Default ON.
+//        - New CONFIG.shortApprovalGate; new tg.alertShortApprovalNeeded().
 //   v2.2.3 V2.2.3 ENTRY OVERHAUL (2026-06-28, paper trading):
 //        - detectEntrySignal rewritten from a loose one-shot "episode scan"
 //          (no arm timeout / no RSI(3) confirm / no weekly-SMA gate — it fired
@@ -2109,6 +2149,49 @@ async function run() {
         proposed_rsi: signal.rsiAtEntry,
       });
       continue;
+    }
+
+    // ── V2.2.4 SHORT APPROVAL GATE ────────────────────────────────────────
+    // Pre-entry discipline overlay: a mechanical SHORT on a long-term-bullish
+    // asset (price>SMA200 AND SMA50>SMA200) is NOT auto-fired. Instead we log it
+    // + Telegram-alert it as an approval-required candidate, and Alan fires it
+    // himself at the right level (e.g. into a supply zone) via the manual
+    // one-shot flow (manual-trade.js / sid-manual-trade.yml). This does NOT
+    // touch any canon rule (RSI 30/70, MACD alignment, RSI-50 exit) — it only
+    // changes what the LIVE bot auto-executes. The v2.2.x backtests still fire
+    // these shorts mechanically, so live results deliberately diverge from the
+    // pure backtest here. Longs + non-bullish-asset shorts are UNAFFECTED.
+    if (CONFIG.shortApprovalGate && signal.signal === 'short') {
+      const ltb = longTermBullish(candles);
+      if (ltb.bullish) {
+        console.log(`⏸  MANUAL-WATCH SHORT — approval required, not auto-fired (long-term-bullish: price>$${ltb.sma200?.toFixed(2)} SMA200, 50>200). Fire manually into the right level via sid-manual-trade.yml.`);
+        writeLog({
+          kind:            'short_approval_required',
+          symbol,
+          signal:          'short',
+          reason:          'Bullish-asset short gated — awaiting manual approval (SID_SHORT_APPROVAL_GATE)',
+          proposed_entry:  signal.entry,
+          proposed_stop:   signal.stopLoss,
+          proposed_rsi:    signal.rsiAtEntry,
+          signalDate:      signal.signalDate,
+          sma50:           ltb.sma50,
+          sma200:          ltb.sma200,
+          detector_reason: signal.reason,
+        });
+        // Rough would-be size for the alert (informational only — not executed).
+        const wouldBeSizing = calcPositionSize(signal.entry, signal.stopLoss);
+        tg.alertShortApprovalNeeded({
+          symbol,
+          signalDate:    signal.signalDate,
+          currentPrice:  signal.entry,
+          proposedEntry: signal.entry,
+          proposedStop:  signal.stopLoss,
+          shares:        wouldBeSizing?.shares,
+          reason:        signal.reason,
+          mode:          CONFIG.tradingMode,
+        }).catch(() => {});
+        continue; // do NOT size/execute — Alan approves + fires manually
+      }
     }
 
     // Earnings blackout check — critical rule, never bypass

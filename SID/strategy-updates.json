@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-07-01",
+    "category": "fix",
+    "title": "V2.2.4 SHORT APPROVAL GATE — bullish-asset shorts no longer auto-fire; they need your approval",
+    "summary": "v2.2.2's MANUAL-WATCH flag only FLAGGED bullish-asset shorts for post-TP1 runner review — it did not block entry. So on 2026-06-30 UNH auto-shorted at $416.52, far below the 439-440 supply zone we actually wanted. v2.2.4 turns that post-entry flag into a PRE-ENTRY APPROVAL GATE: a mechanical SHORT signal on a long-term-bullish asset (price > 200-day SMA AND 50-day SMA > 200-day SMA) is no longer auto-executed. The bot logs a short_approval_required entry and sends a Telegram alert (symbol, signal date, current price, proposed entry + stop, would-be size) so Alan can fire it manually at the right level — e.g. into a supply zone — via the existing manual one-shot flow (sid-manual-trade.yml / manual-trade.js). No auto-fire, no reply-to-approve infra for v1. IMPORTANT — this is a LIVE execution-discipline overlay, NOT a signal-logic change: RSI 30/70 thresholds, RSI+MACD alignment, the RSI-50 TP1 trigger, the 14-day earnings blackout and the AUTO-tier 80-ticker universe are ALL untouched. The v2.2.3 backtest (280 trades / 73.9% WR / PF 3.19 / +$31,426, tier1 5y $200 fixed) INCLUDES these bullish-asset shorts firing mechanically — so live results will deliberately DIVERGE from the pure backtest on this subset. The headline backtest numbers are unchanged for exactly that reason. Longs and non-bullish-asset shorts are UNAFFECTED and still auto-fire. Toggle: SID_SHORT_APPROVAL_GATE=false reverts to fully-mechanical bullish-asset shorts. The v2.2.1-era Pine visualiser already distinguishes green=mechanical / amber=manual-watch; that amber flag now corresponds to 'approval-required, not auto-fired.' New: CONFIG.shortApprovalGate + tg.alertShortApprovalNeeded() in bot-sid.js/telegram-alerts.js."
+  },
+  {
     "date": "2026-06-28",
     "category": "release",
     "title": "V2.2.3 ENTRY OVERHAUL — bot entry realigned to the validated backtest + shorts-only re-arm cooldown",

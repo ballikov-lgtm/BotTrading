@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.2.3 TERMINAL</title>
+<title>SID // v2.2.4 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -817,15 +817,15 @@
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.3 ENTRY OVERHAUL 2026-06-28 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.4 SHORT APPROVAL GATE 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.2.3 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2.2.3 ENTRY OVERHAUL · 73.9% BACKTEST WR · PF 3.19 · 3-DAY ARM + SHORTS COOLDOWN</div>
+      <div class="brand">SID // v2.2.4 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.2.4 SHORT APPROVAL GATE · 73.9% BACKTEST WR · PF 3.19 · BULLISH-ASSET SHORTS NEED APPROVAL</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -838,7 +838,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 15:38:53</span>
+        <span>SYS · 18:54:51</span>
       </div>
     </div>
   </header>
@@ -847,9 +847,9 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.2.3 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.2.4 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
-      V2.2.3 backtest results (73.9% WR, 280 trades on AUTO tier, 5y) come from a simulated run; live performance will differ.
+The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live performance will differ. Note (v2.2.4): the backtest still fires bullish-asset shorts mechanically, but LIVE now GATES them for manual approval (a discipline overlay, not a rule change) — so live results deliberately diverge from the pure backtest on that subset.
       Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
       <strong>Not financial advice.</strong>
     </div>
@@ -916,21 +916,21 @@
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(17)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(18)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-01 15:38:53 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-01 18:54:51 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
           <span class="pos-symbol">UNH</span>
           <span class="pos-side" style="color:#ff1493;text-shadow:0 0 6px #ff1493">▼ SHORT</span>
           
-          
+          <span class="pos-tag-watch" title="bullish-asset short — plan an S/R exit for the runner after TP1">👁 WATCH · S/R</span>
         </div>
         <div class="pos-pnl" style="color:#ff0044;text-shadow:0 0 8px #ff0044">-1.03%</div>
       </div>
@@ -1244,7 +1244,7 @@
                 <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">207</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">73</span></div>
               </div>
             </div>
-            <div class="perf-note">V2.2.3 ENTRY OVERHAUL · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.4 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
@@ -1932,7 +1932,7 @@
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (17)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (18)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1940,6 +1940,13 @@
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-01</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">V2.2.4 SHORT APPROVAL GATE — bullish-asset shorts no longer auto-fire; they need your approval</div>
+      <div class="update-summary">v2.2.2's MANUAL-WATCH flag only FLAGGED bullish-asset shorts for post-TP1 runner review — it did not block entry. So on 2026-06-30 UNH auto-shorted at $416.52, far below the 439-440 supply zone we actually wanted. v2.2.4 turns that post-entry flag into a PRE-ENTRY APPROVAL GATE: a mechanical SHORT signal on a long-term-bullish asset (price &gt; 200-day SMA AND 50-day SMA &gt; 200-day SMA) is no longer auto-executed. The bot logs a short_approval_required entry and sends a Telegram alert (symbol, signal date, current price, proposed entry + stop, would-be size) so Alan can fire it manually at the right level — e.g. into a supply zone — via the existing manual one-shot flow (sid-manual-trade.yml / manual-trade.js). No auto-fire, no reply-to-approve infra for v1. IMPORTANT — this is a LIVE execution-discipline overlay, NOT a signal-logic change: RSI 30/70 thresholds, RSI+MACD alignment, the RSI-50 TP1 trigger, the 14-day earnings blackout and the AUTO-tier 80-ticker universe are ALL untouched. The v2.2.3 backtest (280 trades / 73.9% WR / PF 3.19 / +$31,426, tier1 5y $200 fixed) INCLUDES these bullish-asset shorts firing mechanically — so live results will deliberately DIVERGE from the pure backtest on this subset. The headline backtest numbers are unchanged for exactly that reason. Longs and non-bullish-asset shorts are UNAFFECTED and still auto-fire. Toggle: SID_SHORT_APPROVAL_GATE=false reverts to fully-mechanical bullish-asset shorts. The v2.2.1-era Pine visualiser already distinguishes green=mechanical / amber=manual-watch; that amber flag now corresponds to 'approval-required, not auto-fired.' New: CONFIG.shortApprovalGate + tg.alertShortApprovalNeeded() in bot-sid.js/telegram-alerts.js.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-06-28</span>
         <span class="update-cat" style="color:#ffaa00;border-color:#ffaa00">RELEASE</span>
@@ -2067,7 +2074,7 @@
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.2.3 // PRIVATE TERMINAL // GENERATED 2026-07-01 15:38:53 UTC</footer>
+  <footer>SID v2.2.4 // PRIVATE TERMINAL // GENERATED 2026-07-01 18:54:51 UTC</footer>
 
 </div>
 
