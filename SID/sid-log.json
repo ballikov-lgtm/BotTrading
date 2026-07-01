@@ -1,5 +1,30 @@
 [
   {
+    "timestamp": "2026-07-01T23:11:05.999Z",
+    "kind": "tp1_close_fail",
+    "symbol": "PYPL",
+    "error": "Market closed — refusing to submit partial close for PYPL",
+    "reprotected": true
+  },
+  {
+    "timestamp": "2026-07-01T23:11:05.176Z",
+    "kind": "external_close_recorded",
+    "symbol": "UNH",
+    "sharesClosed": 2,
+    "exitPrice": 428.05,
+    "pnl": -23.06,
+    "reason": "full_external_fill",
+    "isFullClose": true,
+    "fillsUsed": [
+      {
+        "orderId": "cf53c7ad-9dfb-4048-bc9e-170ead3ae64d",
+        "filledAt": "2026-07-01T19:41:54.555222Z",
+        "qty": 2,
+        "price": 428.05
+      }
+    ]
+  },
+  {
     "timestamp": "2026-07-01T16:55:26.391Z",
     "kind": "tp1_close_fail",
     "symbol": "PYPL",
@@ -3094,18 +3119,6 @@
   {
     "timestamp": "2026-06-12T17:23:02.920Z",
     "symbol": "GLD",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-12T17:23:02.569Z",
-    "symbol": "GE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-12T17:23:02.095Z",
-    "symbol": "GDX",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }

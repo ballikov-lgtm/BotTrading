@@ -153,5 +153,45 @@
     "total_pnl": -18.96,
     "realizedPnl": -18.96,
     "is_full_close": true
+  },
+  {
+    "id": "d9bca959-f4e3-4fa0-bcf0-bfca2cb8c272",
+    "symbol": "UNH",
+    "side": "short",
+    "entry": 416.5199890136719,
+    "stopLoss": 428,
+    "shares": 2,
+    "shares_total": 2,
+    "shares_remaining": 2,
+    "orig_stop": 428,
+    "tp1_hit": false,
+    "totalUsd": 833.04,
+    "riskUsd": 22.96,
+    "signalDate": "2026-06-26",
+    "openDate": "2026-06-30",
+    "openTime": "16:37:02",
+    "mode": "paper",
+    "strategy": "SID v2.2.3",
+    "brokerStopOrderId": "cf53c7ad-9dfb-4048-bc9e-170ead3ae64d",
+    "clientOrderIdPrefix": "SID-UNH-20260626-short",
+    "manual_watch": true,
+    "manual_watch_reason": "bullish-asset short — plan an S/R exit for the runner after TP1",
+    "closeDate": "2026-07-01",
+    "closeTime": "23:11:04",
+    "exit_strategy": "full_external_fill",
+    "exit_price": 428.05,
+    "exit_pnl": -23.06,
+    "exit_shares": 2,
+    "exit_fills": [
+      {
+        "orderId": "cf53c7ad-9dfb-4048-bc9e-170ead3ae64d",
+        "filledAt": "2026-07-01T19:41:54.555222Z",
+        "qty": 2,
+        "price": 428.05
+      }
+    ],
+    "total_pnl": -23.06,
+    "realizedPnl": -23.06,
+    "is_full_close": true
   }
 ]
