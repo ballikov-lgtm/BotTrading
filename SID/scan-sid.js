@@ -23,6 +23,7 @@ import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import pkg from 'technicalindicators';
 const { RSI, MACD, SMA, ADX } = pkg;
+import { rsiTargetPrice } from './rsi-target-price.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -114,6 +115,12 @@ function computeIndicators(dailyBars, weeklyBars) {
   });
   const adxDaily = ADX.calculate({ close: closes, high: highs, low: lows, period: 14 });
 
+  // Daily SMA50/SMA200 — the V2.1/V2.2 TP2 runner targets (distinct from the
+  // WEEKLY sma50w/sma200w used only for the trend-clarity score). Emitted so the
+  // dashboard can show each open position's TP2 exit levels.
+  const sma50d   = SMA.calculate({ period: 50,  values: closes });
+  const sma200d  = SMA.calculate({ period: 200, values: closes });
+
   const weeklyCloses = weeklyBars.map(b => b.close);
   const weeklyHighs  = weeklyBars.map(b => b.high);
   const weeklyLows   = weeklyBars.map(b => b.low);
@@ -121,7 +128,7 @@ function computeIndicators(dailyBars, weeklyBars) {
   const sma200w  = SMA.calculate({ period: 200, values: weeklyCloses });
   const adxWeek  = ADX.calculate({ close: weeklyCloses, high: weeklyHighs, low: weeklyLows, period: 14 });
 
-  return { rsi, macd, adxDaily, sma50w, sma200w, adxWeek, closes, highs, lows };
+  return { rsi, macd, adxDaily, sma50w, sma200w, sma50d, sma200d, adxWeek, closes, highs, lows };
 }
 
 // Choppiness Index (daily, last 14 bars): high = chop, low = trend
@@ -276,6 +283,14 @@ async function scanTicker(symbol, openPositions, previousStatusBySymbol) {
     daysToEarnings,
     earningsBlackout : daysToEarnings != null && daysToEarnings <= EARNINGS_BLACKOUT,
     lastClose      : ind.closes.at(-1),
+    // ── V2.1/V2.2 exit-target readouts (additive, for the dashboard) ─────────
+    // DAILY SMA50/SMA200 = the TP2 runner exit levels (price touch closes the
+    // remaining 50%). rsi50Target = the price the next bar must print for daily
+    // RSI(14) to equal 50 — the SHORT TP1 intraday-touch target (the short's
+    // resting GTC limit rests here). Rounded for display; null when unavailable.
+    dailySma50     : ind.sma50d.at(-1)  != null ? Math.round(ind.sma50d.at(-1)  * 100) / 100 : null,
+    dailySma200    : ind.sma200d.at(-1) != null ? Math.round(ind.sma200d.at(-1) * 100) / 100 : null,
+    rsi50Target    : rsiTargetPrice(ind.closes, 14, 50),
     note           : state.note || null,
     transitionedFrom : transitioned ? prevStatus : null,
   };

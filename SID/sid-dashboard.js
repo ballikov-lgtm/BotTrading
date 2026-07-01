@@ -29,7 +29,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.2.4';
+const STRATEGY_VERSION = '2.2.5';
+// v2.2.5 (2026-07-01) = TP1 CANCEL-FIRST / HELD-SHARES FIX + EXIT-TARGET READOUT.
+// A live-execution plumbing + observability fix, NOT a signal-logic change. The
+// long TP1 partial close was failing every run (PYPL, 5 days silent) because the
+// full-size resting GTC stop "held" all shares, so the DELETE-by-qty partial got
+// `insufficient qty available (available: 0)`. Fix: cancel the resting stop FIRST
+// to release shares → partial close → poll the fill → re-place the BE stop on the
+// runner only; a failed/unconfirmed close re-protects the full qty and raises a
+// LOUD Telegram alarm. Short-side twin fixed: while TP1 is pending the resting
+// stop reserves only the runner half so the resting TP1 limit can place, and the
+// TP1 half is now an OCO (limit+stop). Dashboard: each open-position card now
+// shows the dynamic EXIT TARGETS (TP1 RSI-50 status, TP2 SMA50/SMA200, stop/BE).
+// The HEADLINE backtest below is UNCHANGED — no rule changed. Details below carried from —
 // v2.2.4 (2026-07-01) = SHORT APPROVAL GATE. A LIVE execution-discipline overlay,
 // NOT a signal-logic change: a mechanical SHORT on a long-term-bullish asset
 // (price>SMA200 AND SMA50>SMA200) is no longer auto-fired — it is logged +
@@ -238,9 +250,20 @@ function renderOpenPositionsCards(rows) {
   const todayMs = Date.now();
   // Map of current prices from scanner data (if available)
   const scanPriceBySymbol = {};
+  // Map of per-ticker exit-target indicators from the scanner (v2.2.5): daily
+  // RSI(14), daily SMA50/SMA200 (TP2 runner exits), and the short RSI-50 target
+  // price. Used to render each open position's dynamic exit targets.
+  const scanIndBySymbol = {};
   if (scanner?.tickers) {
     for (const t of scanner.tickers) {
-      if (t.symbol && t.lastClose != null) scanPriceBySymbol[t.symbol] = t.lastClose;
+      if (!t.symbol) continue;
+      if (t.lastClose != null) scanPriceBySymbol[t.symbol] = t.lastClose;
+      scanIndBySymbol[t.symbol] = {
+        rsi:         t.rsi ?? null,
+        dailySma50:  t.dailySma50 ?? null,
+        dailySma200: t.dailySma200 ?? null,
+        rsi50Target: t.rsi50Target ?? null,
+      };
     }
   }
 
@@ -330,6 +353,53 @@ function renderOpenPositionsCards(rows) {
     const tp1Line = r._manual && r._tp1_price
       ? `<span>TP1 <strong>$${Number(r._tp1_price).toFixed(2)}</strong></span>`
       : '';
+
+    // ── EXIT TARGETS readout (v2.2.5) ───────────────────────────────────────
+    // Surfaces the DYNAMIC exit levels so they're always visible on the card:
+    //   TP1  — the RSI-50 trigger: current daily RSI(14) vs 50 + tp1_hit status.
+    //          Long fires at RSI ≥ 50 (daily close); short at RSI ≤ 50 (intraday
+    //          touch) — for a short we also show the RSI-50 target PRICE.
+    //   TP2  — the runner exits: daily SMA50 and SMA200 (price touch closes the
+    //          remaining 50%).
+    //   STOP/BE — the current stop (pre-TP1) or break-even (post-TP1).
+    const ind = scanIndBySymbol[r.symbol] || {};
+    const tp1Hit = !!r.tp1_hit;
+    const curRsi = ind.rsi;
+    const rsiStr = curRsi != null ? Number(curRsi).toFixed(1) : '—';
+    // RSI-vs-50 progress: long wants RSI up to 50, short wants RSI down to 50.
+    const rsiReached = curRsi != null && (isLong ? curRsi >= 50 : curRsi <= 50);
+    const tp1Color = tp1Hit ? '#00ffff' : (rsiReached ? '#39ff14' : '#ffaa00');
+    const tp1Status = tp1Hit
+      ? 'BANKED'
+      : rsiReached
+        ? 'RSI 50 REACHED'
+        : `RSI ${rsiStr} → 50`;
+    const shortTgt = (!isLong && !tp1Hit && ind.rsi50Target != null)
+      ? ` @ $${Number(ind.rsi50Target).toFixed(2)}`
+      : '';
+    const sma50Str  = ind.dailySma50  != null ? `$${Number(ind.dailySma50).toFixed(2)}`  : '—';
+    const sma200Str = ind.dailySma200 != null ? `$${Number(ind.dailySma200).toFixed(2)}` : '—';
+    const stopLabel = tp1Hit ? 'BE STOP' : 'STOP';
+    const exitTargets = `
+      <div class="pos-exits" title="Dynamic exit targets from the last scanner run (3×/day). TP1 = RSI(14) reaches 50 (long ≥50 close / short ≤50 touch). TP2 = price touches daily SMA50 or SMA200 (closes the runner). ${stopLabel} = current protective stop.">
+        <div class="pos-exit-row">
+          <span class="pos-exit-k" style="color:${tp1Color}">TP1 · RSI 50</span>
+          <span class="pos-exit-v" style="color:${tp1Color}">${tp1Status}${shortTgt}</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA50</span>
+          <span class="pos-exit-v">${sma50Str}</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA200</span>
+          <span class="pos-exit-v">${sma200Str}</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">${stopLabel}</span>
+          <span class="pos-exit-v">$${stop.toFixed(2)}</span>
+        </div>
+      </div>`;
+
     return `<div class="position-card${r._manual ? ' position-card-manual' : ''}">
       <div class="pos-head">
         <div>
@@ -352,6 +422,7 @@ function renderOpenPositionsCards(rows) {
         <span>DAYS <strong>${daysOpen}</strong></span>
         <span>OPEN <strong>${esc(r.openDate || '—')}</strong></span>
       </div>
+      ${exitTargets}
     </div>`;
   }).join('');
 
@@ -1148,6 +1219,30 @@ const html = `<!DOCTYPE html>
     margin-left: 4px;
   }
 
+  /* ── EXIT TARGETS readout (v2.2.5) ─────────────────── */
+  .pos-exits {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .pos-exit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 2px 0;
+  }
+  .pos-exit-k {
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .pos-exit-v {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ── HEADER RIGHT (clock + toggle + status) ────────── */
   .header-right {
     display: flex;
@@ -1364,7 +1459,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.4 SHORT APPROVAL GATE 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.5 TP1 CANCEL-FIRST FIX 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1372,7 +1467,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.2.4 SHORT APPROVAL GATE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · BULLISH-ASSET SHORTS NEED APPROVAL</div>
+      <div class="brand-sub">V2.2.5 TP1 CANCEL-FIRST FIX · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1489,7 +1584,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.2.4 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.5 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

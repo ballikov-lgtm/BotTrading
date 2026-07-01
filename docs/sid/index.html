@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.2.4 TERMINAL</title>
+<title>SID // v2.2.5 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -601,6 +601,30 @@
     margin-left: 4px;
   }
 
+  /* ── EXIT TARGETS readout (v2.2.5) ─────────────────── */
+  .pos-exits {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .pos-exit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 2px 0;
+  }
+  .pos-exit-k {
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .pos-exit-v {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ── HEADER RIGHT (clock + toggle + status) ────────── */
   .header-right {
     display: flex;
@@ -817,15 +841,15 @@
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.4 SHORT APPROVAL GATE 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.2.5 TP1 CANCEL-FIRST FIX 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.2.4 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2.2.4 SHORT APPROVAL GATE · 73.9% BACKTEST WR · PF 3.19 · BULLISH-ASSET SHORTS NEED APPROVAL</div>
+      <div class="brand">SID // v2.2.5 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.2.5 TP1 CANCEL-FIRST FIX · 73.9% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -838,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 22:44:17</span>
+        <span>SYS · 22:55:45</span>
       </div>
     </div>
   </header>
@@ -847,7 +871,7 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.2.4 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.2.5 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
 The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live performance will differ. Note (v2.2.4): the backtest still fires bullish-asset shorts mechanically, but LIVE now GATES them for manual approval (a discipline overlay, not a rule change) — so live results deliberately diverge from the pure backtest on that subset.
       Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
@@ -916,14 +940,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(18)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(19)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-01 22:44:17 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 3 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-01 22:55:45 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -967,6 +991,25 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span>TO STOP <strong>0.3%</strong></span>
         <span>DAYS <strong>1</strong></span>
         <span>OPEN <strong>2026-06-30</strong></span>
+      </div>
+      
+      <div class="pos-exits" title="Dynamic exit targets from the last scanner run (3×/day). TP1 = RSI(14) reaches 50 (long ≥50 close / short ≤50 touch). TP2 = price touches daily SMA50 or SMA200 (closes the runner). STOP = current protective stop.">
+        <div class="pos-exit-row">
+          <span class="pos-exit-k" style="color:#ffaa00">TP1 · RSI 50</span>
+          <span class="pos-exit-v" style="color:#ffaa00">RSI 65.9 → 50</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA50</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA200</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">STOP</span>
+          <span class="pos-exit-v">$428.00</span>
+        </div>
       </div>
     </div><div class="position-card">
       <div class="pos-head">
@@ -1012,6 +1055,25 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span>DAYS <strong>5</strong></span>
         <span>OPEN <strong>2026-06-26</strong></span>
       </div>
+      
+      <div class="pos-exits" title="Dynamic exit targets from the last scanner run (3×/day). TP1 = RSI(14) reaches 50 (long ≥50 close / short ≤50 touch). TP2 = price touches daily SMA50 or SMA200 (closes the runner). STOP = current protective stop.">
+        <div class="pos-exit-row">
+          <span class="pos-exit-k" style="color:#ffaa00">TP1 · RSI 50</span>
+          <span class="pos-exit-v" style="color:#ffaa00">RSI 44.3 → 50</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA50</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA200</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">STOP</span>
+          <span class="pos-exit-v">$190.00</span>
+        </div>
+      </div>
     </div><div class="position-card">
       <div class="pos-head">
         <div>
@@ -1055,6 +1117,25 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span>TO STOP <strong>9.2%</strong></span>
         <span>DAYS <strong>19</strong></span>
         <span>OPEN <strong>2026-06-12</strong></span>
+      </div>
+      
+      <div class="pos-exits" title="Dynamic exit targets from the last scanner run (3×/day). TP1 = RSI(14) reaches 50 (long ≥50 close / short ≤50 touch). TP2 = price touches daily SMA50 or SMA200 (closes the runner). STOP = current protective stop.">
+        <div class="pos-exit-row">
+          <span class="pos-exit-k" style="color:#39ff14">TP1 · RSI 50</span>
+          <span class="pos-exit-v" style="color:#39ff14">RSI 50 REACHED</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA50</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">TP2 · SMA200</span>
+          <span class="pos-exit-v">—</span>
+        </div>
+        <div class="pos-exit-row">
+          <span class="pos-exit-k">STOP</span>
+          <span class="pos-exit-v">$40.00</span>
+        </div>
       </div>
     </div></div>
     </div>
@@ -1251,7 +1332,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
                 <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">207</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">73</span></div>
               </div>
             </div>
-            <div class="perf-note">V2.2.4 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.2.5 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
@@ -1939,7 +2020,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (18)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (19)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1947,6 +2028,13 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-01</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">V2.2.5 TP1 CANCEL-FIRST FIX — TP1 partial close no longer fails silently; exit targets now on every card</div>
+      <div class="update-summary">LIVE BUG FIXED: the long TP1 partial close had been FAILING on every run since 2026-06-26 — PYPL (long 23sh @ $41.395) has had daily RSI(14) at/above 50 the whole time, so TP1 SHOULD have banked, but the close returned `insufficient qty available for order (requested: 11, available: 0)` for FIVE straight days, silently. ROOT CAUSE: the v2.2 broker design leaves a full-size resting GTC stop from entry, and Alpaca 'holds' every share against it, so the DELETE-by-qty partial close can never claim shares. This is the live analogue of the documented Alpaca held-shares/OCO trap. FIX (correct order of operations): when TP1 fires, (1) CANCEL the resting broker stop first to release the shares and wait for them to free, (2) submit the partial close and POLL that it actually fills, (3) only then re-place the break-even stop on the RUNNER (remaining shares) at the direction-aware BE price. If the partial fill is NOT confirmed, the FULL remaining qty is re-protected with a stop so the position is never left naked. The short-side twin was fixed too: while TP1 is pending the resting stop now reserves only the runner half (so the resting TP1 limit can actually be placed — it used to fail the same way), and the TP1 half is placed as an OCO (limit + stop) so both legs are protected. Any TP1 close failure now fires a LOUD Telegram alarm (tg.alertTp1CloseFailed) so a multi-day silent failure can't recur. For PYPL specifically the very next run that sees RSI ≥ 50 will cleanly book the 11-share TP1 and set the $41.41 BE stop on the remaining 12. ALSO (dashboard, Alan-requested): each OPEN-position card now shows the DYNAMIC exit targets so the exits are always visible — TP1 (current daily RSI(14) vs 50 + whether it's banked; for shorts the RSI-50 target price too), TP2 (daily SMA50 and SMA200 runner exits), and the current stop/BE. NO signal-logic change — RSI 30/70, MACD alignment, the RSI-50 TP1 trigger, the earnings blackout and the AUTO-tier universe are all untouched, so the headline backtest numbers are unchanged. New executor helpers: cancelOrderById / waitForNoOpenOrders / pollOrderFill / placeStop.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-07-01</span>
         <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
@@ -2081,7 +2169,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.2.4 // PRIVATE TERMINAL // GENERATED 2026-07-01 22:44:17 UTC</footer>
+  <footer>SID v2.2.5 // PRIVATE TERMINAL // GENERATED 2026-07-01 22:55:45 UTC</footer>
 
 </div>
 

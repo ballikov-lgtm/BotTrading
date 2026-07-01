@@ -81,8 +81,47 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2.4'; // V2.2.4 SHORT APPROVAL GATE: bullish-asset shorts (price>SMA200 AND SMA50>SMA200) no longer auto-fire — they are logged + Telegram-alerted for manual approval (Alan fires them into the right level via the manual one-shot flow). Live execution-discipline overlay ONLY — no canon rule change (RSI 30/70, MACD alignment, RSI-50 exit untouched). Backtest numbers UNCHANGED (the v2.2.x backtests still fire these shorts mechanically — live now intentionally diverges). Toggle: SID_SHORT_APPROVAL_GATE=false. (paper trading, 2026-07-01)
+const BOT_VERSION = 'v2.2.5'; // V2.2.5 TP1 CANCEL-FIRST FIX: the long TP1 partial close now CANCELS the resting full-size broker GTC stop FIRST (to release the held shares), then submits the partial close, POLLS that it filled, and only then re-places the break-even stop on the runner. Fixes a 5-day SILENT FAILURE on PYPL where the DELETE-by-qty partial close returned `insufficient qty available (available: 0)` every run because the full stop held all shares → TP1 profit never banked. Short-side twin fixed too: while TP1 is pending the resting stop reserves only the RUNNER half so the resting TP1 limit can actually place, and the TP1 half is now an OCO (limit + stop) so both legs are protected. Any TP1 close failure now raises a LOUD Telegram alarm (tg.alertTp1CloseFailed) so a silent multi-day failure can't recur; a failed/unconfirmed close re-protects the FULL remaining qty. No canon rule change. (paper trading, 2026-07-01)
 // Version history:
+//   v2.2.5 V2.2.5 TP1 CANCEL-FIRST / HELD-SHARES FIX (2026-07-01, paper trading):
+//        - ROOT CAUSE: the v2.2 broker design leaves a full-size GTC stop
+//          resting from entry (pos.brokerStopOrderId). Alpaca "holds" every
+//          share against that stop, so the long TP1 partial close
+//          (DELETE /v2/positions/SYM?qty=N) returned `insufficient qty available
+//          for order (requested: N, available: 0)` on EVERY run. PYPL (long 23sh
+//          @ $41.395, RSI(14) ≥ 50 since 2026-06-26) failed its TP1 for 5 days
+//          straight, silently — TP1 profit never banked.
+//        - LONG FIX (checkPositions Branch A): correct order of operations —
+//          (1) CANCEL the resting broker stop (pos.brokerStopOrderId + any
+//          lingering -stop) to release the shares and WAIT for zero open orders;
+//          (2) submit the partial close and POLL the order until it FILLS;
+//          (3) only then re-place the break-even stop on the RUNNER (remaining
+//          shares) at the direction-aware BE price. If the partial fill is NOT
+//          confirmed, the FULL remaining qty is re-protected with a stop and a
+//          LOUD alarm fires — the position is never left naked.
+//        - SHORT FIX (maintainV2_2BrokerOrders): the short-side twin. While TP1
+//          is still pending, the resting -stop reserves only the RUNNER half
+//          (shares_total - tp1Qty) instead of the full position, so the resting
+//          TP1 limit can actually be placed (it used to fail silently with
+//          `insufficient qty`). The TP1 half is now an OCO (limit TP1 + stop SL)
+//          so BOTH legs are protected — mirrors the documented manual-trade.js
+//          OCO pattern. Longs are unaffected (no resting TP1 limit).
+//        - LOUD FAILURE: new tg.alertTp1CloseFailed() Telegram alarm on any TP1
+//          close failure or unconfirmed fill, so a 5-day silent failure cannot
+//          recur. New sid-log kinds: tp1_close_fail carries `reprotected`;
+//          be_stop_place_fail when the runner BE stop can't be placed post-TP1.
+//        - New executor helpers (alpaca-executor.js): cancelOrderById (best-effort,
+//          treats 404/422 as already-gone), waitForNoOpenOrders (poll shares
+//          released), pollOrderFill (confirm the market close filled), placeStop
+//          (re-place BE / re-protect stop on N shares).
+//        - Dashboard (sid-dashboard.js): each OPEN-position card now shows the
+//          dynamic EXIT TARGETS — TP1 (current daily RSI(14) vs 50 + tp1_hit / or
+//          the short RSI-50 target price), TP2 (SMA50 & SMA200), and the current
+//          stop/BE. Additive only.
+//        - NO SIGNAL-LOGIC CHANGE. RSI 30/70 thresholds, RSI+MACD alignment, the
+//          RSI-50 TP1 trigger, the 14-day earnings blackout and the AUTO-tier
+//          80-ticker universe are ALL untouched. Backtest numbers UNCHANGED —
+//          this is an execution-plumbing + observability fix, not a rule change.
 //   v2.2.4 V2.2.4 SHORT APPROVAL GATE (2026-07-01, paper trading):
 //        - PRE-ENTRY discipline overlay. A mechanical SHORT signal on a
 //          long-term-bullish asset (longTermBullish(): daily price>SMA200 AND
@@ -614,7 +653,23 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
   // ── Resting stop ────────────────────────────────────────────────────────
   const expectedStopPrice = pos.tp1_hit ? parseFloat(pos.entry.toFixed(2)) : pos.stopLoss;
   const existingStop = await findOpenOrder(client, pos.symbol, '-stop');
-  const stopShares = pos.shares_remaining ?? pos.shares;
+  // ── SHORT held-shares fix (v2.2.5) ──────────────────────────────────────
+  // For a v2.2 SHORT the TP1 exit is a resting GTC limit placed further down.
+  // If the resting stop reserves the FULL position, Alpaca "holds" every share
+  // against it and the subsequent TP1 limit submit fails with `insufficient qty
+  // available` (silently — only a console.warn). This is the short-side twin of
+  // the PYPL long TP1 bug. FIX: while TP1 is still pending on a SHORT, the stop
+  // reserves only the RUNNER half (shares_total - tp1Qty), leaving the TP1 half
+  // free for the resting limit. Once tp1_hit, the stop reverts to the runner
+  // (shares_remaining) at BE — unchanged. LONGS are unaffected (they carry no
+  // resting TP1 limit — long TP1 is the cancel-first daily-poll close), so a
+  // long keeps a full-size stop until its close cancels it.
+  let stopShares = pos.shares_remaining ?? pos.shares;
+  if (pos.side === 'short' && !pos.tp1_hit) {
+    const pendingTp1Qty = Math.floor((pos.shares_total ?? pos.shares) * CONFIG.tp1Portion);
+    const runnerShares  = (pos.shares_total ?? pos.shares) - pendingTp1Qty;
+    if (runnerShares >= 1) stopShares = runnerShares;
+  }
 
   if (!existingStop) {
     try {
@@ -698,21 +753,35 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
     return;
   }
 
+  // v2.2.5: the SHORT TP1 half is placed as an OCO (limit TP1 + stop SL) so it is
+  // ALSO stop-protected. Previously the TP1 was a bare limit while the resting
+  // -stop reserved the full position — the two couldn't coexist (one always
+  // failed with `insufficient qty`). Now the runner-only -stop (above) protects
+  // the runner half, and this OCO protects the TP1 half on BOTH legs: the TP1
+  // limit books profit at the RSI-50 target, its bundled stop covers the adverse
+  // case. Only one OCO leg fires; the other auto-cancels. Mirrors the documented
+  // manual-trade.js OCO pattern (SID/CLAUDE.md § "insufficient qty" OCO write-up).
+  const tp1StopPrice = parseFloat(Number(pos.stopLoss).toFixed(2));
+  const submitTp1Oco = async () => client.submitOrder({
+    symbol:          pos.symbol,
+    qty:             tp1Qty,
+    side:            exitSide,
+    type:            'limit',
+    limit_price:     tp1Target,
+    time_in_force:   'gtc',
+    order_class:     'oco',
+    take_profit:     { limit_price: tp1Target },
+    stop_loss:       { stop_price:  tp1StopPrice },
+    client_order_id: `${prefix}-tp1-${Date.now()}`,
+  });
+
   const existingTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
   if (!existingTp1) {
     try {
-      const tp1Order = await client.submitOrder({
-        symbol:          pos.symbol,
-        qty:             tp1Qty,
-        side:            exitSide,
-        type:            'limit',
-        limit_price:     tp1Target,
-        time_in_force:   'gtc',
-        client_order_id: `${prefix}-tp1-${Date.now()}`,
-      });
-      console.log(`  [V2.2] Placed TP1 limit for ${pos.symbol}: ${tp1Qty}sh @ $${tp1Target} (id ${tp1Order.id})`);
+      const tp1Order = await submitTp1Oco();
+      console.log(`  [V2.2] Placed TP1 OCO for ${pos.symbol}: ${tp1Qty}sh limit $${tp1Target} / stop $${tp1StopPrice} (id ${tp1Order.id})`);
     } catch (err) {
-      console.warn(`  [V2.2] TP1 limit placement failed for ${pos.symbol}: ${err.message}`);
+      console.warn(`  [V2.2] TP1 OCO placement failed for ${pos.symbol}: ${err.message}`);
     }
   } else {
     const existingTp1Price = parseFloat(existingTp1.limit_price);
@@ -721,17 +790,9 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
       try {
         await client.cancelOrder(existingTp1.id);
         await new Promise(r => setTimeout(r, 800));
-        await client.submitOrder({
-          symbol:          pos.symbol,
-          qty:             tp1Qty,
-          side:            exitSide,
-          type:            'limit',
-          limit_price:     tp1Target,
-          time_in_force:   'gtc',
-          client_order_id: `${prefix}-tp1-${Date.now()}`,
-        });
+        await submitTp1Oco();
       } catch (err) {
-        console.warn(`  [V2.2] TP1 limit refresh failed for ${pos.symbol}: ${err.message}`);
+        console.warn(`  [V2.2] TP1 OCO refresh failed for ${pos.symbol}: ${err.message}`);
       }
     } else {
       // Already at the right price — leave it
@@ -1610,15 +1671,113 @@ async function checkPositions(executor = null) {
             : (pos.entry - exitPrice) * tp1Shares
         ).toFixed(2));
 
+        // ── BE stop price (needed up-front for the re-protect step) ─────────
+        // Direction-aware penny rounding, ALWAYS locks ≥ 1¢/share profit.
+        // Round to nearest cent first (float-safe), then bias 1¢ in the
+        // favourable direction (long: 1¢ above entry; short: 1¢ below).
+        const beCents = Math.round(pos.entry * 100);
+        const beBias  = pos.side === 'long' ? 1 : -1;
+        const bePrice = (beCents + beBias) / 100;
+        const runnerShares = pos.shares_total - tp1Shares;
+
+        // ── CANCEL-FIRST TP1 close (v2.2.5 fix) ─────────────────────────────
+        // ROOT CAUSE (PYPL, 2026-06-26→07-01): the v2.2 broker design leaves a
+        // full-size GTC stop resting from entry (pos.brokerStopOrderId). Alpaca
+        // "holds" all shares against it, so DELETE /v2/positions/SYM?qty=N (the
+        // partial close) returned `insufficient qty available (available: 0)`
+        // EVERY run — TP1 profit never banked for 5 days, silently.
+        //
+        // Correct order of operations:
+        //   (1) CANCEL the resting broker stop to RELEASE the shares.
+        //   (2) Submit the partial close and POLL that it actually fills.
+        //   (3) Only THEN re-place the break-even stop on the REMAINING shares.
+        //   (*) If the partial fill is NOT confirmed, do NOT leave the position
+        //       unprotected — re-place a protective stop on the FULL remaining
+        //       qty and raise a LOUD alarm.
+        let tp1Confirmed = true;   // true when there is no executor (dry_run) OR the fill confirmed
         if (executor) {
+          // (1) Release the shares held by the resting broker stop(s).
           try {
-            await executor.closePartial(pos, tp1Shares, `V2.1 TP1 — RSI ${rsi.toFixed(1)} reached, closing ${tp1Shares} sh (50%)`);
+            if (pos.brokerStopOrderId) {
+              await executor.cancelOrderById(pos.brokerStopOrderId);
+            }
+            // Belt-and-braces: cancel ANY lingering -stop order on the symbol
+            // (id may have rotated via maintainV2_2BrokerOrders across runs).
+            const lingeringStop = await findOpenOrder(executor.client, pos.symbol, '-stop');
+            if (lingeringStop) await executor.cancelOrderById(lingeringStop.id);
+            // Wait for Alpaca to actually free the held shares before the close.
+            await executor.waitForNoOpenOrders(pos.symbol);
           } catch (err) {
-            console.log(`\n    🚫 Alpaca TP1 partial close FAILED: ${err.message} — position stays at full size, will retry next run`);
-            writeLog({ kind: 'tp1_close_fail', symbol: pos.symbol, error: err.message });
+            console.log(`\n    ⚠ Could not cancel resting stop for ${pos.symbol} before TP1: ${err.message} — attempting close anyway`);
+          }
+
+          // (2) Submit the partial close and CONFIRM the fill.
+          let closeOrderId = null;
+          try {
+            const res = await executor.closePartial(pos, tp1Shares, `V2.1 TP1 — RSI ${rsi.toFixed(1)} reached, closing ${tp1Shares} sh (50%)`);
+            closeOrderId = res.closeOrderId;
+          } catch (err) {
+            // Partial close was REJECTED — re-protect the FULL position (stop
+            // was already cancelled above → naked otherwise) then alarm + bail.
+            let reprotected = false;
+            try {
+              const rp = await executor.placeStop(pos, pos.shares_remaining ?? pos.shares_total, pos.stopLoss, 'restop');
+              pos.brokerStopOrderId = rp.stopOrderId;
+              reprotected = true;
+            } catch (rpErr) {
+              console.log(`\n    🚨 RE-PROTECT FAILED for ${pos.symbol}: ${rpErr.message}`);
+            }
+            console.log(`\n    🚫 Alpaca TP1 partial close FAILED: ${err.message} — position stays at full size, ${reprotected ? 're-protected' : 'RE-PROTECT FAILED'}, will retry next run`);
+            writeLog({ kind: 'tp1_close_fail', symbol: pos.symbol, error: err.message, reprotected });
+            tg.alertTp1CloseFailed({
+              symbol: pos.symbol, side: pos.side, tp1Shares, sharesTotal: pos.shares_total,
+              error: err.message, reprotected, mode: pos.mode || CONFIG.tradingMode,
+            }).catch(() => {});
             stillOpen.push(pos);
             positionHandled = true;
             break;
+          }
+
+          // Confirm the market close actually filled before re-placing the BE
+          // stop on the runner. If it did NOT fill, re-protect the FULL qty.
+          const fill = closeOrderId ? await executor.pollOrderFill(closeOrderId) : { filled: false };
+          if (!fill.filled) {
+            tp1Confirmed = false;
+            let reprotected = false;
+            try {
+              const rp = await executor.placeStop(pos, pos.shares_remaining ?? pos.shares_total, pos.stopLoss, 'restop');
+              pos.brokerStopOrderId = rp.stopOrderId;
+              reprotected = true;
+            } catch (rpErr) {
+              console.log(`\n    🚨 RE-PROTECT FAILED for ${pos.symbol}: ${rpErr.message}`);
+            }
+            const failMsg = `TP1 partial close order ${closeOrderId} did not confirm fill (status ${fill.order?.status || 'unknown'})`;
+            console.log(`\n    🚫 ${failMsg} — ${reprotected ? 're-protected full qty' : 'RE-PROTECT FAILED'}, will retry next run`);
+            writeLog({ kind: 'tp1_close_fail', symbol: pos.symbol, error: failMsg, reprotected });
+            tg.alertTp1CloseFailed({
+              symbol: pos.symbol, side: pos.side, tp1Shares, sharesTotal: pos.shares_total,
+              error: failMsg, reprotected, mode: pos.mode || CONFIG.tradingMode,
+            }).catch(() => {});
+            stillOpen.push(pos);
+            positionHandled = true;
+            break;
+          }
+
+          // (3) Fill confirmed — re-place the break-even stop on the RUNNER only.
+          try {
+            const rp = await executor.placeStop(pos, runnerShares, bePrice, 'stop');
+            pos.brokerStopOrderId = rp.stopOrderId;
+          } catch (rpErr) {
+            // The TP1 half is banked but the runner is now unprotected. Alarm —
+            // maintainV2_2BrokerOrders will re-place the missing stop next run,
+            // but flag it so it's not silent.
+            console.log(`\n    🚨 BE stop placement FAILED for ${pos.symbol} runner: ${rpErr.message} — next run's broker-order maintenance will re-place it`);
+            writeLog({ kind: 'be_stop_place_fail', symbol: pos.symbol, error: rpErr.message });
+            tg.alertTp1CloseFailed({
+              symbol: pos.symbol, side: pos.side, tp1Shares, sharesTotal: pos.shares_total,
+              error: `TP1 banked but BE stop failed: ${rpErr.message}`, reprotected: false,
+              mode: pos.mode || CONFIG.tradingMode,
+            }).catch(() => {});
           }
         }
 
@@ -1630,17 +1789,9 @@ async function checkPositions(executor = null) {
         pos.tp1_pnl          = tp1Pnl;
         pos.tp1_reason       = 'rsi50';
         pos.tp1_rsi          = rsi;
-        pos.shares_remaining = pos.shares_total - tp1Shares;
-        // BE stop — direction-aware penny rounding, ALWAYS locks ≥ 1¢/share profit.
-        // Replaces the old Math.round(entry) which was direction-blind: a long
-        // entry of $281.49 used to round DOWN to $281 (tiny loss), and a short
-        // entry of $381.84 used to round UP to $382 (tiny loss). Now: round to
-        // nearest cent first (float-safe), then bias 1¢ in the favourable
-        // direction (long: 1¢ above entry; short: 1¢ below). Guarantees
-        // post-TP1 BE stop never closes at a small loss.
-        const beCents = Math.round(pos.entry * 100);
-        const beBias  = pos.side === 'long' ? 1 : -1;
-        pos.stopLoss  = (beCents + beBias) / 100;
+        pos.shares_remaining = runnerShares;
+        // BE stop — locks ≥ 1¢/share profit (computed above as bePrice).
+        pos.stopLoss  = bePrice;
         // Book TP1 partial P&L immediately so account compounds
         const acctAfterTp1 = updateAccount(tp1Pnl);
         appendTrade([

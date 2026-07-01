@@ -189,6 +189,43 @@ export async function alertShortApprovalNeeded({ symbol, signalDate, currentPric
   return sendMessage(msg);
 }
 
+/**
+ * TP1 FAILURE alarm (v2.2.5). Fired LOUDLY whenever a TP1 partial close cannot
+ * be completed — the exact class of failure that silently ran for 5 days on
+ * PYPL (2026-06-26 → 2026-07-01) because a full-size GTC stop held all shares
+ * so the DELETE-by-qty partial close got `insufficient qty available`. This
+ * alert makes any recurrence impossible to miss.
+ *
+ * @param {Object} p
+ * @param {string} p.symbol
+ * @param {string} p.side
+ * @param {number} [p.tp1Shares]   — the qty the bot tried to close
+ * @param {number} [p.sharesTotal]
+ * @param {string} p.error         — the underlying error message
+ * @param {boolean} [p.reprotected]— was the full remaining qty re-protected with a stop?
+ * @param {string} [p.mode]
+ */
+export async function alertTp1CloseFailed({ symbol, side, tp1Shares, sharesTotal, error, reprotected, mode }) {
+  const modeTag = formatModeTag(mode);
+  const protLine = reprotected === true
+    ? '🛡️ Full remaining qty RE-PROTECTED with a stop — position is NOT naked.'
+    : reprotected === false
+      ? '🚨 <b>RE-PROTECT ALSO FAILED — position may be UNPROTECTED. CHECK ALPACA NOW.</b>'
+      : '';
+  const msg = [
+    `🆘 <b>SID TP1 CLOSE FAILED</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> — ${String(side || '').toUpperCase()}`,
+    tp1Shares != null ? `Tried to close: ${tp1Shares}${sharesTotal != null ? `/${sharesTotal}` : ''} sh (TP1 50%)` : '',
+    ``,
+    `<b>Error:</b> ${escape(error)}`,
+    protLine,
+    ``,
+    `<i>TP1 profit did NOT bank this run. The bot will retry next run. If this repeats, a resting order is likely holding the shares — cancel it on Alpaca so the partial close can fill.</i>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
 // ── Internals ───────────────────────────────────────────────────────────
 
 function formatModeTag(mode) {

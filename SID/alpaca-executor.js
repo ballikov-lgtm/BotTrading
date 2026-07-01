@@ -266,6 +266,14 @@ class AlpacaExecutor {
    * This preserves the PDT-immune property — partial fill executes on the
    * next day, not same-day as the entry/scan.
    *
+   * ⚠ HELD-SHARES TRAP (fixed v2.2.5, 2026-07-01): Alpaca "holds" shares
+   * against any resting exit order. If a GTC stop for the FULL position is
+   * still live, the DELETE-by-qty here gets `insufficient qty available for
+   * order (requested: N, available: 0)` and fails EVERY run. The v2.2 broker
+   * design leaves a full-size GTC stop resting from entry, so the TP1 caller
+   * MUST cancel that stop first (see cancelOrderById + waitForNoOpenOrders)
+   * before calling closePartial. This method does NOT cancel it for you.
+   *
    * @param {Object} localPos      — entry from open-positions-sid.json
    * @param {number} qty           — shares to close (must be < total held)
    * @param {string} reason        — log-only
@@ -286,6 +294,125 @@ class AlpacaExecutor {
     this.log.log(`    [Alpaca:${this.mode}] Partial close order ${closeOrder.id} submitted (status: ${closeOrder.status})`);
 
     return { closeOrderId: closeOrder.id, qty };
+  }
+
+  /**
+   * Cancel a single broker order by its id. Best-effort — returns
+   * { cancelled: true } on success, { cancelled: false, reason } if the order
+   * is already gone/filled/not-found (404 or 422 both count as "already gone",
+   * which is fine — the shares are released either way). Never throws for the
+   * common already-gone cases so the caller can proceed to the partial close.
+   *
+   * Used by the TP1 cancel-first fix: release the resting GTC stop so the
+   * shares become available before the DELETE-by-qty partial close.
+   */
+  async cancelOrderById(orderId) {
+    if (!orderId) return { cancelled: false, reason: 'no order id' };
+    try {
+      await this.client.cancelOrder(orderId);
+      this.log.log(`    [Alpaca:${this.mode}] Cancelled order ${orderId}`);
+      return { cancelled: true };
+    } catch (err) {
+      // 404 (gone), 422 (already filled / not cancelable) → shares already free
+      if (err.status === 404 || err.status === 422) {
+        this.log.log(`    [Alpaca:${this.mode}] Order ${orderId} already gone (${err.status}) — shares released`);
+        return { cancelled: false, reason: `already gone (${err.status})` };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Poll until the symbol has NO open orders (or timeout). After cancelling the
+   * resting stop we must wait for Alpaca to actually release the held shares
+   * before submitting the partial close, otherwise the DELETE-by-qty can still
+   * race the cancel and hit `insufficient qty available`.
+   *
+   * Returns true if the symbol reached zero open orders, false on timeout.
+   */
+  async waitForNoOpenOrders(symbol, { attempts = 6, delayMs = 700 } = {}) {
+    for (let i = 0; i < attempts; i++) {
+      let open;
+      try {
+        open = await this.client.listOrders({ status: 'open', symbols: symbol, limit: 50 });
+      } catch (err) {
+        this.log.log(`    [Alpaca:${this.mode}] waitForNoOpenOrders listOrders failed (${err.message}) — retrying`);
+        open = null;
+      }
+      if (Array.isArray(open) && open.length === 0) return true;
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+    return false;
+  }
+
+  /**
+   * Poll an order until it reaches a terminal state (filled/canceled/rejected)
+   * or timeout. Returns the last order snapshot seen. Used to CONFIRM the TP1
+   * partial-close market order actually filled before we re-place the BE stop
+   * on the runner — if it didn't fill we must NOT leave the position
+   * unprotected.
+   *
+   * @returns {{ order: Object|null, filled: boolean, filledQty: number, filledAvgPrice: number|null }}
+   */
+  async pollOrderFill(orderId, { attempts = 8, delayMs = 750 } = {}) {
+    let last = null;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        last = await this.client.getOrder(orderId);
+      } catch (err) {
+        this.log.log(`    [Alpaca:${this.mode}] pollOrderFill getOrder failed (${err.message}) — retrying`);
+      }
+      const status = String(last?.status || '').toLowerCase();
+      const filledQty = parseFloat(last?.filled_qty || 0);
+      if (status === 'filled' || (filledQty > 0 && status !== 'partially_filled')) {
+        return {
+          order: last,
+          filled: filledQty > 0,
+          filledQty,
+          filledAvgPrice: last?.filled_avg_price != null ? parseFloat(last.filled_avg_price) : null,
+        };
+      }
+      if (status === 'canceled' || status === 'rejected' || status === 'expired') {
+        return { order: last, filled: filledQty > 0, filledQty, filledAvgPrice: last?.filled_avg_price != null ? parseFloat(last.filled_avg_price) : null };
+      }
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+    const filledQty = parseFloat(last?.filled_qty || 0);
+    return {
+      order: last,
+      filled: filledQty > 0,
+      filledQty,
+      filledAvgPrice: last?.filled_avg_price != null ? parseFloat(last.filled_avg_price) : null,
+    };
+  }
+
+  /**
+   * Place a GTC stop on N shares in the exit direction. Used to (a) re-place the
+   * break-even stop on the runner after the TP1 partial confirms, and (b) as a
+   * SAFETY re-protect on the FULL remaining qty if the TP1 partial DIDN'T
+   * confirm — so a cancelled-stop position is never left naked.
+   *
+   * @param {Object} localPos  — position (for symbol/side/clientOrderIdPrefix)
+   * @param {number} qty       — shares to protect
+   * @param {number} stopPrice — stop trigger price
+   * @param {string} tag       — client_order_id suffix discriminator (e.g. 'stop' | 'restop')
+   * @returns {{ stopOrderId: string }}
+   */
+  async placeStop(localPos, qty, stopPrice, tag = 'stop') {
+    if (!(qty > 0)) throw new Error(`Invalid stop qty: ${qty}`);
+    const exitSide = localPos.side === 'long' ? 'sell' : 'buy';
+    const prefix = localPos.clientOrderIdPrefix || `SID-${localPos.symbol}-${Date.now()}`;
+    const stopOrder = await this.client.submitOrder({
+      symbol:          localPos.symbol,
+      qty,
+      side:            exitSide,
+      type:            'stop',
+      stop_price:      parseFloat(Number(stopPrice).toFixed(2)),
+      time_in_force:   'gtc',
+      client_order_id: `${prefix}-${tag}-${Date.now()}`,
+    });
+    this.log.log(`    [Alpaca:${this.mode}] Placed ${tag} for ${localPos.symbol}: ${qty}sh @ $${Number(stopPrice).toFixed(2)} (id ${stopOrder.id})`);
+    return { stopOrderId: stopOrder.id };
   }
 
   /**

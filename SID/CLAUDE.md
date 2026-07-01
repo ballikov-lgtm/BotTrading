@@ -12,9 +12,9 @@ There are TWO `SID/` folders on disk and they are NOT the same:
 | Path | What it is | git branch | Use? |
 |---|---|---|---|
 | `Trading Setup/SID/` (parent) | **Stale snapshot** — older v1.0 code | `claude/silly-robinson-abcf6c` | ❌ **DO NOT EDIT.** Anything here is out of date. |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — current v2.2.3 deployment | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
+| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — current v2.2.5 deployment | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
 
-**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (currently **v2.2.3** — entry overhaul: bar-by-bar arm replay, EXITS still the v2.2.1 HYBRID model) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
+**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (currently **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
 
 **Rule of thumb before editing anything:**
 1. Run `git status` to confirm which branch you're on.
@@ -691,6 +691,74 @@ if (inLong or inShort) and tp1Hit and not na(barsSinceTp1) and barsSinceTp1 > i_
 ```
 
 After deploying this, the UNH 4H stuck position cleared and the info table went from "IN LONG (runner) Entry $13.34" to clean "IDLE".
+
+### Pitfall: LIVE TP1 partial close fails every run — full-size GTC stop HOLDS the shares (v2.2.5, 2026-07-01)
+
+**The live analogue of the OCO/held-shares trap below — but on the recurring
+daily-poll TP1 close, not the one-shot entry.** Confirmed on PYPL (paper):
+`sid-log.json` showed the same `tp1_close_fail` every run from 2026-06-26 to
+2026-07-01:
+
+```
+{"kind":"tp1_close_fail","symbol":"PYPL",
+ "error":"Alpaca DELETE /v2/positions/PYPL?qty=11 failed: insufficient qty
+          available for order (requested: 11, available: 0)"}
+```
+
+PYPL was long 23sh @ $41.395 with `tp1_hit:false`, RSI(14) ≥ 50 the whole time
+(so TP1 SHOULD have banked), and a resting GTC broker stop
+(`brokerStopOrderId 9a155efb-…`) at $40 covering **all 23 shares**.
+
+**Root cause.** The v2.2 broker design (`openEntry`) places a full-size GTC stop
+at entry and leaves it resting. Alpaca "holds" every share against that stop, so
+when `checkPositions` Branch A fired TP1 and called
+`executor.closePartial(pos, 11, …)` → `DELETE /v2/positions/PYPL?qty=11`, Alpaca
+reported `available: 0` and rejected it. The old catch just logged
+`tp1_close_fail`, pushed the position back to `stillOpen`, and moved on — so the
+failure repeated silently for **5 days**. TP1 profit never banked.
+
+**Fix — cancel-first ordering (checkPositions Branch A long TP1):**
+1. **CANCEL** the resting broker stop first (`executor.cancelOrderById(pos.brokerStopOrderId)`
+   + a belt-and-braces `findOpenOrder(…, '-stop')` cancel) to RELEASE the shares,
+   then `executor.waitForNoOpenOrders(symbol)` so Alpaca actually frees them
+   before the close races the cancel.
+2. Submit the partial close, then **`executor.pollOrderFill(closeOrderId)`** —
+   CONFIRM it filled. Do not trust submit-success alone.
+3. Only THEN re-place the break-even stop on the **runner only**
+   (`executor.placeStop(pos, runnerShares, bePrice, 'stop')`), long BE = entry+1¢.
+4. **Never leave the position naked:** if the partial is rejected OR the fill
+   isn't confirmed, re-place a protective stop on the FULL remaining qty
+   (`placeStop(pos, shares_remaining, pos.stopLoss, 'restop')`) and raise a LOUD
+   `tg.alertTp1CloseFailed()` alarm. The 5-day silent failure is exactly what the
+   alarm prevents recurring.
+
+**PYPL traced numbers:** 23sh → TP1 `Math.floor(23×0.50)=11` sh, runner 12 sh, BE
+= `round(41.395×100)=4140` → $41.40 → +1¢ long bias → **$41.41** on the 12-share
+runner. Cancel target = stop `9a155efb-…` @ $40.
+
+**Short-side twin (maintainV2_2BrokerOrders).** Shorts don't hit Branch A (they
+`continue` — their TP1 is a resting GTC limit). But the SAME hold bug lived on the
+PLACEMENT side: the function placed a full-size `-stop` FIRST (holding all shares),
+then tried to place the `-tp1` limit — which threw `insufficient qty` and was only
+`console.warn`ed, so the short TP1 limit never actually rested. Fix: while
+`tp1_hit === false` on a SHORT, the resting stop reserves only the RUNNER half
+(`shares_total − tp1Qty`), leaving the TP1 half free for the limit; and the TP1
+limit is now an **OCO** (limit TP1 + stop SL) so both legs are protected. Once
+`tp1_hit`, the stop reverts to the runner at BE (unchanged). Longs carry no
+resting TP1 limit, so they keep a full-size stop until the cancel-first close
+cancels it.
+
+**New executor helpers (alpaca-executor.js):** `cancelOrderById` (treats 404/422
+as already-gone → shares freed, doesn't throw), `waitForNoOpenOrders` (poll shares
+released), `pollOrderFill` (confirm the market close filled), `placeStop` (re-place
+BE / re-protect a stop on N shares). New sid-log kinds: `tp1_close_fail` now
+carries `reprotected`; `be_stop_place_fail` when the runner BE stop can't place.
+
+**Lesson:** a broker-side resting stop that covers the FULL position is
+incompatible with a partial close by qty — the stop must be cancelled (or reduced
+to the runner) BEFORE the partial, and any close must be fill-confirmed and
+alarm-loud on failure. Also: any "position stays open, will retry next run" catch
+that isn't ALSO loud is a silent-failure timebomb — make it alert.
 
 ### Pitfall: Alpaca rejects SL stop for full position when TP1 limit already holds partial
 
