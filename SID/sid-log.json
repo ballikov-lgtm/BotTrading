@@ -1,5 +1,11 @@
 [
   {
+    "timestamp": "2026-07-02T16:19:19.428Z",
+    "kind": "tp2_close_fail",
+    "symbol": "PYPL",
+    "error": "Alpaca DELETE /v2/positions/PYPL failed: insufficient qty available for order (requested: 12, available: 0)"
+  },
+  {
     "timestamp": "2026-07-01T23:11:05.999Z",
     "kind": "tp1_close_fail",
     "symbol": "PYPL",
@@ -3113,12 +3119,6 @@
   {
     "timestamp": "2026-06-12T17:23:03.279Z",
     "symbol": "GME",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-06-12T17:23:02.920Z",
-    "symbol": "GLD",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
