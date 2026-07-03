@@ -1917,5 +1917,24 @@
     "closeDate": "2026-07-01",
     "closeTime": "13:45:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1783031364944",
+    "symbol": "STXUSDT",
+    "side": "long",
+    "entry": 0.17,
+    "stopLoss": 0.1624,
+    "takeProfit": 0.1721,
+    "qty": 30.066146,
+    "totalUsd": 5,
+    "openDate": "2026-07-02",
+    "openTime": "22:29:24",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.1853,
+    "exitLevel": "tp1",
+    "exitPrice": 0.1721,
+    "closeDate": "2026-07-03",
+    "closeTime": "12:00:00",
+    "outcome": "WIN"
   }
 ]
