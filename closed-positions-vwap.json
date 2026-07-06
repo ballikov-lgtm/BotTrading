@@ -2107,5 +2107,43 @@
     "closeDate": "2026-07-05",
     "closeTime": "01:15:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1783284683660",
+    "symbol": "BTCUSDT",
+    "side": "short",
+    "entry": 62729,
+    "stopLoss": 63210.6,
+    "takeProfit": 62006.6,
+    "qty": 0.00008,
+    "totalUsd": 5.02,
+    "openDate": "2026-07-05",
+    "openTime": "20:51:23",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.1156,
+    "exitLevel": "sl",
+    "exitPrice": 63210.6,
+    "closeDate": "2026-07-05",
+    "closeTime": "22:15:00",
+    "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1783284684022",
+    "symbol": "XRPUSDT",
+    "side": "short",
+    "entry": 1.14,
+    "stopLoss": 1.1535,
+    "takeProfit": 1.11,
+    "qty": 4.401021,
+    "totalUsd": 5,
+    "openDate": "2026-07-05",
+    "openTime": "20:51:24",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.1776,
+    "exitLevel": "sl",
+    "exitPrice": 1.1535,
+    "closeDate": "2026-07-05",
+    "closeTime": "22:15:00",
+    "outcome": "LOSS"
   }
 ]
