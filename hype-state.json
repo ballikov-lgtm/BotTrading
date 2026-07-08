@@ -3,12 +3,18 @@
   "entryQty": 30,
   "entryPrice": 40.901,
   "tp1Hit": true,
-  "tp2Hit": false,
+  "tp2Hit": true,
   "tp3Hit": false,
   "tp1OrderId": "1458880677305528321",
-  "tp2OrderId": null,
+  "tp2OrderId": "1458884454037204993",
   "tp3OrderId": null,
   "log": [
+    "2026-07-08T22:51Z     ✔ TP3 order placed (id: null)",
+    "2026-07-08T22:51Z  📤 Placing TP3 limit close: 7.5 HYPE @ $59.4",
+    "2026-07-08T22:51Z  🔒 Setting 3% trailing stop (activated @ $49.3)",
+    "2026-07-08T22:51Z  ✅ TP2 FILLED @ $49.3 — closed 35% of position",
+    "2026-07-08T22:51Z     ✔ TP2 order placed (id: 1458884454037204993)",
+    "2026-07-08T22:51Z  📤 Placing TP2 limit close: 10.5 HYPE @ $49.3",
     "2026-07-08T22:36Z     ✔ TP2 order placed (id: null)",
     "2026-07-08T22:36Z  📤 Placing TP2 limit close: 10.5 HYPE @ $49.3",
     "2026-07-08T22:36Z  🔒 Moving SL to break-even: $40.901",
@@ -152,12 +158,6 @@
     "2026-07-08T08:20Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783498857498,\"data\":null}",
     "2026-07-08T08:20Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-07-08T08:05Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783497957872,\"data\":null}",
-    "2026-07-08T08:05Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T07:50Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783497057407,\"data\":null}",
-    "2026-07-08T07:50Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T07:35Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783496157498,\"data\":null}",
-    "2026-07-08T07:35Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T07:20Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783495257475,\"data\":null}",
-    "2026-07-08T07:20Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
+    "2026-07-08T08:05Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
   ]
 }
