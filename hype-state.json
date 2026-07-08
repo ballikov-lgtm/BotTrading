@@ -2,13 +2,19 @@
   "active": true,
   "entryQty": 30,
   "entryPrice": 40.901,
-  "tp1Hit": false,
+  "tp1Hit": true,
   "tp2Hit": false,
   "tp3Hit": false,
-  "tp1OrderId": null,
+  "tp1OrderId": "1458880677305528321",
   "tp2OrderId": null,
   "tp3OrderId": null,
   "log": [
+    "2026-07-08T22:36Z     ✔ TP2 order placed (id: null)",
+    "2026-07-08T22:36Z  📤 Placing TP2 limit close: 10.5 HYPE @ $49.3",
+    "2026-07-08T22:36Z  🔒 Moving SL to break-even: $40.901",
+    "2026-07-08T22:36Z  ✅ TP1 FILLED @ $45.6 — closed 40% of position",
+    "2026-07-08T22:36Z     ✔ TP1 order placed (id: 1458880677305528321)",
+    "2026-07-08T22:36Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-07-08T22:21Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783549278379,\"data\":null}",
     "2026-07-08T22:21Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-07-08T22:18Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783549126537,\"data\":null}",
@@ -152,12 +158,6 @@
     "2026-07-08T07:35Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783496157498,\"data\":null}",
     "2026-07-08T07:35Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
     "2026-07-08T07:20Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783495257475,\"data\":null}",
-    "2026-07-08T07:20Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T07:15Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783494910947,\"data\":null}",
-    "2026-07-08T07:15Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T07:00Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783494010689,\"data\":null}",
-    "2026-07-08T07:00Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6",
-    "2026-07-08T06:45Z     ⚠️  TP1 order error: Close order failed: {\"code\":\"22002\",\"msg\":\"No position to close\",\"requestTime\":1783493110194,\"data\":null}",
-    "2026-07-08T06:45Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
+    "2026-07-08T07:20Z  📤 Placing TP1 limit close: 12 HYPE @ $45.6"
   ]
 }
