@@ -2620,5 +2620,24 @@
     "closeDate": "2026-07-14",
     "closeTime": "12:15:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1784067204009",
+    "symbol": "INJUSDT",
+    "side": "long",
+    "entry": 4.99,
+    "stopLoss": 4.8656,
+    "takeProfit": 5.1691,
+    "qty": 1.002607,
+    "totalUsd": 5,
+    "openDate": "2026-07-14",
+    "openTime": "22:13:24",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.5384,
+    "exitLevel": "tp1",
+    "exitPrice": 5.1691,
+    "closeDate": "2026-07-15",
+    "closeTime": "12:45:00",
+    "outcome": "WIN"
   }
 ]
