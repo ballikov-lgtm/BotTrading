@@ -1,9 +1,11 @@
 {
   "unh-440-resistance": {
-    "fired": false,
+    "fired": true,
+    "firedAt": "2026-07-16T15:41:36Z",
     "symbol": "UNH",
     "threshold": 440,
     "direction": "above",
-    "note": "Alan's previous-support-now-resistance level (2026-06-28, price was $427.89). Fires once when UNH day-high touches $440."
+    "priceAtFire": 434.88,
+    "probeAtFire": 461
   }
 }
