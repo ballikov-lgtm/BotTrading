@@ -862,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 10:47:13</span>
+        <span>SYS · 11:58:33</span>
       </div>
     </div>
   </header>
@@ -940,14 +940,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(23)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(24)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 10:47:13 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 11:58:33 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -1902,7 +1902,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (23)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (24)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1910,6 +1910,13 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-17</span>
+        <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
+      </div>
+      <div class="update-title">Offline tax-report tool - one-click local Excel of your realised trades, filter by UK tax year, never leaves your machine</div>
+      <div class="update-summary">NEW: a double-click tool that builds a spreadsheet of every closed SID trade with its realised profit or loss - to hand to your accountant. Windows: GENERATE-TAX-REPORT.bat. Mac: generate-tax-report.command. It runs entirely on YOUR computer (it refreshes your latest trades, builds the Excel with tax-report.py, and opens it) - nothing is uploaded and the file is git-ignored so your private figures are never committed to the public repo. One row per trade: Symbol, Side, Opened, Closed, Quantity, Proceeds, Cost, Realised P&amp;L, plus a computed Month and UK Tax Year (the UK year runs 6 April to 5 April). Click the filter arrow on the 'UK Tax Year' or 'Month' column and the bold total row shows realised P&amp;L for just the visible rows (hidden/filtered rows are not counted). It's a record for your tax return, NOT tax advice; amounts are in USD and your accountant converts to GBP at official HMRC rates. Full guide: HOW-TO-TAX-REPORT.md. Offline tool only - no change to any trading rule.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-07-17</span>
         <span class="update-cat" style="color:#ffaa00;border-color:#ffaa00">RELEASE</span>
@@ -2079,7 +2086,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.4.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 10:47:13 UTC</footer>
+  <footer>SID v2.4.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 11:58:33 UTC</footer>
 
 </div>
 

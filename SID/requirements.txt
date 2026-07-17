@@ -6,3 +6,5 @@
 # version protects against breaking changes.
 yfinance>=0.2,<1
 pandas>=2,<3
+# tax-report.py (offline follower tax tool) builds an interactive .xlsx.
+openpyxl>=3,<4

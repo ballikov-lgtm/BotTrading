@@ -2,3 +2,9 @@ node_modules/
 .env
 .claude/worktrees/
 .claude/settings.local.json
+
+# SID offline tax reports are generated locally on each follower's machine and
+# contain their private trade P&L. Never commit them to the public repo.
+# Scoped to this folder ONLY — the backtest .xlsx under SID/ and
+# SID/strategy-test-vault/ stay tracked.
+/SID/tax-reports/

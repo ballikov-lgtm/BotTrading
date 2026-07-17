@@ -27,6 +27,7 @@ SID/manual-trade.js
 SID/manual-close.js
 SID/rsi-target-price.js
 SID/strategy-audit.js
+SID/tax-report.py
 
 # ── Strategy config / universe / reference data ──────────────────────────────
 SID/watchlist-sid.json
@@ -44,6 +45,11 @@ SID/SID-DEPLOY-PROMPT.md
 SID/SID-UPDATE-PROMPT.md
 SID/HOW-TO-UPDATE.md
 SID/HOW-TO-FUND-ALPACA.md
+SID/HOW-TO-TAX-REPORT.md
+
+# ── Offline tax-report tool (double-click launchers — output stays local) ────
+SID/GENERATE-TAX-REPORT.bat
+SID/generate-tax-report.command
 
 # ── TradingView visualisers + the Telegram approval Worker ───────────────────
 SID/pine

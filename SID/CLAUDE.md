@@ -1161,6 +1161,76 @@ signal-level, not execution-level). A pre-existing stray
 `strategy-updates.json.tmp.37284.*` (Jun 14, not mine) is still untracked — left
 alone.
 
+### OFFLINE / LOCAL TAX-REPORT TOOL (2026-07-17) — WORKING TREE, NOT COMMITTED
+
+Built a follower-facing tool that turns `closed-positions-sid.json` into an
+interactive tax Excel **on the follower's OWN machine** — the sensitive tax
+document is generated locally and NEVER committed to the public repo (no private
+repo, no cloud artifact). **Status: WORKING TREE ONLY — nothing committed,
+pushed, or executed this session (per the brief). Return for review.** This is an
+OFFLINE tool, **NOT a strategy change** — `BOT_VERSION`/`STRATEGY_VERSION` stay
+`v2.4.0`.
+
+**What was built (all additive):**
+- `SID/tax-report.py` — reads `closed-positions-sid.json` (defensive about the
+  varied schema — long/short, `exit_price`/`exitPrice`, `total_pnl`/`realizedPnl`,
+  `shares_total`/`exit_shares`/`shares`, `openDate`/`signalDate` etc.; skips
+  malformed records with a `[SKIP]` warning rather than crashing) and writes ONE
+  row per closed trade to `SID/tax-reports/sid-tax-report-YYYY-MM-DD.xlsx` (dir
+  auto-created; date from the system clock — fine, runs on the user's machine).
+  Columns: `Symbol | Side | Opened | Closed | Quantity | Proceeds (USD) |
+  Cost (USD) | Realised P&L (USD) | Month | UK Tax Year`. **Realised P&L uses the
+  stored `total_pnl`/`realizedPnl` as authoritative**; Proceeds/Cost are reference
+  (long: cost=entry*qty, proceeds=exit*qty; short: proceeds=entry*qty,
+  cost=exit*qty). **UK Tax Year** from the CLOSE date, 6 Apr–5 Apr:
+  `(month,day) >= (4,6) → start=year else year-1`, label `f"{start}/{(start+1)%100:02d}"`
+  (verified against all four spec boundary cases + year-2000 rollover → `1999/00`).
+  **AutoFilter** on the header row; a bold **filter-aware TOTAL row** using
+  **`SUBTOTAL(109,...)`** (109 = SUM ignoring BOTH filtered-out AND manually-hidden
+  rows) on Proceeds/Cost/Realised-P&L, labelled "REALISED P&L (visible rows)".
+  Frozen+bold header, currency/date number formats, notice banner row.
+  Zero-trades → headers + a `0` total, no crash. Windows-safe prints (`[OK]`/
+  `[DONE]`/`[SKIP]`, no unicode — cp1252 trap).
+- `SID/GENERATE-TAX-REPORT.bat` (Windows) + `SID/generate-tax-report.command`
+  (Mac) — double-click launchers: cd to repo root (`%~dp0\..` / `$(dirname
+  "$0")/..`), detect Python (`python`→`py -3`→`python3`), `git pull origin main`
+  (tolerate failure with a friendly "generating from what's on disk"),
+  `pip install openpyxl`, run the script, open the newest xlsx (`start`/`open`),
+  pause. The `.command` is staged mode `100755` (executable) and pinned to LF via a
+  new `SID/.gitattributes` (`generate-tax-report.command text eol=lf`) — the repo
+  has `core.autocrlf=true`, which would otherwise CRLF-corrupt the bash script for
+  Mac users. `HOW-TO-TAX-REPORT.md` notes Mac's first-run right-click→Open.
+- `SID/HOW-TO-TAX-REPORT.md` — non-technical guide (double-click, filter the UK
+  Tax Year/Month column, read the total row; UK Apr–Apr year explained; record not
+  advice; USD→GBP by the accountant; stays private on the machine).
+- Wiring: `.sid-update-manifest.txt` gained the 4 TOOL files (`tax-report.py`,
+  `.bat`, `.command`, `HOW-TO-TAX-REPORT.md`) but NOT the `tax-reports/` output;
+  `SID-README.md` Files table gained rows; `strategy-updates.json` got ONE new
+  INFRA entry at the top (count 23→24) and `docs/sid/index.html` was regenerated
+  from the WORKTREE ROOT (`node SID/sid-dashboard.js` — worktree root has
+  node_modules; the repo-root snapshot errors MODULE_NOT_FOUND); `requirements.txt`
+  gained `openpyxl>=3,<4`.
+
+**Privacy guarantee — `SID/tax-reports/` is git-ignored.** Added `/SID/tax-reports/`
+to the ROOT `.gitignore`, scoped so it does NOT touch the tracked backtest `.xlsx`
+under `SID/` and `SID/strategy-test-vault/`. Verified with `git check-ignore`:
+generated reports ARE ignored; the 3 backtest `.xlsx` are NOT ignored and stay in
+the index. The one-click follower updater's denylist doesn't need the output file
+(the manifest can't list it), but note the tool files ARE pulled by an update.
+
+**Tested (local, no network, no commit):** ran against the live 5-trade
+`closed-positions-sid.json` → correct columns, correct short/long Proceeds/Cost,
+correct Month + UK Tax Year per row; `SUBTOTAL(109,F4:F8/G/H)` formulas verified
+in the saved xlsx (caught + fixed an early bug where the range end anchor omitted
+the column letter → `F4:8`; now `F4:F8`). Zero-trades and malformed-record paths
+exercised (skip-with-warning, empty total, no crash). Dashboard rebuilt: markers
+still v2.4.0, Updates count 24, tax entry present. All test-generated
+`tax-reports/` artifacts deleted afterward.
+
+**Queued / not done:** nothing committed/pushed/executed (per brief — return for
+review). If Alan approves, push via the standard protocol (fetch → pull --rebase
+--autostash → push; never without approval).
+
 ### Pitfall: Alpaca rejects SL stop for full position when TP1 limit already holds partial
 
 Confirmed 2026-05-22 on the MCD oneshot trade (entry filled 8 shares @ $281.67). Original `manual-trade.js` pattern was:
