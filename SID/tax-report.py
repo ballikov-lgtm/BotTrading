@@ -79,9 +79,10 @@ DATE_FMT = 'yyyy-mm-dd'
 
 NOTICE = (
     "SID realised-trades record for your tax return - NOT tax advice. "
-    "Amounts in USD; your accountant converts to GBP at official HMRC rates. "
-    "Filter the Month or 'UK Tax Year' column; the total row shows realised "
-    "P&L for the visible rows."
+    "LIVE trades only: paper (simulated) trades are EXCLUDED because they are not "
+    "taxable. Amounts in USD; your accountant converts to GBP at official HMRC rates. "
+    "Filter the Month or 'UK Tax Year' column; the total row shows realised P&L for "
+    "the visible rows."
 )
 
 # Column order (1-indexed positions used throughout).
@@ -96,6 +97,7 @@ COLUMNS = [
     "Realised P&L (USD)",
     "Month",
     "UK Tax Year",
+    "Mode",
 ]
 COL = {name: i + 1 for i, name in enumerate(COLUMNS)}
 
@@ -196,6 +198,7 @@ def build_row(rec: dict):
 
     month = f"{closed.year:04d}-{closed.month:02d}"
     tax_yr = uk_tax_year(closed)
+    mode = str(_first(rec, "mode") or "").lower()
 
     return {
         "Symbol": str(symbol),
@@ -208,6 +211,7 @@ def build_row(rec: dict):
         "Realised P&L (USD)": pnl,
         "Month": month,
         "UK Tax Year": tax_yr,
+        "Mode": mode or "?",
     }, None
 
 
@@ -289,6 +293,7 @@ def build_workbook(rows):
 
         ws.cell(row=r, column=COL["Month"], value=row["Month"]).alignment = ALIGN_CENTRE
         ws.cell(row=r, column=COL["UK Tax Year"], value=row["UK Tax Year"]).alignment = ALIGN_CENTRE
+        ws.cell(row=r, column=COL["Mode"], value=row["Mode"]).alignment = ALIGN_CENTRE
         r += 1
 
     data_end = r - 1                 # last data row (== header row if zero trades)
@@ -336,7 +341,7 @@ def build_workbook(rows):
     widths = {
         "Symbol": 10, "Side": 8, "Opened": 12, "Closed": 12, "Quantity": 10,
         "Proceeds (USD)": 15, "Cost (USD)": 15, "Realised P&L (USD)": 18,
-        "Month": 10, "UK Tax Year": 12,
+        "Month": 10, "UK Tax Year": 12, "Mode": 8,
     }
     for name, w in widths.items():
         ws.column_dimensions[get_column_letter(COL[name])].width = w
@@ -350,7 +355,14 @@ def main():
 
     rows = []
     skipped = 0
+    excluded_paper = 0
     for rec in records:
+        # LIVE-ONLY: paper (simulated) and dry_run trades are NOT taxable, so they
+        # are excluded from the tax report entirely. Only mode == 'live' is counted.
+        mode = str((rec.get("mode") if isinstance(rec, dict) else "") or "").lower()
+        if mode != "live":
+            excluded_paper += 1
+            continue
         row, reason = build_row(rec)
         if row is None:
             skipped += 1
@@ -368,7 +380,12 @@ def main():
     wb = build_workbook(rows)
     wb.save(out_path)
 
-    print("[OK] Included " + str(len(rows)) + " closed trade(s).")
+    print("[OK] Included " + str(len(rows)) + " LIVE closed trade(s).")
+    if excluded_paper:
+        print("[OK] Excluded " + str(excluded_paper) + " paper/simulated trade(s) - not taxable.")
+    if not rows:
+        print("[NOTE] No LIVE trades yet, so the report is empty - that is correct:")
+        print("       paper trading has no taxable events. It fills in once you trade live.")
     if skipped:
         print("[OK] Skipped " + str(skipped) + " malformed/incomplete record(s) (see [SKIP] above).")
     print("[DONE] Report saved to:")

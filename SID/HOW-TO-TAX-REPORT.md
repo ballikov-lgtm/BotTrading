@@ -44,6 +44,12 @@ One row per closed trade, with these columns:
 | **Realised P&L (USD)** | **The actual profit or loss on the trade** — this is the number that matters. |
 | **Month** | The month the trade closed (e.g. `2026-06`). Handy for filtering. |
 | **UK Tax Year** | The UK tax year the trade closed in (e.g. `2026/27`). Handy for filtering. |
+| **Mode** | `live` — real-money trades only. (Paper/simulated trades are left out entirely — see below.) |
+
+**Only your LIVE (real-money) trades appear here.** Paper (simulated) trades are
+**excluded**, because paper trading isn't real and isn't taxable. So while you're
+still on paper, this report will be **empty** — that's correct, there's nothing to
+declare yet. Once you go live, your real trades fill it in automatically.
 
 All amounts are in **US dollars (USD)**, because that's the currency the trades
 are made in. Your accountant converts them to **GBP** using the official HMRC
@@ -84,6 +90,9 @@ just filter that column.
 
 ## Important
 
+- **Live trades only.** The report contains only your real-money (`live`) trades —
+  paper/simulated trades are excluded because they are not taxable. It stays empty
+  while you're on paper, which is correct.
 - **This is a record of your trades, not tax advice.** It's a tidy list to hand
   to your accountant or use for your Self Assessment. It does not tell you how
   much tax you owe.
