@@ -24,7 +24,7 @@ const CONFIG = {
   accountUsd:       parseFloat(process.env.SID_ACCOUNT_USD)     || 30000,  // V2.2 fallback only
   riskPct:          parseFloat(process.env.SID_RISK_PCT)         || 0.01,   // V2 default 1% per instructor S3_Ep4
   maxPositionPct:   parseFloat(process.env.SID_MAX_POS_PCT)      || 0.10,   // 10% of account max per trade
-  maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 3,      // Never hold more than 3 at once
+  maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 5,      // Never hold more than 5 at once (v2.2.6: raised 3→5; 5 × 10% cap = ~50% max deployed)
   maxPerDay:        parseInt(process.env.SID_MAX_PER_DAY)        || 1,      // Max new entries per run
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
   rsiNoGoLong:      parseFloat(process.env.SID_RSI_NOGO_LONG)    || 45,     // V2: reject long entry if RSI >= this
@@ -81,8 +81,58 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2.5'; // V2.2.5 TP1 CANCEL-FIRST FIX: the long TP1 partial close now CANCELS the resting full-size broker GTC stop FIRST (to release the held shares), then submits the partial close, POLLS that it filled, and only then re-places the break-even stop on the runner. Fixes a 5-day SILENT FAILURE on PYPL where the DELETE-by-qty partial close returned `insufficient qty available (available: 0)` every run because the full stop held all shares → TP1 profit never banked. Short-side twin fixed too: while TP1 is pending the resting stop reserves only the RUNNER half so the resting TP1 limit can actually place, and the TP1 half is now an OCO (limit + stop) so both legs are protected. Any TP1 close failure now raises a LOUD Telegram alarm (tg.alertTp1CloseFailed) so a silent multi-day failure can't recur; a failed/unconfirmed close re-protects the FULL remaining qty. No canon rule change. (paper trading, 2026-07-01)
+const BOT_VERSION = 'v2.2.6'; // V2.2.6 TP2 CANCEL-FIRST FIX (+ cap raise 3→5 + BITF delist removal): the TP2 runner-close (checkPositions Branch B) now applies the SAME cancel-first pattern the v2.2.5 fix applied to TP1 — it CANCELS the resting break-even broker GTC stop FIRST (to release the runner shares), then submits the full runner close, POLLS that it filled, and only re-protects on failure. Fixes the SAME silent-retry loop v2.2.5 cured for TP1, but on the other branch: PYPL (12sh runner, BE $41.41) and ADBE (2sh runner, BE $200.79) hit a legitimate SMA50-touch TP2 but the close failed every run 2026-07-13→16 with `insufficient qty available (available: 0)` because the BE stop held the runner shares → tp2Hit never banked, retried silently. On a REJECTED/unconfirmed close the runner is re-protected with a stop + a LOUD Telegram alarm (tg.alertTp2CloseFailed) fires. Also: CONFIG.maxOpenPositions 3→5 (5 × 10% cap = ~50% max deployed); BITF removed from the universe (delisted — Alpaca HTTP 404 every run); stale UNH one-shot close workflow deleted. No canon rule change. (paper trading, 2026-07-17)
 // Version history:
+//   v2.2.6 V2.2.6 TP2 CANCEL-FIRST / RUNNER-HELD-SHARES FIX (2026-07-17, paper trading):
+//        - ROOT CAUSE: exact twin of the v2.2.5 TP1 bug, on the TP2 branch. After
+//          TP1 banks, the v2.2 broker design leaves a full-RUNNER GTC break-even
+//          stop resting (pos.brokerStopOrderId, client_order_id `...-stop-<ts>`).
+//          Alpaca "holds" the runner shares against it, so when checkPositions
+//          Branch B fired a legitimate TP2 (SMA50 touch) and called
+//          executor.closePosition() → DELETE /v2/positions/SYM, it returned
+//          `insufficient qty available (requested: N, available: 0)` EVERY run.
+//          The old catch just logged tp2_close_fail and re-queued the position →
+//          the same silent retry loop the TP1 fix cured. PYPL (12sh runner, BE
+//          $41.41) failed 4×, ADBE (2sh runner, BE $200.79) 2×, 2026-07-13→16.
+//          (closePosition's own cleanup only cancels client_order_ids ending in
+//          the literal `-stop`, but placeStop/maintainV2_2BrokerOrders append a
+//          timestamp, so it never matched — hence the leak.)
+//        - TP2 TRIGGER WAS LEGITIMATE, not a false positive: both runners rallied
+//          FAVOURABLY up through their SMA50 (PYPL close $56.73 vs SMA50 $44.51 &
+//          SMA200 $52.90; ADBE close $235.31 vs SMA50 $230.94). The crossedSMA
+//          gap-cross clause fired correctly — the runners genuinely earned a TP2
+//          exit and were stuck retrying because the CLOSE failed, not the trigger.
+//        - FIX (checkPositions Branch B): mirror the v2.2.5 TP1 cancel-first order
+//          of operations — (1) CANCEL the resting BE broker stop
+//          (pos.brokerStopOrderId + any lingering -stop) and WAIT for zero open
+//          orders to release the runner shares; (2) submit the runner close and
+//          POLL the order until it FILLS; (3) TP2 fully closes the runner so no
+//          re-stop is needed on SUCCESS. If the close is REJECTED or the fill
+//          isn't confirmed, re-place a protective stop on the remaining runner qty
+//          and raise a LOUD alarm (tg.alertTp2CloseFailed) — tp2Hit is NOT booked,
+//          so it retries next run with the runner protected.
+//        - LOUD FAILURE: new tg.alertTp2CloseFailed() Telegram alarm (twin of
+//          alertTp1CloseFailed). sid-log tp2_close_fail now carries `reason` +
+//          `reprotected` so the exact TP2 trigger + protection state is recorded.
+//        - CAP RAISE: CONFIG.maxOpenPositions default 3→5 (env SID_MAX_POSITIONS).
+//          Capital: 5 × maxPositionPct 10% = ~50% max deployed (1%-risk sizing is
+//          usually well under the 10% cap, so real deployment is lower). No cap
+//          on total risk beyond the per-position 10%.
+//        - UNIVERSE: BITF removed from watchlist-sid.json (master + HUMAN tier)
+//          and asset-classification.json — delisted, returned Alpaca HTTP 404
+//          every run and was silently skipped. AUTO-80 tier UNCHANGED (BITF was
+//          HUMAN/LOG-only, never auto-fired). Universe 113→112, HUMAN 33→32.
+//          (The v2_human_approval_33 JSON key name is left as-is to avoid breaking
+//          the Python backtests that read it literally; it now holds 32.)
+//        - HOUSEKEEPING: deleted stale one-shot workflow
+//          .github/workflows/sid-oneshot-close-unh-2026-07-01.yml — the UNH short
+//          it targeted (id d9bca959…, entry $416.52) stopped out on its broker
+//          stop 2026-07-01 ($428.05, exit_strategy full_external_fill), so the
+//          position no longer exists.
+//        - NO SIGNAL-LOGIC CHANGE. RSI 30/70 thresholds, RSI+MACD alignment, the
+//          RSI-50 TP1 trigger, the 14-day earnings blackout and the AUTO-tier
+//          80-ticker universe are ALL untouched. Backtest numbers UNCHANGED —
+//          execution-plumbing + config + universe-hygiene fix, not a rule change.
 //   v2.2.5 V2.2.5 TP1 CANCEL-FIRST / HELD-SHARES FIX (2026-07-01, paper trading):
 //        - ROOT CAUSE: the v2.2 broker design leaves a full-size GTC stop
 //          resting from entry (pos.brokerStopOrderId). Alpaca "holds" every
@@ -1893,17 +1943,98 @@ async function checkPositions(executor = null) {
           : (pos.entry - tp2ExitPrice) * pos.shares_remaining
       ).toFixed(2));
 
+      // ── CANCEL-FIRST TP2 runner-close (v2.2.6 fix) ──────────────────────
+      // ROOT CAUSE (PYPL 12sh BE $41.41, ADBE 2sh BE $200.79; 2026-07-13→16):
+      // after TP1 banks, the v2.2 broker design leaves a full-RUNNER GTC BE
+      // stop resting (pos.brokerStopOrderId, client_order_id `...-stop-<ts>`).
+      // Alpaca "holds" the runner shares against it, so the TP2 full close
+      // (DELETE /v2/positions/SYM) returned `insufficient qty available
+      // (available: 0)` EVERY run. The old catch just logged tp2_close_fail and
+      // re-queued the position → identical 5-day-style silent retry loop the
+      // v2.2.5 TP1 fix cured on Branch A. (closePosition's own cleanup only
+      // cancels orders ending in the literal `-stop`, but placeStop/maintain
+      // append a timestamp, so it never matched — hence the leak.)
+      //
+      // Correct order of operations (mirrors the v2.2.5 TP1 cancel-first fix):
+      //   (1) CANCEL the resting BE/runner broker stop (brokerStopOrderId + any
+      //       lingering -stop) and WAIT for zero open orders to RELEASE the
+      //       runner shares.
+      //   (2) Submit the runner close and POLL that it actually FILLS.
+      //   (3) TP2 fully closes the runner → no re-stop needed on SUCCESS.
+      //   (*) On a REJECTED or UNCONFIRMED close, do NOT leave the runner naked:
+      //       re-place a protective stop on the remaining qty + fire the LOUD
+      //       alarm + do NOT record the close (retry next run).
+      let tp2Confirmed = true;   // true when there's no executor (dry_run) OR the fill confirmed
       if (executor) {
+        // (1) Release the runner shares held by the resting BE broker stop(s).
         try {
-          await executor.closePosition(pos, `V2.1 TP2 (${tp2Reason}) on ${c.date}`);
+          if (pos.brokerStopOrderId) {
+            await executor.cancelOrderById(pos.brokerStopOrderId);
+          }
+          // Belt-and-braces: cancel ANY lingering -stop order on the symbol
+          // (id may have rotated via maintainV2_2BrokerOrders across runs).
+          const lingeringStop = await findOpenOrder(executor.client, pos.symbol, '-stop');
+          if (lingeringStop) await executor.cancelOrderById(lingeringStop.id);
+          // Wait for Alpaca to actually free the held shares before the close.
+          await executor.waitForNoOpenOrders(pos.symbol);
         } catch (err) {
-          console.log(`\n    🚫 Alpaca TP2 close FAILED: ${err.message} — position stays open, will retry next run`);
-          writeLog({ kind: 'tp2_close_fail', symbol: pos.symbol, error: err.message });
+          console.log(`\n    ⚠ Could not cancel resting BE stop for ${pos.symbol} before TP2: ${err.message} — attempting close anyway`);
+        }
+
+        // (2) Submit the runner close and CONFIRM the fill.
+        let closeOrderId = null;
+        try {
+          const res = await executor.closePosition(pos, `V2.1 TP2 (${tp2Reason}) on ${c.date}`);
+          closeOrderId = res?.closeOrderId ?? null;
+        } catch (err) {
+          // Runner close was REJECTED — the BE stop was already cancelled above
+          // so re-protect the runner qty then alarm + retry next run.
+          let reprotected = false;
+          try {
+            const rp = await executor.placeStop(pos, pos.shares_remaining, pos.stopLoss, 'restop');
+            pos.brokerStopOrderId = rp.stopOrderId;
+            reprotected = true;
+          } catch (rpErr) {
+            console.log(`\n    🚨 RE-PROTECT FAILED for ${pos.symbol} runner: ${rpErr.message}`);
+          }
+          console.log(`\n    🚫 Alpaca TP2 close FAILED: ${err.message} — runner stays open, ${reprotected ? 're-protected' : 'RE-PROTECT FAILED'}, will retry next run`);
+          writeLog({ kind: 'tp2_close_fail', symbol: pos.symbol, reason: tp2Reason, error: err.message, reprotected });
+          tg.alertTp2CloseFailed({
+            symbol: pos.symbol, side: pos.side, runnerShares: pos.shares_remaining,
+            reason: tp2Reason, error: err.message, reprotected, mode: pos.mode || CONFIG.tradingMode,
+          }).catch(() => {});
+          stillOpen.push(pos);
+          positionHandled = true;
+          break;
+        }
+
+        // Confirm the market close actually filled before booking the trade. If
+        // it did NOT fill, re-protect the runner and retry next run.
+        const fill = closeOrderId ? await executor.pollOrderFill(closeOrderId) : { filled: false };
+        if (!fill.filled) {
+          tp2Confirmed = false;
+          let reprotected = false;
+          try {
+            const rp = await executor.placeStop(pos, pos.shares_remaining, pos.stopLoss, 'restop');
+            pos.brokerStopOrderId = rp.stopOrderId;
+            reprotected = true;
+          } catch (rpErr) {
+            console.log(`\n    🚨 RE-PROTECT FAILED for ${pos.symbol} runner: ${rpErr.message}`);
+          }
+          const failMsg = `TP2 runner close order ${closeOrderId} did not confirm fill (status ${fill.order?.status || 'unknown'})`;
+          console.log(`\n    🚫 ${failMsg} — ${reprotected ? 're-protected runner' : 'RE-PROTECT FAILED'}, will retry next run`);
+          writeLog({ kind: 'tp2_close_fail', symbol: pos.symbol, reason: tp2Reason, error: failMsg, reprotected });
+          tg.alertTp2CloseFailed({
+            symbol: pos.symbol, side: pos.side, runnerShares: pos.shares_remaining,
+            reason: tp2Reason, error: failMsg, reprotected, mode: pos.mode || CONFIG.tradingMode,
+          }).catch(() => {});
           stillOpen.push(pos);
           positionHandled = true;
           break;
         }
       }
+      // TP2 close confirmed (or dry_run) — fall through to book the trade.
+      void tp2Confirmed;
 
       const acctAfterTp2 = updateAccount(tp2Pnl);
       const totalPnl     = parseFloat(((pos.tp1_pnl || 0) + tp2Pnl).toFixed(2));

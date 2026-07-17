@@ -1,8 +1,8 @@
 {
-  "version": "4.0",
-  "lastUpdated": "2026-05-16",
-  "source": "research/SID Trading Watchlist.txt (community-curated) + 5-year backtest curation + tier1_expansion 2026-05-15",
-  "description": "V2 method universe (113 tickers): 80 AUTO-trade (proven via 5y V1 backtest) + 33 HUMAN-approval tier (high-vol / crypto / leveraged ETFs / re-added dropouts). Heatmap shows all 113.",
+  "version": "4.1",
+  "lastUpdated": "2026-07-17",
+  "source": "research/SID Trading Watchlist.txt (community-curated) + 5-year backtest curation + tier1_expansion 2026-05-15; BITF removed 2026-07-17 (delisted — Alpaca HTTP 404 every run)",
+  "description": "V2 method universe (112 tickers): 80 AUTO-trade (proven via 5y V1 backtest) + 32 HUMAN-approval tier (high-vol / crypto / leveraged ETFs / re-added dropouts). Heatmap shows all 112. (BITF removed 2026-07-17 — delisted, returned Alpaca HTTP 404 every run.)",
   "tickers": [
     "AAL",
     "AAPL",
@@ -19,7 +19,6 @@
     "AXP",
     "B",
     "BA",
-    "BITF",
     "BLK",
     "BOIL",
     "CAT",
@@ -396,7 +395,6 @@
       "AI",
       "AMC",
       "ARM",
-      "BITF",
       "BOIL",
       "COIN",
       "CSCO",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.2.5 TERMINAL</title>
+<title>SID // v2.2.6 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -848,8 +848,8 @@
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.2.5 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2.2.5 TP1 CANCEL-FIRST FIX · 73.9% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
+      <div class="brand">SID // v2.2.6 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.2.6 TP2 CANCEL-FIRST FIX · MAX 5 POSITIONS · 73.9% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -862,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 22:18:45</span>
+        <span>SYS · 06:58:53</span>
       </div>
     </div>
   </header>
@@ -871,7 +871,7 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.2.5 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.2.6 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
 The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live performance will differ. Note (v2.2.4): the backtest still fires bullish-asset shorts mechanically, but LIVE now GATES them for manual approval (a discipline overlay, not a rule change) — so live results deliberately diverge from the pure backtest on that subset.
       Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
@@ -930,7 +930,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   </div>
     <div class="stat-tile" style="--accent:var(--amber)">
     <div class="stat-label">MONITOR</div>
-    <div class="stat-value">33</div>
+    <div class="stat-value">32</div>
     <div class="stat-sub">manual review</div>
   </div>
   </div>
@@ -940,14 +940,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(19)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(20)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-16 22:18:45 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 06:58:53 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -989,7 +989,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span>QTY <strong>4</strong></span>
         <span>RISK <strong>$43.12</strong></span>
         <span>TO STOP <strong>14.7%</strong></span>
-        <span>DAYS <strong>20</strong></span>
+        <span>DAYS <strong>21</strong></span>
         <span>OPEN <strong>2026-06-26</strong></span>
       </div>
       
@@ -1052,7 +1052,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span>QTY <strong>23</strong></span>
         <span>RISK <strong>$32.09</strong></span>
         <span>TO STOP <strong>27.0%</strong></span>
-        <span>DAYS <strong>34</strong></span>
+        <span>DAYS <strong>35</strong></span>
         <span>OPEN <strong>2026-06-12</strong></span>
       </div>
       
@@ -1229,7 +1229,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
           <div class="panel-title">CLASSIFICATION</div>
           <div style="display:flex;flex-direction:column;gap:10px;font-family:'Share Tech Mono', monospace;font-size:12px">
             <div style="display:flex;justify-content:space-between"><span style="color:var(--green)">▰ AUTO_TRADE</span><span>80</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="color:var(--amber)">▰ MONITOR</span><span>33</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:var(--amber)">▰ MONITOR</span><span>32</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--text-dim)">▰ INSUFFICIENT</span><span>0</span></div>
             <div style="display:flex;justify-content:space-between"><span style="color:var(--red)">▰ EXCLUDED</span><span>0</span></div>
           </div>
@@ -1902,7 +1902,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (19)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (20)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1910,6 +1910,13 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-17</span>
+        <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
+      </div>
+      <div class="update-title">V2.2.6 TP2 CANCEL-FIRST FIX — TP2 runner-close no longer fails silently; position cap raised 3→5; BITF removed</div>
+      <div class="update-summary">LIVE BUG FIXED — the exact twin of the v2.2.5 TP1 bug, on the TP2 branch. After TP1 banks, the v2.2 broker design leaves a full-RUNNER break-even GTC stop resting on Alpaca, and Alpaca 'holds' the runner shares against it — so when checkPositions Branch B fired a TP2 exit and called the full close (DELETE /v2/positions/SYM), it returned `insufficient qty available for order (requested: N, available: 0)` on EVERY run. The old catch just logged tp2_close_fail and re-queued the position, so it retried silently: PYPL (12-share runner, BE $41.41) failed 4x and ADBE (2-share runner, BE $200.79) 2x over 2026-07-13 to 07-16. IMPORTANT — the TP2 trigger itself was LEGITIMATE, not a false positive: both runners had rallied FAVOURABLY up through their 50-day SMA (PYPL last close $56.73 vs SMA50 $44.51 &amp; SMA200 $52.90; ADBE last close $235.31 vs SMA50 $230.94), so the SMA50-touch TP2 fired correctly — they were stuck only because the CLOSE couldn't land while the BE stop held the shares. FIX (mirrors the v2.2.5 TP1 order of operations): (1) CANCEL the resting BE stop first (+ any lingering -stop) and wait for zero open orders to release the runner shares, (2) submit the runner close and POLL that it fills, (3) TP2 fully closes the runner so no re-stop on success — but on a rejected or unconfirmed close the runner is re-protected with a stop, tp2Hit is NOT booked (so it retries next run), and a LOUD Telegram alarm fires (tg.alertTp2CloseFailed). The sid-log tp2_close_fail entry now records the TP2 reason + protection state. ALSO in this release: the concurrent-position cap was raised from 3 to 5 (CONFIG.maxOpenPositions, env SID_MAX_POSITIONS; at the 10% per-position cap that's ~50% of the account max deployed, and 1%-risk sizing is usually well under the cap so real deployment is lower). AND: BITF was removed from the universe — it had been delisted and returned Alpaca HTTP 404 every run, so it was silently skipped; the AUTO-80 tier is unchanged (BITF was HUMAN/log-only, never auto-fired), the universe drops 113→112 and the HUMAN tier 33→32. The stale UNH one-shot close workflow was also deleted (the UNH short it targeted stopped out on its broker stop on 2026-07-01). NO signal-logic change — RSI 30/70, MACD alignment, the RSI-50 TP1 trigger, the earnings blackout and the AUTO-tier 80-ticker universe are all untouched, so the headline backtest numbers are unchanged.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-07-01</span>
         <span class="update-cat" style="color:#39ff14;border-color:#39ff14">FIX</span>
@@ -2051,7 +2058,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.2.5 // PRIVATE TERMINAL // GENERATED 2026-07-16 22:18:45 UTC</footer>
+  <footer>SID v2.2.6 // PRIVATE TERMINAL // GENERATED 2026-07-17 06:58:53 UTC</footer>
 
 </div>
 

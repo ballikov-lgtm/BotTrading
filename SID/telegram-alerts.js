@@ -226,6 +226,37 @@ export async function alertTp1CloseFailed({ symbol, side, tp1Shares, sharesTotal
   return sendMessage(msg);
 }
 
+/**
+ * v2.2.6 — LOUD alarm when the TP2 runner-close fails or its fill can't be
+ * confirmed. Twin of alertTp1CloseFailed but for the TP2 full-runner close in
+ * checkPositions Branch B. Root cause is the same class of bug: a resting BE
+ * broker stop reserves the runner shares, so DELETE /v2/positions/SYM (full
+ * close) hits `insufficient qty available (available: 0)`. The fix cancels the
+ * stop first; this alarm ensures any residual failure can't fail silently for
+ * days like the pre-fix version did.
+ */
+export async function alertTp2CloseFailed({ symbol, side, runnerShares, reason, error, reprotected, mode }) {
+  const modeTag = formatModeTag(mode);
+  const protLine = reprotected === true
+    ? '🛡️ Runner qty RE-PROTECTED with a stop — position is NOT naked. Will retry TP2 next run.'
+    : reprotected === false
+      ? '🚨 <b>RE-PROTECT ALSO FAILED — runner may be UNPROTECTED. CHECK ALPACA NOW.</b>'
+      : '';
+  const msg = [
+    `🆘 <b>SID TP2 CLOSE FAILED</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> — ${String(side || '').toUpperCase()} runner`,
+    runnerShares != null ? `Tried to close: ${runnerShares} sh (TP2 full runner)` : '',
+    reason ? `TP2 trigger: ${escape(reason)}` : '',
+    ``,
+    `<b>Error:</b> ${escape(error)}`,
+    protLine,
+    ``,
+    `<i>TP2 did NOT close this run. The bot will retry next run. If this repeats, a resting BE stop is likely holding the runner shares — cancel it on Alpaca so the close can fill.</i>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
 // ── Internals ───────────────────────────────────────────────────────────
 
 function formatModeTag(mode) {

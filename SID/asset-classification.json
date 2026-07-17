@@ -4,14 +4,14 @@
   "data_source": "V2 backtest (v2-weekly-or, 113 universe, 5y) \u2014 see SID/backtest-v2-validation-report.json",
   "rules": {
     "AUTO_TRADE": "V2 AUTO tier (80 tickers): refined-47 + tier1 expansion. Proven via 5y V1 backtest. Bot auto-fires.",
-    "MONITOR": "V2 HUMAN tier (33 tickers): crypto/EV/leveraged/intl ETFs/re-adds. Telegram approval required (v2.1 wires the flow).",
+    "MONITOR": "V2 HUMAN tier (32 tickers): crypto/EV/leveraged/intl ETFs/re-adds. Telegram approval required (v2.1 wires the flow). BITF removed 2026-07-17 (delisted — Alpaca HTTP 404).",
     "EXCLUDED": "Removed from universe entirely."
   },
   "summary": {
     "auto_trade": 80,
-    "monitor": 33,
+    "monitor": 32,
     "excluded": 0,
-    "total": 113
+    "total": 112
   },
   "tickers": [
     {
@@ -163,16 +163,6 @@
       "net_pnl": 1978.17,
       "trade_count": 3,
       "reason": "V2 AUTO tier - proven 5y backtest, 3 V2 trades / WR 100.0% / P&L $+1978"
-    },
-    {
-      "symbol": "BITF",
-      "tier": "MONITOR",
-      "direction": "both",
-      "win_rate": 100.0,
-      "profit_factor": 0,
-      "net_pnl": 34.4,
-      "trade_count": 1,
-      "reason": "V2 HUMAN tier - Telegram approval required, 1 V2 trades / WR 100.0% / P&L $+34"
     },
     {
       "symbol": "BLK",

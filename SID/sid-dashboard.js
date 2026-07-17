@@ -29,7 +29,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.2.5';
+const STRATEGY_VERSION = '2.2.6';
+// v2.2.6 (2026-07-17) = TP2 CANCEL-FIRST / RUNNER-HELD-SHARES FIX + CAP 3->5 + BITF
+// DELIST REMOVAL. Exact twin of the v2.2.5 TP1 bug, on the TP2 branch: after TP1
+// banks, the full-runner break-even GTC stop "holds" the runner shares, so the TP2
+// full close (DELETE /v2/positions/SYM) got `insufficient qty available
+// (available: 0)` every run (PYPL 12sh BE $41.41 4x, ADBE 2sh BE $200.79 2x,
+// 2026-07-13->16). The TP2 trigger itself was LEGITIMATE (both runners rallied up
+// through their SMA50). Fix: cancel the resting BE stop FIRST to release the runner
+// shares -> close -> poll the fill; a rejected/unconfirmed close re-protects the
+// runner + raises a LOUD tg.alertTp2CloseFailed alarm (tp2Hit not booked -> retry).
+// Also: concurrent-position cap 3->5 (SID_MAX_POSITIONS); BITF removed from the
+// universe (delisted, Alpaca HTTP 404 every run; AUTO-80 unchanged). A live-execution
+// plumbing + config + universe-hygiene fix, NOT a signal-logic change. The HEADLINE
+// backtest below is UNCHANGED. Details below carried from —
 // v2.2.5 (2026-07-01) = TP1 CANCEL-FIRST / HELD-SHARES FIX + EXIT-TARGET READOUT.
 // A live-execution plumbing + observability fix, NOT a signal-logic change. The
 // long TP1 partial close was failing every run (PYPL, 5 days silent) because the
@@ -1467,7 +1480,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.2.5 TP1 CANCEL-FIRST FIX · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
+      <div class="brand-sub">V2.2.6 TP2 CANCEL-FIRST FIX · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">

@@ -760,6 +760,95 @@ to the runner) BEFORE the partial, and any close must be fill-confirmed and
 alarm-loud on failure. Also: any "position stays open, will retry next run" catch
 that isn't ALSO loud is a silent-failure timebomb — make it alert.
 
+### Pitfall: LIVE TP2 runner-close fails every run — BE stop HOLDS the runner shares (v2.2.6, 2026-07-17)
+
+**Exact twin of the v2.2.5 TP1 held-shares bug above, but on the OTHER branch
+(TP2 runner-close, `checkPositions` Branch B).** Confirmed on PYPL + ADBE (paper).
+`sid-log.json` showed the same failure every run 2026-07-13→16:
+
+```
+{"kind":"tp2_close_fail","symbol":"PYPL",
+ "error":"Alpaca DELETE /v2/positions/PYPL failed: insufficient qty available
+          for order (requested: 12, available: 0)"}
+{"kind":"tp2_close_fail","symbol":"ADBE",
+ "error":"...ADBE... (requested: 2, available: 0)"}
+```
+
+Both are LONG post-TP1 runners: PYPL 12 sh @ entry $41.395, BE stop $41.41
+(id 1ce719cd…); ADBE 2 sh @ entry $200.78, BE stop $200.79 (id a3f92ad8…). TP1
+had banked cleanly (the v2.2.5 fix worked): PYPL banked $31.85 on 2026-06-26, ADBE
+$39.36 on 2026-07-02.
+
+**Root cause.** After TP1 banks, `maintainV2_2BrokerOrders` leaves a full-RUNNER
+GTC break-even stop resting (`pos.brokerStopOrderId`, `client_order_id`
+`<prefix>-stop-<timestamp>`). Alpaca "holds" the runner shares against it, so when
+Branch B fired a TP2 and called `executor.closePosition(pos)` → `DELETE
+/v2/positions/SYM` (FULL close), Alpaca reported `available: 0` and rejected it.
+The old catch just logged `tp2_close_fail`, pushed the position to `stillOpen`,
+and moved on — so it repeated silently. (Note: `closePosition`'s own cleanup loop
+DID try to cancel resting stops, but it only matches `client_order_id.endsWith('-stop')`,
+and `placeStop`/`maintain` append a `-<timestamp>` — so the id ends in digits, never
+literal `-stop`, and the BE stop was never cancelled ahead of the close.)
+
+**WHY was TP2 triggering?** It was a LEGITIMATE exit, not a false positive or a
+stuck-flag. Both runners had rallied FAVOURABLY up through their SMA50 — that's the
+"price touches 50-day SMA → close the runner" TP2 condition firing correctly. From
+`scanner-sid.json` (2026-07-16): PYPL last close $56.73 vs SMA50 $44.51 & SMA200
+$52.90 (crossed BOTH); ADBE last close $235.31 vs SMA50 $230.94 (crossed SMA50;
+SMA200 $282.56 still above). The `crossedSMA` gap-cross clause caught the up-cross.
+The runners had genuinely earned a TP2 and were stuck retrying only because the
+CLOSE failed — the cancel-first fix resolves it (no false-trigger fix needed).
+Note the SMA50/200 timeout at 30 trading days was NOT the trigger — only ~11-14
+business days had elapsed since TP1. It was the SMA50 touch.
+
+**Fix — cancel-first ordering (checkPositions Branch B TP2 close):**
+1. **CANCEL** the resting BE broker stop first (`executor.cancelOrderById(pos.brokerStopOrderId)`
+   + belt-and-braces `findOpenOrder(…, '-stop')` cancel) to RELEASE the runner
+   shares, then `executor.waitForNoOpenOrders(symbol)`.
+2. Submit the runner close (`executor.closePosition`) and **`executor.pollOrderFill`** —
+   CONFIRM it filled before booking the trade.
+3. TP2 fully closes the runner → **no re-stop on success**.
+4. **Never leave the runner naked:** on a REJECTED or unconfirmed close, re-place a
+   protective stop on `pos.shares_remaining` (`placeStop(pos, shares_remaining, pos.stopLoss, 'restop')`),
+   do NOT record the close / do NOT set the closed record (retry next run), and
+   raise a LOUD `tg.alertTp2CloseFailed()` alarm. `sid-log` `tp2_close_fail` now
+   carries `reason` (the TP2 trigger) + `reprotected`.
+
+**New telegram alert:** `alertTp2CloseFailed({symbol, side, runnerShares, reason,
+error, reprotected, mode})` in `telegram-alerts.js` — twin of `alertTp1CloseFailed`.
+
+**Lesson (reinforces the v2.2.5 one):** EVERY broker-managed close (partial OR full)
+that runs while a resting stop covers those shares must cancel-first + fill-confirm +
+alarm-loud. The TP1 fix left the identical trap on the TP2 branch because TP2 uses
+`closePosition` (not `closePartial`) and nobody re-checked `closePosition`'s stop
+cleanup matched the timestamped `client_order_id`. When you fix one broker-close
+path, audit ALL of them (TP1, TP2, pre-TP1 stop-out, V2.0 fallback) for the same
+held-shares assumption. (Pre-TP1 stop-out + V2.0 fallback are legacy/non-v2.2 paths
+with no resting stop to release → left unchanged.)
+
+### maxOpenPositions raised 3 → 5 (v2.2.6, 2026-07-17)
+
+`CONFIG.maxOpenPositions` default was **3** ("never hold more than 3"). Alan wanted
+at least 5. Changed default **3 → 5** (still env-overridable via `SID_MAX_POSITIONS`).
+Capital math: 5 × `maxPositionPct` 10% = **~50% of the account max deployed** if all
+5 hit the per-position 10% cap. There is NO cap on total deployed beyond the
+per-position 10%. In practice 1%-risk-driven sizing usually lands well under the 10%
+cap, so real simultaneous deployment is typically lower than 50%. Fine at 5.
+
+### BITF removed from the universe — delisted (v2.2.6, 2026-07-17)
+
+BITF returned Alpaca `HTTP 404` every run (delisted/renamed) and was silently
+skipped. Removed from BOTH `watchlist-sid.json` (master `tickers` array AND
+`sections/v2_human_approval_33`) and `asset-classification.json` (its MONITOR-tier
+record + the `summary` counts). Effect on counts: universe **113 → 112**, HUMAN
+tier **33 → 32**. **AUTO-80 tier UNCHANGED** — BITF was HUMAN/log-only (never in
+`AUTO_APPROVED_TICKERS`, never auto-fired), so the locked 80-ticker AUTO universe
+is untouched. NOTE: the JSON key name `v2_human_approval_33` is LEFT AS-IS (now
+holds 32) — renaming it would break the Python backtests that read it by that
+literal key (`backtest-sid-*.py`, `build-v2.1-excel-report.py`). The `-33` in the
+key name is now a cosmetic misnomer, documented here so nobody "fixes" it and
+breaks the backtests. Did NOT add a replacement ticker (separate strategy decision).
+
 ### Pitfall: Alpaca rejects SL stop for full position when TP1 limit already holds partial
 
 Confirmed 2026-05-22 on the MCD oneshot trade (entry filled 8 shares @ $281.67). Original `manual-trade.js` pattern was:
