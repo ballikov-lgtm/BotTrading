@@ -26,15 +26,17 @@
     "tp2_shares": 0,
     "tp2_pnl": 0,
     "tp2_reason": "stopped_before_tp1",
-    "total_pnl": -691.08,
+    "total_pnl": -648.18,
     "exit_strategy": "v2.1-stop",
     "exitLevel": "sl",
     "exitPrice": 405,
     "exitRsi": 69.95,
     "closeDate": "2026-06-08",
-    "realizedPnl": -691.08,
+    "realizedPnl": -648.18,
     "outcome": "LOSS",
-    "accountAfter": 9351.16
+    "accountAfter": 9351.16,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "b9b591df-ae20-49c4-822b-9af6c6712cbd",
@@ -74,9 +76,11 @@
         "price": 347.8346
       }
     ],
-    "total_pnl": 562.45,
-    "realizedPnl": 562.45,
-    "is_full_close": true
+    "total_pnl": 688.68,
+    "realizedPnl": 688.68,
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "fc060148-5173-4cc3-a128-69a8be45a4c9",
@@ -114,7 +118,9 @@
     ],
     "total_pnl": -61.16,
     "realizedPnl": -61.16,
-    "is_full_close": true
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "a73fbaba-330c-4fc9-a107-a33474656527",
@@ -150,9 +156,11 @@
         "price": 416.23
       }
     ],
-    "total_pnl": -18.96,
-    "realizedPnl": -18.96,
-    "is_full_close": true
+    "total_pnl": -18.88,
+    "realizedPnl": -18.88,
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "d9bca959-f4e3-4fa0-bcf0-bfca2cb8c272",
@@ -192,7 +200,9 @@
     ],
     "total_pnl": -23.06,
     "realizedPnl": -23.06,
-    "is_full_close": true
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "c95dc605-4b56-47c3-bd84-be5265e9405b",
@@ -228,15 +238,17 @@
     "tp2_pnl": 41.85,
     "tp2_reason": "sma50_touch",
     "tp2_rsi": 59.83,
-    "total_pnl": 73.7,
+    "total_pnl": 218.62,
     "exit_strategy": "v2.1-tp1+tp2",
     "exitLevel": "sma50_touch",
     "exitPrice": 44.8828,
     "exitRsi": 59.83,
     "closeDate": "2026-07-02",
-    "realizedPnl": 73.7,
+    "realizedPnl": 218.62,
     "outcome": "WIN",
-    "accountAfter": 9803.11
+    "accountAfter": 9803.11,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
   },
   {
     "id": "272fa6a4-1384-4b1c-83fc-9149b7350328",
@@ -272,14 +284,34 @@
     "tp2_pnl": 61.06,
     "tp2_reason": "sma50_touch",
     "tp2_rsi": 53.08,
-    "total_pnl": 100.42,
+    "total_pnl": 104.49,
     "exit_strategy": "v2.1-tp1+tp2",
     "exitLevel": "sma50_touch",
     "exitPrice": 231.3122,
     "exitRsi": 53.08,
     "closeDate": "2026-07-15",
-    "realizedPnl": 100.42,
+    "realizedPnl": 104.49,
     "outcome": "WIN",
-    "accountAfter": 9864.17
+    "accountAfter": 9864.17,
+    "pnl_source": "alpaca_fill",
+    "reconciled_at": "2026-07-17"
+  },
+  {
+    "symbol": "MCD",
+    "side": "long",
+    "entry": 281.67,
+    "exit_price": 271.9025,
+    "shares_total": 8,
+    "shares": 8,
+    "openDate": "2026-05-22",
+    "closeDate": "2026-06-04",
+    "exit_strategy": "reconstructed_from_fills",
+    "total_pnl": -78.14,
+    "realizedPnl": -78.14,
+    "mode": "paper",
+    "strategy": "SID (reconstructed from Alpaca fills)",
+    "pnl_source": "alpaca_fill",
+    "reconstructed": true,
+    "reconciled_at": "2026-07-17"
   }
 ]
