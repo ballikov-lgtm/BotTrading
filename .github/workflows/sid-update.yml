@@ -1,0 +1,223 @@
+name: Update SID to latest
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ONE-CLICK SID UPDATER (for followers — no clone, no git, no Claude)
+#
+# What it does: pulls the latest published SID strategy CODE + release notes from
+# the source repo (upstream) into YOUR fork, then commits + pushes it for you.
+#
+# What it NEVER touches: your open/closed positions, account balance, trade log,
+# run log, pending approvals, dashboard build output, or any of your GitHub
+# Secrets. A hard safety guard ABORTS the whole run before committing if any of
+# those state files would be changed — so your trades can never be overwritten.
+#
+# How to run it:  Actions tab -> "Update SID to latest" (left) -> "Run workflow".
+# Full plain-English guide: SID/HOW-TO-UPDATE.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Never let two updates race each other.
+concurrency:
+  group: sid-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      # Keep persist-credentials (default true) so the built-in GITHUB_TOKEN can
+      # push the update back to the fork. Full history so rebases work.
+      - name: Check out my fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add + fetch the source repo (upstream)
+        run: |
+          if ! git remote get-url upstream >/dev/null 2>&1; then
+            git remote add upstream https://github.com/ballikov-lgtm/BotTrading.git
+          fi
+          git fetch upstream --no-tags
+
+      # Bring the fork's own main up to date first — the follower's bot/dashboard
+      # workflows may have committed state since the last update. Tolerate a no-op
+      # (e.g. nothing to pull) so the run doesn't fail here.
+      - name: Bring my fork up to date first
+        run: |
+          git pull --rebase --autostash origin main || echo "Nothing to pull (already current) — continuing."
+
+      # Read the manifest and check out ONLY those paths from upstream/main.
+      # A path that doesn't exist upstream is skipped, not fatal. NOTHING outside
+      # the manifest is ever touched.
+      - name: Pull the latest SID code from upstream (manifest-driven)
+        run: |
+          MANIFEST="SID/.sid-update-manifest.txt"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::Manifest $MANIFEST not found — cannot determine what to update."
+            exit 1
+          fi
+          echo "Reading update list from $MANIFEST"
+          checked_out=0
+          skipped=0
+          while IFS= read -r raw || [ -n "$raw" ]; do
+            # strip comments + surrounding whitespace, skip blanks
+            path="$(printf '%s' "$raw" | sed 's/#.*//' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+            [ -z "$path" ] && continue
+            if git checkout upstream/main -- "$path" 2>/dev/null; then
+              echo "  updated: $path"
+              checked_out=$((checked_out + 1))
+            else
+              echo "  skipped (not on upstream): $path"
+              skipped=$((skipped + 1))
+            fi
+          done < "$MANIFEST"
+          echo "Checked out $checked_out path(s), skipped $skipped."
+
+      # ── SAFETY GUARD (the guarantee your trades can't be overwritten) ────────
+      # After the checkout, look at what is STAGED. If ANY of your state files
+      # appears, abort the run WITHOUT committing or pushing. The manifest can't
+      # contain these, so this is belt-and-braces: it fails closed no matter what.
+      - name: Safety guard — refuse to touch any state file
+        run: |
+          # Exact repo-relative paths that must NEVER be modified by an update.
+          DENYLIST="\
+          SID/open-positions-sid.json
+          SID/closed-positions-sid.json
+          SID/sid-account.json
+          SID/sid-log.json
+          SID/trades-sid.csv
+          SID/pending-approvals-sid.json
+          SID/scanner-sid.json
+          docs/sid/index.html"
+
+          STAGED="$(git diff --cached --name-only)"
+          echo "Staged files after checkout:"
+          echo "${STAGED:-  (none)}"
+
+          violation=""
+          for f in $DENYLIST; do
+            if printf '%s\n' "$STAGED" | grep -Fxq "$f"; then
+              violation="$violation $f"
+            fi
+          done
+
+          if [ -n "$violation" ]; then
+            {
+              echo "## ❌ Update ABORTED — a protected state file was about to change"
+              echo ""
+              echo "The updater tried to modify one of your live data files:"
+              echo ""
+              for f in $violation; do echo "- \`$f\`"; done
+              echo ""
+              echo "**Nothing was committed or pushed. Your trades and account are untouched.**"
+              echo "This should never happen — please report it. No action needed on your side."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Protected state file staged ($violation) — aborting without commit/push."
+            git reset --hard HEAD
+            exit 1
+          fi
+          echo "Safety guard passed — no state file is staged."
+
+      # If nothing changed, tell the follower they're already current and stop.
+      - name: Detect whether anything actually changed
+        id: changed
+        run: |
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Read the new version + one-line summary from the top of strategy-updates.json.
+      # (Best-effort; if it can't be parsed the commit/summary still work with a fallback.)
+      - name: Read the new version + summary
+        id: version
+        run: |
+          VER="$(node -e '
+            try {
+              const u = require("./SID/strategy-updates.json");
+              const top = Array.isArray(u) && u[0] ? u[0] : {};
+              process.stdout.write(String(top.title || "").split("—")[0].trim() || "the latest version");
+            } catch (e) { process.stdout.write("the latest version"); }
+          ')"
+          SUMLINE="$(node -e '
+            try {
+              const u = require("./SID/strategy-updates.json");
+              const top = Array.isArray(u) && u[0] ? u[0] : {};
+              let s = String(top.summary || top.title || "");
+              s = s.split(". ")[0];
+              if (s.length > 300) s = s.slice(0, 297) + "...";
+              process.stdout.write(s);
+            } catch (e) { process.stdout.write("Strategy code and release notes were refreshed from the source repo."); }
+          ')"
+          # Persist across steps (may contain spaces/punctuation — use a heredoc delimiter).
+          {
+            echo "ver<<SID_EOF"
+            echo "$VER"
+            echo "SID_EOF"
+            echo "summary<<SID_EOF"
+            echo "$SUMLINE"
+            echo "SID_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Already up to date — nothing to do
+        if: steps.changed.outputs.changed == 'false'
+        run: |
+          {
+            echo "## ✅ You're already up to date (${{ steps.version.outputs.ver }})"
+            echo ""
+            echo "There was no newer SID version to pull, so nothing changed."
+            echo ""
+            echo "**Your positions, account balance, trades, and secrets were NOT touched.**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit + push the update
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          git commit -m "chore: update SID to ${{ steps.version.outputs.ver }} (one-click updater)"
+
+          # Push. If the fork moved (bot/dashboard committed state meanwhile), rebase
+          # on our own main and retry. If a rebase ever conflicts on a STATE file,
+          # keep OURS (the fork's own live data) — never upstream's.
+          if ! git push origin HEAD:main; then
+            echo "Push rejected (fork moved) — rebasing on my own main and retrying."
+            if ! git pull --rebase --autostash origin main; then
+              echo "Rebase hit a conflict — resolving any state-file conflict in favour of MY data (ours)."
+              for f in \
+                SID/open-positions-sid.json SID/closed-positions-sid.json \
+                SID/sid-account.json SID/sid-log.json SID/trades-sid.csv \
+                SID/pending-approvals-sid.json SID/scanner-sid.json docs/sid/index.html; do
+                if git ls-files -u -- "$f" | grep -q .; then
+                  git checkout --ours -- "$f" && git add "$f"
+                fi
+              done
+              git -c core.editor=true rebase --continue || git rebase --abort
+            fi
+            git push origin HEAD:main
+          fi
+
+      - name: Success summary
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          {
+            echo "## ✅ SID updated to ${{ steps.version.outputs.ver }}"
+            echo ""
+            echo "${{ steps.version.outputs.summary }}"
+            echo ""
+            echo "**Your positions, account balance, trades, and secrets were NOT touched — only the strategy code and release notes were updated.**"
+            echo ""
+            echo "Your bot now runs the latest version on its next scheduled run. Your"
+            echo "dashboard will show the new version and release notes the next time the"
+            echo "**SID Dashboard** workflow rebuilds it (it runs automatically a few times"
+            echo "each trading day — or run it now from the Actions tab)."
+          } >> "$GITHUB_STEP_SUMMARY"

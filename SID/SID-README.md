@@ -329,5 +329,8 @@ Bot detects bullish-asset short
 | `approval-worker/` | v2.3.0 — Cloudflare Worker (Telegram webhook receiver) + `wrangler.toml` + setup `README.md`. Validates chat-id + webhook secret, then dispatches `sid-approve-trade.yml` |
 | `SID-README.md` | This file |
 | `SID-DEPLOY-PROMPT.md` | **Deploy your own (fresh)** — paste into a fresh Claude session for a step-by-step, pause-after-each-step first-run setup on your own fork (fork + clean-slate state + disable non-SID workflows + `upstream` remote + Alpaca PAPER + GitHub Actions + dashboard) |
-| `SID-UPDATE-PROMPT.md` | **Update to the latest revision** — paste into a fresh Claude session to pull a published SID revision (code + release notes only) from the `upstream` remote into your fork WITHOUT touching your trade state, account ledger, or secrets |
+| `HOW-TO-UPDATE.md` | **One-click update (no coding, no Claude)** — the dead-simple guide: run the **"Update SID to latest"** Action from your fork's Actions tab and your bot is on the newest version in ~1 minute. Never touches your trades or account. Primary method for non-technical followers |
+| `SID-UPDATE-PROMPT.md` | **Update — advanced/manual route** — paste into a fresh Claude session to pull a published SID revision (code + release notes only) from the `upstream` remote into your fork WITHOUT touching your trade state, account ledger, or secrets. Most people should use HOW-TO-UPDATE.md instead |
+| `.sid-update-manifest.txt` | The single source of truth for **which files an update pulls** (CODE only — read by both the one-click Action and the update prompt). Never lists a state file |
+| `.github/workflows/sid-update.yml` | The **one-click updater** workflow behind the "Update SID to latest" button. Reads the manifest, pulls upstream code, and aborts before committing if any state file would change |
 | `research/SID/` | Original strategy source images |

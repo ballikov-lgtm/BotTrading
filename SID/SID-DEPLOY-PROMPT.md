@@ -242,6 +242,8 @@ Walk me through disabling every NON-SID workflow:
 3. KEEP ENABLED only the SID workflows:
      - sid.yml            (SID Swing Bot — required)
      - sid-dashboard.yml  (SID Dashboard — required)
+     - sid-update.yml     (Update SID to latest — the one-click updater I'll use to
+                           pull future versions; keep this ENABLED)
      - sid-approve-trade.yml + sid-manual-trade.yml + any other sid-*.yml
        (optional helpers — keep if I might use the manual/approval flows)
 
@@ -493,13 +495,20 @@ Make these points clearly, and do NOT change anything to live for me:
   SID_TRADING_MODE=live, and set SID_LIVE_CONFIRMED to its required confirmation
   value). You are NOT to do that for me as part of this setup.
 - To pull a future published SID revision into my fork WITHOUT disturbing my trades,
-  account ledger, or secrets, I use the companion SID-UPDATE-PROMPT.md (it pulls only
-  the strategy CODE from the "upstream" remote I wired up in Step 7).
+  account ledger, or secrets, the EASIEST way is the one-click "Update SID to latest"
+  Action (Actions tab -> "Update SID to latest" -> Run workflow — no commands, see
+  SID/HOW-TO-UPDATE.md). It pulls only the strategy CODE + release notes from the
+  "upstream" remote I wired up in Step 7 and aborts before committing if it would ever
+  touch my trade state. If I'd rather watch it happen command-by-command, the guided
+  companion SID-UPDATE-PROMPT.md is the manual/advanced route.
 
 Finish by confirming setup is complete: the fork is mine, Actions are enabled, the
 non-SID workflows are disabled, the trade state is a clean slate, the "upstream"
 remote is wired, the Alpaca PAPER secrets are saved, the dashboard is live on GitHub
 Pages, and the bot has done its first paper run.
+
+To update later, just run the "Update SID to latest" Action — see HOW-TO-UPDATE.md. No
+commands needed.
 ```
 
 ---

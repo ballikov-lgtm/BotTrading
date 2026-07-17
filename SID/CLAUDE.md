@@ -954,6 +954,80 @@ beyond the reference — and sizes by 1% risk on the CURRENT entry→stop distan
 - The Pine visualiser legend still says amber = "manual-watch"; next Pine push
   could note amber = "approval-required, approve via Telegram." Not urgent.
 
+### ONE-CLICK FOLLOWER UPDATER — "Update SID to latest" Action + manifest (2026-07-17) — WORKING TREE, NOT COMMITTED
+
+Built to make updating a fork FOOLPROOF for non-technical followers (no clone, no git,
+no downloads, no Claude). Primary method is now a single button in the follower's own
+Actions tab; the Claude-based `SID-UPDATE-PROMPT.md` is demoted to the advanced/manual
+fallback. **Status: WORKING TREE ONLY — nothing committed or pushed this session (per
+the brief).**
+
+**What changed (all additive):**
+- `SID/.sid-update-manifest.txt` — NEW. The **single source of truth** for which files
+  an update pulls (CODE only). Plain list, one repo-relative path per line, `#`
+  comments + blanks allowed. Folder paths (`SID/pine`, `SID/approval-worker`) pull the
+  whole folder. **Self-updating** — it lists ITSELF and `sid-update.yml`, so followers
+  always run the newest updater + newest file list. Populated 1:1 from the CODE list in
+  `SID-UPDATE-PROMPT.md`. Contains NO state file by construction.
+- `.github/workflows/sid-update.yml` — NEW. `workflow_dispatch`-only, titled "Update
+  SID to latest", `permissions: contents: write`. Flow: checkout@v4 (fetch-depth 0,
+  default persist-credentials so the built-in `GITHUB_TOKEN` pushes) → git identity →
+  add `upstream` if missing + `git fetch upstream` → `git pull --rebase --autostash
+  origin main` (tolerate no-op) → loop the manifest and `git checkout upstream/main --
+  <path>` each (skip missing-upstream individually, never fail the whole run) → **SAFETY
+  GUARD** → detect-changed → read version+summary from top of `strategy-updates.json`
+  (embedded Node, best-effort with fallback) → if unchanged: friendly "already up to
+  date" summary, exit 0 → else commit `chore: update SID to <version> (one-click
+  updater)` + push (on non-ff: `pull --rebase --autostash` then keep OURS on any
+  state-file conflict, retry push) → success summary in bold "positions/balance/
+  trades/secrets NOT touched — only code + release notes" + "dashboard shows new
+  version on next rebuild".
+- **SAFETY GUARD mechanism (the guarantee):** after the manifest checkout, the workflow
+  reads `git diff --cached --name-only` and greps it (`grep -Fxq`, exact whole-line
+  match) against a hardcoded denylist: `open-positions-sid.json`,
+  `closed-positions-sid.json`, `sid-account.json`, `sid-log.json`, `trades-sid.csv`,
+  `pending-approvals-sid.json`, `scanner-sid.json`, `docs/sid/index.html`. If ANY
+  appears, it writes an "ABORTED" step summary, `git reset --hard HEAD`, and `exit 1`
+  BEFORE any commit/push. The manifest can't contain these, so the guard is
+  belt-and-braces — it **fails closed** regardless of the manifest. Denylist covers
+  every SID state file (the same STATE list in `SID-UPDATE-PROMPT.md` minus `.env`,
+  which is git-ignored and never staged anyway).
+- `SID/HOW-TO-UPDATE.md` — NEW. Jargon-free, five numbered clicks (Actions tab → "Update
+  SID to latest" → Run workflow → green Run workflow → wait ~1 min, refresh, green
+  tick). Reassures (bold) trades/account are never touched, explains how they know an
+  update exists (dashboard Updates tab), then a short "Advanced / if you use Claude"
+  section → `SID-UPDATE-PROMPT.md`, and a one-line "prefer a local double-click? ask"
+  note (the local script was deliberately NOT built — the button covers everyone).
+- Wiring: `SID-DEPLOY-PROMPT.md` Step 6 keep-enabled list now includes `sid-update.yml`
+  + a closing "To update later, run the 'Update SID to latest' Action" line + Step 13
+  update bullet leads with the button. `SID-UPDATE-PROMPT.md` got a top pointer to the
+  one-click method + the manifest is now declared the source of truth (with a
+  read-the-manifest loop example) + both file lists and the explicit `git checkout`
+  command gained `.sid-update-manifest.txt`, `HOW-TO-UPDATE.md`, `sid-update.yml`.
+  `SID-README.md` Files table gained rows for `HOW-TO-UPDATE.md` (primary),
+  `.sid-update-manifest.txt`, `.github/workflows/sid-update.yml`, and re-labelled
+  `SID-UPDATE-PROMPT.md` as advanced/manual.
+- Ship-check (infra, NOT a strategy revision): `strategy-updates.json` got ONE new
+  INFRA entry at the top (count auto 21 → 22); regenerated `docs/sid/index.html` from
+  the WORKTREE ROOT (`node SID/sid-dashboard.js` — the worktree root has `node_modules`,
+  the repo-root snapshot does not). **BOT_VERSION / STRATEGY_VERSION deliberately
+  UNCHANGED at v2.3.0** — this is tooling, not a rule change.
+
+**Tested (local, no network):** manifest parse loop resolves all 30 paths locally with
+correct comment/whitespace stripping and lists ZERO denylisted state files; both
+embedded Node extractors return sane output ("V2.3.0 TELEGRAM YES/NO TRADE-APPROVAL
+FLOW" / first-sentence summary); `sid-update.yml` passes `yaml.safe_load` (UTF-8 — the
+cp1252 Python-print trap bit the first validation attempt, use `io.open(...,
+encoding='utf-8')`); `strategy-updates.json` valid (22 entries); dashboard rebuilt,
+version markers still v2.3.0, Updates tab + panel-title count both read (22), one-click
+entry present.
+
+**Queued / not done:** nothing committed/pushed (per brief — return for review). If Alan
+approves, push via the standard protocol (fetch → pull --rebase --autostash → push;
+never without approval). The one-click workflow only becomes runnable on a fork once
+that commit is on the fork's main. Optional future: the local double-click updater
+script (intentionally deferred).
+
 ### maxOpenPositions raised 3 → 5 (v2.2.6, 2026-07-17)
 
 `CONFIG.maxOpenPositions` default was **3** ("never hold more than 3"). Alan wanted

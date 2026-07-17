@@ -862,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 07:13:02</span>
+        <span>SYS · 09:59:06</span>
       </div>
     </div>
   </header>
@@ -940,14 +940,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(21)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(22)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 07:13:02 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 09:59:06 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -1902,7 +1902,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (21)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (22)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1910,6 +1910,13 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-17</span>
+        <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
+      </div>
+      <div class="update-title">ONE-CLICK FOLLOWER UPDATER — 'Update SID to latest' Action + HOW-TO-UPDATE guide (no clone, no commands, no Claude)</div>
+      <div class="update-summary">Updating your fork to a new SID version is now a single button. NEW: an 'Update SID to latest' GitHub Action (.github/workflows/sid-update.yml) that you run from your fork's Actions tab — the same tab you already use to run the bot. It pulls the latest strategy CODE + release notes from the source repo and commits them to your fork for you: no local clone, no git commands, no downloads, no Claude. WHICH FILES IT UPDATES lives in ONE place — a plain-text manifest (SID/.sid-update-manifest.txt, self-updating so the updater updates itself) that both the button and the guided update prompt read, so the list can never drift. SAFETY (the guarantee your trades can't be overwritten): after pulling the code, the workflow checks the staged changes against a denylist of every state file — open/closed positions, account ledger, trade log, run log, pending approvals, scanner output, dashboard build output — and if any of them would change it ABORTS before committing or pushing and leaves you exactly as you were. On success it writes a friendly summary with the new version, a one-line what-changed, and in bold: your positions, account balance, trades, and secrets were NOT touched — only the strategy code and release notes were updated. If there's nothing new it just says you're already up to date. A dead-simple, jargon-free guide (SID/HOW-TO-UPDATE.md) walks non-technical followers through it as five numbered clicks, and the deploy + update docs now point at the button as the primary method (the Claude-based SID-UPDATE-PROMPT.md is kept as the advanced/manual fallback). This is tooling only — NO strategy change: RSI 30/70, MACD alignment, the RSI-50 TP1 trigger, the earnings blackout and the AUTO-tier 80-ticker universe are all untouched, and the strategy version is unchanged at v2.3.0.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-07-17</span>
         <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
@@ -2065,7 +2072,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.3.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 07:13:02 UTC</footer>
+  <footer>SID v2.3.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 09:59:06 UTC</footer>
 
 </div>
 

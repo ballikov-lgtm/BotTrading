@@ -1,0 +1,61 @@
+# SID update manifest — the SINGLE source of truth for which files an update pulls
+# from upstream (github.com/ballikov-lgtm/BotTrading).
+#
+# One repo-relative path per line. Blank lines and lines starting with '#' are
+# ignored. Folder paths (e.g. SID/pine) pull the whole folder.
+#
+# These are CODE / release-notes / workflow / docs files only — pulling upstream's
+# copy over yours is exactly what "update" means. This list must NEVER contain a
+# STATE file (your trades, positions, account ledger, run log, pending approvals,
+# scanner output, or dashboard build output). Those are yours and are protected by
+# the denylist in .github/workflows/sid-update.yml — if one ever appears here or in
+# a staged diff, the one-click updater ABORTS.
+#
+# Both the guided prompt (SID-UPDATE-PROMPT.md) and the one-click updater
+# (.github/workflows/sid-update.yml) read THIS file, so the list lives in exactly
+# one place.
+
+# ── Bot + execution engine ───────────────────────────────────────────────────
+SID/bot-sid.js
+SID/scan-sid.js
+SID/sid-dashboard.js
+SID/alpaca-executor.js
+SID/alpaca-client.js
+SID/telegram-alerts.js
+SID/approve-trade.js
+SID/manual-trade.js
+SID/manual-close.js
+SID/rsi-target-price.js
+SID/strategy-audit.js
+
+# ── Strategy config / universe / reference data ──────────────────────────────
+SID/watchlist-sid.json
+SID/asset-classification.json
+SID/event-dates.json
+SID/requirements.txt
+
+# ── Release notes (drives the dashboard Updates tab) ─────────────────────────
+SID/strategy-updates.json
+
+# ── Docs (human + Claude context) ────────────────────────────────────────────
+SID/SID-README.md
+SID/CLAUDE.md
+SID/SID-DEPLOY-PROMPT.md
+SID/SID-UPDATE-PROMPT.md
+SID/HOW-TO-UPDATE.md
+
+# ── TradingView visualisers + the Telegram approval Worker ───────────────────
+SID/pine
+SID/approval-worker
+
+# ── The manifest itself (self-updating — an update refreshes this list too) ──
+SID/.sid-update-manifest.txt
+
+# ── Shared Node deps + SID workflows ─────────────────────────────────────────
+package.json
+.github/workflows/sid.yml
+.github/workflows/sid-dashboard.yml
+.github/workflows/sid-approve-trade.yml
+.github/workflows/sid-manual-trade.yml
+# The one-click updater updates ITSELF, so followers always run the newest updater.
+.github/workflows/sid-update.yml

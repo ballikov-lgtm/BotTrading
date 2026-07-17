@@ -1,5 +1,10 @@
 # SID Swing Strategy — Guided Update Prompt (pull a published revision into your fork)
 
+> **Easiest way:** use the one-click **"Update SID to latest"** Action (Actions tab ->
+> "Update SID to latest" -> Run workflow — no commands, no clone, no Claude). See
+> **`SID/HOW-TO-UPDATE.md`**. This prompt is the manual/advanced route for people who
+> want to run and approve each step by hand.
+
 This is a **guided, interactive prompt** for pulling a newly published SID revision
 into **your own fork** WITHOUT touching your live trade state, your account ledger,
 or any of your secrets. It refreshes the **strategy logic and the release notes
@@ -99,10 +104,29 @@ STEP 3 — CHECK OUT ONLY THE CODE FILES FROM UPSTREAM (never the state files)
 This is the heart of the update. We check out the CODE files from upstream/main into
 my working tree, and we DELIBERATELY leave every STATE file untouched.
 
+THE AUTHORITATIVE CODE LIST lives in ONE place: SID/.sid-update-manifest.txt (one
+repo-relative path per line, '#' comments allowed). That same manifest is what the
+one-click "Update SID to latest" Action reads, so the list can never drift between the
+two update routes. PREFER reading the manifest and checking out each path from it. The
+list printed below is a human-readable copy of that manifest for reference — if it ever
+disagrees with SID/.sid-update-manifest.txt, THE MANIFEST WINS.
+
+The clean way to run this step: read every non-comment line of
+SID/.sid-update-manifest.txt and `git checkout upstream/main -- <path>` for each one
+(skip a path if it doesn't exist upstream). For example:
+
+   while IFS= read -r line; do
+     path="$(printf '%s' "$line" | sed 's/#.*//' | xargs)"
+     [ -z "$path" ] && continue
+     git checkout upstream/main -- "$path" 2>/dev/null || echo "skip (not upstream): $path"
+   done < SID/.sid-update-manifest.txt
+
 FIRST, read me both lists so I understand the split, then run the checkout.
 
-CODE — safe to check out from upstream (this is the strategy logic + release notes +
-workflows + docs; overwriting my copies with upstream's is exactly what an update is):
+CODE — safe to check out from upstream (human-readable copy of the manifest; the
+strategy logic + release notes + workflows + docs; overwriting my copies with
+upstream's is exactly what an update is):
+   SID/.sid-update-manifest.txt   (the update list itself — self-updating)
    SID/bot-sid.js
    SID/scan-sid.js
    SID/sid-dashboard.js
@@ -123,6 +147,7 @@ workflows + docs; overwriting my copies with upstream's is exactly what an updat
    SID/CLAUDE.md
    SID/SID-DEPLOY-PROMPT.md
    SID/SID-UPDATE-PROMPT.md
+   SID/HOW-TO-UPDATE.md
    SID/pine/            (whole folder — TradingView visualisers)
    SID/approval-worker/ (whole folder — Cloudflare Worker + its setup README)
    package.json         (root — shared Node deps)
@@ -130,6 +155,7 @@ workflows + docs; overwriting my copies with upstream's is exactly what an updat
    .github/workflows/sid-dashboard.yml
    .github/workflows/sid-approve-trade.yml
    .github/workflows/sid-manual-trade.yml
+   .github/workflows/sid-update.yml   (the one-click updater — so it updates itself)
    (and any other .github/workflows/sid-*.yml that exists on upstream)
 
 STATE — NEVER check out from upstream (these are MY live data + build output; pulling
@@ -154,15 +180,17 @@ Now run the checkout — list the CODE paths explicitly so nothing else can be t
 path doesn't exist upstream, drop that one and continue.)
 
    git checkout upstream/main -- \
+     SID/.sid-update-manifest.txt \
      SID/bot-sid.js SID/scan-sid.js SID/sid-dashboard.js SID/alpaca-executor.js \
      SID/alpaca-client.js SID/telegram-alerts.js SID/approve-trade.js \
      SID/manual-trade.js SID/manual-close.js SID/rsi-target-price.js \
      SID/watchlist-sid.json SID/asset-classification.json SID/event-dates.json \
      SID/strategy-updates.json SID/requirements.txt SID/strategy-audit.js \
      SID/SID-README.md SID/CLAUDE.md SID/SID-DEPLOY-PROMPT.md SID/SID-UPDATE-PROMPT.md \
-     SID/pine SID/approval-worker package.json \
+     SID/HOW-TO-UPDATE.md SID/pine SID/approval-worker package.json \
      .github/workflows/sid.yml .github/workflows/sid-dashboard.yml \
-     .github/workflows/sid-approve-trade.yml .github/workflows/sid-manual-trade.yml
+     .github/workflows/sid-approve-trade.yml .github/workflows/sid-manual-trade.yml \
+     .github/workflows/sid-update.yml
 
 Then confirm the split held:
    git status
