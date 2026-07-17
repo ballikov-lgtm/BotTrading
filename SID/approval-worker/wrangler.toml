@@ -1,0 +1,19 @@
+# Cloudflare Worker config for the SID Telegram approval receiver (v2.3.0).
+#
+# Deploy:  wrangler deploy   (from SID/approval-worker/)
+# Secrets: set with `wrangler secret put <NAME>` — NEVER put secret VALUES here.
+#          See README.md for the full step-by-step.
+#
+# Required secrets (documented in README.md, set via `wrangler secret put`):
+#   TELEGRAM_BOT_TOKEN  WEBHOOK_SECRET  ALLOWED_CHAT_ID  GITHUB_TOKEN  GH_OWNER  GH_REPO
+
+name = "sid-approval-worker"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# No KV, no D1, no durable objects — the Worker is stateless. It validates the
+# request, then dispatches a GitHub workflow. All state lives in the repo.
+
+# NOTE: do NOT add a [vars] block for the secrets above. Plaintext vars in this
+# file get committed. Use `wrangler secret put` so they're stored encrypted in
+# Cloudflare and never touch the repo.

@@ -159,7 +159,16 @@ export async function alertManualWatch({ positions = [], mode } = {}) {
  * backtests still fire these shorts mechanically; the gate only affects what the
  * LIVE bot auto-executes.
  *
+ * v2.3.0: this alert now carries an inline keyboard — [✅ Approve] / [❌ Skip].
+ * Tapping Approve triggers the Cloudflare Worker → sid-approve-trade.yml →
+ * approve-trade.js, which enters the trade as a PROPERLY TRACKED bot position
+ * (full TP1/TP2 management). The callback_data references the pending record's
+ * stable id (`${symbol}-${signalDate}-${side}`), kept ≤64 bytes as Telegram
+ * requires. If `id` is omitted (e.g. a caller that hasn't queued the approval),
+ * the buttons are suppressed and the message falls back to the manual runbook.
+ *
  * @param {Object} p
+ * @param {string} [p.id]         — the pending-approval id (for the buttons)
  * @param {string} p.symbol
  * @param {string} p.signalDate  — the arm/signal date (YYYY-MM-DD)
  * @param {number} p.currentPrice — proposed mechanical entry (today's close)
@@ -169,13 +178,14 @@ export async function alertManualWatch({ positions = [], mode } = {}) {
  * @param {string} [p.reason]      — the detector's reason string
  * @param {string} [p.mode]
  */
-export async function alertShortApprovalNeeded({ symbol, signalDate, currentPrice, proposedEntry, proposedStop, shares, reason, mode }) {
+export async function alertShortApprovalNeeded({ id, symbol, signalDate, currentPrice, proposedEntry, proposedStop, shares, reason, mode }) {
   const modeTag = formatModeTag(mode);
-  const msg = [
+  const hasButtons = typeof id === 'string' && id.length > 0 && id.length <= 60;
+  const bodyLines = [
     `⏸️ <b>SID SHORT — APPROVAL REQUIRED</b> ${modeTag}`,
     ``,
     `<b>${escape(symbol)}</b> SHORT on a long-term-bullish asset was <b>NOT auto-fired</b>.`,
-    `Bullish-asset shorts now need your approval — fire it manually when the level is right (e.g. into the supply zone above), not mechanically below it.`,
+    `Bullish-asset shorts need your approval — approve when price is at your level (e.g. into the supply zone above), not mechanically below it.`,
     ``,
     `Signal date:  ${escape(signalDate || '—')}`,
     `Current price: $${Number(currentPrice)?.toFixed(2)}`,
@@ -183,10 +193,30 @@ export async function alertShortApprovalNeeded({ symbol, signalDate, currentPric
     shares != null ? `Would-be size: ${shares} sh` : '',
     reason ? `\n<i>${escape(reason)}</i>` : '',
     ``,
-    `Approve by firing it yourself via the manual one-shot:`,
-    `<code>gh workflow run sid-manual-trade.yml -f ticker=${escape(symbol)} -f side=short -f shares=N -f tp1_price=RSI50_TARGET -f sl_price=STOP</code>`,
-  ].filter(Boolean).join('\n');
-  return sendMessage(msg);
+  ];
+  if (hasButtons) {
+    bodyLines.push(
+      `Tap <b>Approve</b> to enter this as a <b>tracked bot position</b> at the CURRENT market price (stop + 1% sizing recomputed live). Tap <b>Skip</b> to dismiss.`,
+    );
+  } else {
+    bodyLines.push(
+      `Approve by firing it yourself via the manual one-shot:`,
+      `<code>gh workflow run sid-manual-trade.yml -f ticker=${escape(symbol)} -f side=short -f shares=N -f tp1_price=RSI50_TARGET -f sl_price=STOP</code>`,
+    );
+  }
+  const msg = bodyLines.filter(Boolean).join('\n');
+
+  // v2.3.0 inline keyboard. callback_data ≤64 bytes → `approve:<id>` / `skip:<id>`.
+  const replyMarkup = hasButtons
+    ? {
+        inline_keyboard: [[
+          { text: '✅ Approve', callback_data: `approve:${id}` },
+          { text: '❌ Skip',    callback_data: `skip:${id}` },
+        ]],
+      }
+    : undefined;
+
+  return sendMessage(msg, { replyMarkup });
 }
 
 /**
@@ -273,8 +303,13 @@ function escape(s) {
 /**
  * Best-effort send. Returns { sent: boolean, reason?: string } — never throws.
  * Logs to console on failure but never blocks the caller.
+ *
+ * @param {string} text
+ * @param {Object} [opts]
+ * @param {Object} [opts.replyMarkup] — Telegram reply_markup (e.g. an inline
+ *   keyboard). Added v2.3.0 for the Yes/No approval buttons. Omit for plain msgs.
  */
-export async function sendMessage(text) {
+export async function sendMessage(text, opts = {}) {
   if (!TG_ENABLED) return { sent: false, reason: 'TELEGRAM_ALERTS_ENABLED=false' };
   if (!TG_BOT_TOKEN || !TG_CHAT_ID) {
     return { sent: false, reason: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set' };
@@ -287,6 +322,7 @@ export async function sendMessage(text) {
     parse_mode: 'HTML',
     disable_web_page_preview: false,
   };
+  if (opts && opts.replyMarkup) body.reply_markup = opts.replyMarkup;
 
   let attempt = 0;
   while (attempt <= TG_MAX_RETRIES) {

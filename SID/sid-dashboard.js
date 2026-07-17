@@ -29,7 +29,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.2.6';
+const STRATEGY_VERSION = '2.3.0';
+// v2.3.0 (2026-07-17) = TELEGRAM YES/NO TRADE-APPROVAL FLOW. New capability, NOT a
+// signal-logic change: the v2.2.4 short-approval gate now carries [Approve]/[Skip]
+// inline buttons on its Telegram alert. Approve → a Cloudflare Worker (chat-id
+// allowlist + webhook-secret header + least-privilege GitHub token) dispatches
+// sid-approve-trade.yml → approve-trade.js enters the trade as a PROPERLY TRACKED
+// bot position (full TP1/TP2 management), closing the old "untracked manual one-shot"
+// gap. Bullish-asset shorts are queued to pending-approvals-sid.json; approvals may
+// arrive days later so entry is at the CURRENT market price with a recomputed stop +
+// 1% sizing and a logged proposed-vs-actual delta; aborts safely on an unknown/stale
+// id. A shared buildEntryPositionRecord() factory is the single schema source of truth
+// for BOTH entry paths. Fires on PAPER. NO canon rule change — the HEADLINE backtest
+// below is UNCHANGED. Details below carried from —
 // v2.2.6 (2026-07-17) = TP2 CANCEL-FIRST / RUNNER-HELD-SHARES FIX + CAP 3->5 + BITF
 // DELIST REMOVAL. Exact twin of the v2.2.5 TP1 bug, on the TP2 branch: after TP1
 // banks, the full-runner break-even GTC stop "holds" the runner shares, so the TP2
@@ -1472,7 +1484,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.2.5 TP1 CANCEL-FIRST FIX 2026-07-01 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.3.0 TELEGRAM APPROVAL FLOW 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1480,7 +1492,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.2.6 TP2 CANCEL-FIRST FIX · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19 · EXIT TARGETS ON EVERY CARD</div>
+      <div class="brand-sub">V2.3.0 TELEGRAM APPROVE/SKIP FLOW · TRACKED APPROVED ENTRIES · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1597,7 +1609,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.2.5 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.3.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

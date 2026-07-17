@@ -826,6 +826,134 @@ path, audit ALL of them (TP1, TP2, pre-TP1 stop-out, V2.0 fallback) for the same
 held-shares assumption. (Pre-TP1 stop-out + V2.0 fallback are legacy/non-v2.2 paths
 with no resting stop to release → left unchanged.)
 
+### TELEGRAM YES/NO TRADE-APPROVAL FLOW (v2.3.0, 2026-07-17) — WORKING TREE, NOT DEPLOYED
+
+Built to close the "untracked manual trade" gap left by v2.2.4. Before this: the
+short-approval gate (bullish-asset short → not auto-fired) only sent a one-way
+advisory alert, and "approve" meant Alan manually running `sid-manual-trade.yml`
+→ an UNTRACKED off-strategy position (`manual-trades-log.json`, no TP1/TP2 bot
+management). Now: the gate alert carries **[✅ Approve] [❌ Skip]** buttons, and
+Approve enters the trade as a fully TRACKED bot position.
+
+**Status as of this write-up: WORKING TREE ONLY — nothing committed, pushed,
+deployed, or executed.** The Cloudflare Worker is NOT deployed and the Telegram
+webhook is NOT registered, so the buttons won't function until Alan does the
+setup in `SID/approval-worker/README.md`. Until then the alert still renders with
+buttons but tapping them does nothing (no webhook receiver).
+
+**End-to-end flow:**
+```
+bot-sid.js detects a bullish-asset short (approval gate, ~run() short block)
+  → addPendingApproval(): appends to pending-approvals-sid.json
+        { id:`${symbol}-${signalDate}-${side}`, symbol, side, proposedEntry,
+          proposedStop, proposedShares, signalDate, rsiAtEntry, createdAt,
+          status:'pending' }   (de-duped on id, pruned after SID_PENDING_TTL_DAYS=5)
+  → tg.alertShortApprovalNeeded({ id, ... }) → sendMessage with inline_keyboard
+        [✅ Approve] callback_data=`approve:<id>` / [❌ Skip] `skip:<id>`  (≤64 bytes)
+        │
+        ├─ Skip    → Worker edits msg to "Skipped", no dispatch
+        └─ Approve → Cloudflare Worker (SID/approval-worker/worker.js)
+                       → POST /repos/{owner}/{repo}/actions/workflows/
+                          sid-approve-trade.yml/dispatches { ref:main,
+                          inputs:{ approval_id:<id> } }
+                       → answerCallbackQuery + editMessageText "Approved — firing…"
+  → .github/workflows/sid-approve-trade.yml (workflow_dispatch, approval_id input)
+       → node approve-trade.js
+            reads pending-approvals-sid.json, finds id, ABORTS SAFELY if
+            unknown/actioned/expired/market-closed → enters at CURRENT market
+            fill price, recomputed stop, 1% sizing → places broker GTC stop →
+            writes FULL tracked open-positions record via the SHARED
+            buildEntryPositionRecord() factory → appends trades.csv → marks the
+            pending record 'approved' → logs approval_entry → Telegram-confirms
+       → commits state back (open/pending/trades/account/log) + pull --rebase push
+```
+
+**Security model (baked into the Worker + workflow):**
+- **Webhook secret header:** Worker rejects (401) unless
+  `X-Telegram-Bot-Api-Secret-Token === env.WEBHOOK_SECRET`. Set via Telegram
+  `setWebhook … secret_token=<WEBHOOK_SECRET>`. Fails closed if the secret is unset.
+- **Chat-id allowlist:** Worker only acts if `callback_query.from.id ===
+  env.ALLOWED_CHAT_ID` (Alan). Anyone else → "Not authorised", no dispatch.
+- **Least-privilege GitHub token:** fine-grained PAT, **Actions read+write on the
+  ONE BotTrading repo only**. Lives only as a Worker secret (`wrangler secret
+  put GITHUB_TOKEN`). Never in code, never committed.
+- **No secrets in code/repo:** all via `wrangler secret put` (Cloudflare,
+  encrypted) + GitHub repo secrets. `wrangler.toml` deliberately has NO `[vars]`.
+- **Paper only:** the workflow runs under `SID_TRADING_MODE` (paper); live still
+  needs `SID_LIVE_CONFIRMED`. dry_run/missing creds → executor falls back to
+  dry_run and NO trade (record stays pending).
+- **Safe abort:** `approve-trade.js` aborts (no Alpaca call, no half-written
+  state) on unknown/actioned/expired id, preflight fail, market closed,
+  <1-share sizing, or insufficient buying power. Never a blind trade.
+
+**How approved trades become TRACKED (the schema-reuse approach):** the new
+exported `buildEntryPositionRecord()` in bot-sid.js is the SINGLE source of truth
+for the open-positions schema — used by BOTH `run()` (normal entry) and
+`approve-trade.js`. The approved position also gets a broker GTC stop at entry, so
+`isV2_2Position()` returns true (it checks `brokerStopOrderId` OR
+`strategy.includes('v2.2')` — but `brokerStopOrderId` is enough) → the position
+is managed by the v2.2 broker-order path (`maintainV2_2BrokerOrders` +
+`checkPositions` Branch A/B) for TP1/TP2 exactly like an auto-fired one. Approved
+records carry provenance extras (`manual_watch:true`, `approved_via:'telegram'`,
+`approval_id`, `proposed_entry`, `proposed_stop`, `entry_delta`) that don't touch
+the core schema. `strategy` tag = `SID v2.3.0` (contains `v2.3`, not `v2.2` — so
+the `brokerStopOrderId` is what flips `isV2_2Position`; both were verified).
+
+**Approve-days-later / price-moved handling:** Alan approves when price reaches
+his level (e.g. UNH into 439-440), which can be days after the mechanical signal.
+`approve-trade.js` enters at the CURRENT market FILL price (submits market order,
+polls the fill, uses `filled_avg_price` as `entry`), recomputes the stop via
+`computeStop(side, refPrice, proposedStop)` — REUSES the original proposed stop
+LEVEL if still valid for the direction (short → stop above ref), else a 2% buffer
+beyond the reference — and sizes by 1% risk on the CURRENT entry→stop distance
+(reuses `calcPositionSize`, after setting `CONFIG.accountUsd` from the ledger like
+`run()` does). Logs the proposed-vs-actual `entry_delta`; if >5% off, still enters
+(Alan chose to approve) but flags it in the Telegram confirm.
+
+**Files touched (v2.3.0):**
+- `bot-sid.js` — `BOT_VERSION` v2.3.0 + history; new `PENDING_PATH` +
+  `PENDING_TTL_DAYS`; pending-queue helpers (`pendingApprovalId`,
+  `loadPendingApprovals`, `savePendingApprovals`, `prunePendingApprovals`,
+  `addPendingApproval`); shared `buildEntryPositionRecord()` factory (also used to
+  refactor the `run()` entry record — behaviour identical); approval-gate block
+  now queues + passes `id` to the alert; expanded `export {}` block.
+- `telegram-alerts.js` — `alertShortApprovalNeeded()` sends the inline keyboard
+  (suppressed if no `id`); `sendMessage(text, {replyMarkup})` passthrough.
+- `approve-trade.js` — NEW. The tracked-entry executor (above).
+- `approval-worker/worker.js` + `wrangler.toml` + `package.json` + `README.md` —
+  NEW. The Cloudflare Worker + guided setup.
+- `.github/workflows/sid-approve-trade.yml` — NEW. workflow_dispatch(approval_id).
+- `pending-approvals-sid.json` — NEW (seeded `[]`).
+- Ship-check: `sid-dashboard.js` `STRATEGY_VERSION=2.3.0` + 3 hardcoded markers
+  (paper banner / brand-sub / perf-note) + regenerated `docs/sid/index.html`;
+  `strategy-updates.json` new INFRA entry at top (count auto → 21); `SID-README.md`
+  current-version line + v2.3.0 history row + "Telegram approval flow" section +
+  Files-table rows.
+
+**Tested (local, no network trades):**
+- `node --check` on all 4 JS files → pass.
+- Import resolution: `approve-trade.js` imports all named exports from bot-sid.js
+  successfully; ledger loads ($9761.26 at test time).
+- Unknown-id run → safe abort, exit 0, no Alpaca call.
+- Seeded a `pending` record, ran `approve-trade.js` in dry_run → found the
+  record, stopped at dry_run with NO state change (record stayed `pending`).
+  Restored the queue to `[]` afterwards.
+- Dashboard regenerated from the WORKTREE ROOT (`node SID/sid-dashboard.js` from
+  `.claude/worktrees/silly-robinson-abcf6c/`, NOT the repo root — the repo-root
+  `SID/sid-dashboard.js` is the stale parent snapshot and errors MODULE_NOT_FOUND;
+  the worktree root has `node_modules`). v2.3.0 markers + count (21) confirmed in
+  `docs/sid/index.html`.
+
+**Queued / not done (needs Alan):**
+- Deploy the Worker + register the Telegram webhook per
+  `SID/approval-worker/README.md` (create free Cloudflare account, `wrangler
+  deploy`, `wrangler secret put` each secret, `setWebhook` with `secret_token`).
+- Create the fine-grained GitHub token himself (Actions RW on BotTrading only) —
+  never share the value.
+- Nothing committed/pushed/deployed/executed this session (per the brief).
+- The Pine visualiser legend still says amber = "manual-watch"; next Pine push
+  could note amber = "approval-required, approve via Telegram." Not urgent.
+
 ### maxOpenPositions raised 3 → 5 (v2.2.6, 2026-07-17)
 
 `CONFIG.maxOpenPositions` default was **3** ("never hold more than 3"). Alan wanted

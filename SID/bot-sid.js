@@ -81,8 +81,49 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.2.6'; // V2.2.6 TP2 CANCEL-FIRST FIX (+ cap raise 3→5 + BITF delist removal): the TP2 runner-close (checkPositions Branch B) now applies the SAME cancel-first pattern the v2.2.5 fix applied to TP1 — it CANCELS the resting break-even broker GTC stop FIRST (to release the runner shares), then submits the full runner close, POLLS that it filled, and only re-protects on failure. Fixes the SAME silent-retry loop v2.2.5 cured for TP1, but on the other branch: PYPL (12sh runner, BE $41.41) and ADBE (2sh runner, BE $200.79) hit a legitimate SMA50-touch TP2 but the close failed every run 2026-07-13→16 with `insufficient qty available (available: 0)` because the BE stop held the runner shares → tp2Hit never banked, retried silently. On a REJECTED/unconfirmed close the runner is re-protected with a stop + a LOUD Telegram alarm (tg.alertTp2CloseFailed) fires. Also: CONFIG.maxOpenPositions 3→5 (5 × 10% cap = ~50% max deployed); BITF removed from the universe (delisted — Alpaca HTTP 404 every run); stale UNH one-shot close workflow deleted. No canon rule change. (paper trading, 2026-07-17)
+const BOT_VERSION = 'v2.3.0'; // V2.3.0 TELEGRAM YES/NO APPROVAL FLOW (new capability, not a signal-logic change): the v2.2.4 short-approval gate now carries [✅ Approve] [❌ Skip] inline-keyboard buttons on its Telegram alert. Tapping Approve triggers a Cloudflare Worker (chat_id allowlist + webhook-secret header + least-privilege GitHub token) which dispatches sid-approve-trade.yml with the approval_id → approve-trade.js enters the trade as a PROPERLY TRACKED bot position (full TP1/TP2 management via checkPositions/maintainV2_2BrokerOrders), closing the old "untracked manual one-shot" gap. Bullish-asset shorts are queued to pending-approvals-sid.json (deterministic id `${symbol}-${signalDate}-${side}`, de-duped + pruned after SID_PENDING_TTL_DAYS=5). Approvals may arrive DAYS later at a different price: approve-trade.js enters at the CURRENT market price, recomputes the stop from the current setup (reuses the original stop level if still valid), sizes by 1% risk on the current entry→stop distance, logs the proposed-vs-actual entry delta, and aborts safely if the approval_id is unknown/stale/actioned. A new shared buildEntryPositionRecord() factory is the single schema source of truth for BOTH entry paths (no drift). Fires on PAPER (SID_TRADING_MODE). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
 // Version history:
+//   v2.3.0 V2.3.0 TELEGRAM YES/NO TRADE-APPROVAL FLOW (2026-07-17, paper trading):
+//        - MOTIVATION: v2.2.4 gated bullish-asset shorts but "approve" meant Alan
+//          manually ran sid-manual-trade.yml, which creates an UNTRACKED off-strategy
+//          position (manual-trades-log.json, no TP1/TP2 bot management). This closes
+//          that gap: Approve now enters a fully-tracked bot position.
+//        - PENDING QUEUE: new pending-approvals-sid.json. The approval gate appends
+//          { id, symbol, side, proposedEntry, proposedStop, proposedShares,
+//          signalDate, rsiAtEntry, createdAt, status:'pending' } (de-duped on the
+//          deterministic id, pruned after SID_PENDING_TTL_DAYS). Existing log +
+//          Telegram alert are unchanged, just extended with buttons.
+//        - TELEGRAM BUTTONS: alertShortApprovalNeeded() now sends an inline keyboard
+//          [✅ Approve] callback_data=`approve:<id>` / [❌ Skip] callback_data=`skip:<id>`.
+//          sendMessage() gained an optional reply_markup passthrough.
+//        - CLOUDFLARE WORKER (SID/approval-worker/worker.js): Telegram webhook
+//          receiver. SECURITY: rejects unless X-Telegram-Bot-Api-Secret-Token ===
+//          WEBHOOK_SECRET (401), and callback_query.from.id === ALLOWED_CHAT_ID
+//          (only Alan). On approve → GitHub REST workflow-dispatch of
+//          sid-approve-trade.yml (least-privilege fine-grained token, Actions RW on
+//          one repo). Answers the callback + edits the message to a confirmation.
+//        - APPROVE WORKFLOW (.github/workflows/sid-approve-trade.yml): workflow_dispatch
+//          input approval_id → node approve-trade.js → commits state back (open/pending/
+//          trades/account/log) with the standard pull --rebase --autostash push.
+//        - approve-trade.js: reads the pending record, aborts safely if unknown/
+//          actioned/expired, market-hours guard, then ENTERS AT CURRENT PRICE with a
+//          recomputed/validated stop, 1% sizing on the live entry→stop distance,
+//          logs the proposed-vs-actual delta, writes a FULL v2.3.0 tracked position
+//          via the shared buildEntryPositionRecord() factory (so checkPositions/
+//          maintainV2_2BrokerOrders manage TP1/TP2 normally), marks the pending
+//          record 'approved', appends trades.csv, updates the account ledger, logs an
+//          approval_entry, and Telegram-confirms.
+//        - SCHEMA-REUSE: new exported buildEntryPositionRecord() is used by BOTH
+//          run() and approve-trade.js so the v2.2.x position schema can never drift
+//          between the two entry sources. calcPositionSize/fetchDailyCandles/state
+//          I/O helpers are exported for the same reason.
+//        - SECURITY MODEL (baked in everywhere): only ALLOWED_CHAT_ID can approve;
+//          webhook secret_token header required; GitHub token is fine-grained
+//          least-privilege (Actions RW, ONE repo); no secrets in code/committed files
+//          (wrangler secret put + repo secrets); fires on PAPER only; the workflow
+//          aborts on an unknown/stale approval_id (no blind trade).
+//        - NO canon rule change. Headline backtest numbers unchanged.
+//   v2.2.6 V2.2.6 TP2 CANCEL-FIRST / RUNNER-HELD-SHARES FIX (2026-07-17, paper trading):
 //   v2.2.6 V2.2.6 TP2 CANCEL-FIRST / RUNNER-HELD-SHARES FIX (2026-07-17, paper trading):
 //        - ROOT CAUSE: exact twin of the v2.2.5 TP1 bug, on the TP2 branch. After
 //          TP1 banks, the v2.2 broker design leaves a full-RUNNER GTC break-even
@@ -328,6 +369,12 @@ const ACCOUNT_PATH    = './sid-account.json';
 const SAFETY_LOG_PATH = './sid-log.json';
 const WATCHLIST_PATH  = './watchlist-sid.json';
 const EVENT_DATES_PATH= './event-dates.json';
+const PENDING_PATH    = './pending-approvals-sid.json';  // v2.3.0: Telegram Yes/No approval queue
+
+// v2.3.0: how many days a pending approval stays actionable before it's pruned
+// as stale. Approvals CAN legitimately arrive days later (Alan waits for price
+// to reach his level), but a setup older than this is no longer the same trade.
+const PENDING_TTL_DAYS = intEnv(process.env.SID_PENDING_TTL_DAYS, 5);
 
 // ── Watchlist (loaded from watchlist-sid.json — currently REFINED 47) ─────────
 // The watchlist file is the canonical trade list. Edit watchlist-sid.json's
@@ -506,6 +553,97 @@ function addOpenPosition(pos) {
   if (open.some(p => p.id === pos.id)) return;
   open.push(pos);
   saveOpenPositions(open);
+}
+
+// ── v2.3.0: Telegram approval queue (pending-approvals-sid.json) ─────────────
+// When the SHORT APPROVAL GATE fires (bullish-asset short not auto-executed),
+// the bot appends a PENDING record here. The Telegram alert carries [Approve]
+// [Skip] buttons whose callback_data references the record's stable id. Tapping
+// Approve dispatches sid-approve-trade.yml with the id → approve-trade.js reads
+// this file, finds the record, and enters the trade as a properly tracked bot
+// position. The id is DETERMINISTIC (`${symbol}-${signalDate}-${side}`) so the
+// same setup can't be queued twice and callback_data stays ≤64 bytes.
+
+function pendingApprovalId(symbol, signalDate, side) {
+  return `${symbol}-${signalDate}-${side}`;
+}
+
+function loadPendingApprovals() {
+  try {
+    if (fs.existsSync(PENDING_PATH)) {
+      const arr = JSON.parse(fs.readFileSync(PENDING_PATH, 'utf8'));
+      return Array.isArray(arr) ? arr : [];
+    }
+  } catch {}
+  return [];
+}
+
+function savePendingApprovals(arr) {
+  fs.writeFileSync(PENDING_PATH, JSON.stringify(arr, null, 2));
+}
+
+// Drop pending records older than PENDING_TTL_DAYS (by createdAt) and any that
+// are already actioned (status !== 'pending'). Returns the surviving array.
+function prunePendingApprovals(arr, ttlDays = PENDING_TTL_DAYS) {
+  const cutoffMs = Date.now() - ttlDays * 86400000;
+  return arr.filter(r => {
+    if (!r || r.status !== 'pending') return false;
+    const created = r.createdAt ? Date.parse(r.createdAt) : NaN;
+    if (Number.isFinite(created) && created < cutoffMs) return false;
+    return true;
+  });
+}
+
+// Append a pending approval, de-duping on the deterministic id. Prunes stale
+// records in the same write so the file never grows unbounded. Returns the
+// record's id.
+function addPendingApproval(rec) {
+  let arr = prunePendingApprovals(loadPendingApprovals());
+  if (!arr.some(r => r.id === rec.id)) arr.unshift(rec);
+  savePendingApprovals(arr);
+  return rec.id;
+}
+
+// ── v2.3.0: shared entry-record factory (schema single source of truth) ──────
+// Builds the FULL open-positions-sid.json record for a new entry. Used by BOTH
+// the bot's normal entry path (run()) AND the approval flow (approve-trade.js)
+// so the v2.2.x schema (shares_total, shares_remaining, orig_stop, tp1_hit,
+// brokerStopOrderId, clientOrderIdPrefix, strategy, etc.) can NEVER drift
+// between the two entry sources. checkPositions()/maintainV2_2BrokerOrders()
+// then manage TP1/TP2 identically regardless of which path opened the position.
+//
+// `extra` merges on top (e.g. manual_watch:true, approved_via, entry_delta) —
+// approval-entered positions carry provenance without changing the core schema.
+function buildEntryPositionRecord({
+  id, symbol, side, entry, stopLoss, shares, totalUsd, riskUsd,
+  signalDate, openDate, openTime, mode, strategyTag,
+  brokerStopOrderId = null, clientOrderIdPrefix = null,
+}, extra = {}) {
+  return {
+    id,
+    symbol,
+    side,                              // 'long' | 'short'
+    entry,
+    stopLoss,
+    shares,                            // legacy field — kept for back-compat
+    shares_total:     shares,          // V2.1: immutable original size
+    shares_remaining: shares,          // V2.1: drops to 50% after TP1
+    orig_stop:        stopLoss,        // V2.1: kept; stopLoss migrates to BE after TP1
+    tp1_hit:          false,           // V2.1: flips true at RSI 50
+    totalUsd,
+    riskUsd,
+    signalDate,
+    openDate,
+    openTime,
+    mode,
+    strategy:         strategyTag,     // e.g. `SID v2.3.0`
+    // V2.2: broker-order tracking for the resting stop + intraday TP1 limit.
+    // Setting brokerStopOrderId also makes isV2_2Position() return true, so the
+    // position is managed by the v2.2 broker-order path (the tracked-bot path).
+    brokerStopOrderId,
+    clientOrderIdPrefix,
+    ...extra,
+  };
 }
 
 // ── External close recorder (FIX tasks #25 + #26, 2026-06-05) ────────────────
@@ -2446,12 +2584,18 @@ async function run() {
     if (CONFIG.shortApprovalGate && signal.signal === 'short') {
       const ltb = longTermBullish(candles);
       if (ltb.bullish) {
-        console.log(`⏸  MANUAL-WATCH SHORT — approval required, not auto-fired (long-term-bullish: price>$${ltb.sma200?.toFixed(2)} SMA200, 50>200). Fire manually into the right level via sid-manual-trade.yml.`);
+        console.log(`⏸  MANUAL-WATCH SHORT — approval required, not auto-fired (long-term-bullish: price>$${ltb.sma200?.toFixed(2)} SMA200, 50>200). Approve via the Telegram button (or sid-manual-trade.yml).`);
+        // Rough would-be size for the alert + queue (informational only).
+        const wouldBeSizing = calcPositionSize(signal.entry, signal.stopLoss);
+        // v2.3.0: deterministic id so the setup is queued exactly once and the
+        // Telegram callback_data stays ≤64 bytes.
+        const approvalId = pendingApprovalId(symbol, signal.signalDate, 'short');
         writeLog({
           kind:            'short_approval_required',
           symbol,
           signal:          'short',
-          reason:          'Bullish-asset short gated — awaiting manual approval (SID_SHORT_APPROVAL_GATE)',
+          reason:          'Bullish-asset short gated — awaiting approval (SID_SHORT_APPROVAL_GATE)',
+          approval_id:     approvalId,
           proposed_entry:  signal.entry,
           proposed_stop:   signal.stopLoss,
           proposed_rsi:    signal.rsiAtEntry,
@@ -2460,9 +2604,25 @@ async function run() {
           sma200:          ltb.sma200,
           detector_reason: signal.reason,
         });
-        // Rough would-be size for the alert (informational only — not executed).
-        const wouldBeSizing = calcPositionSize(signal.entry, signal.stopLoss);
+        // v2.3.0: append to the pending-approvals queue (de-duped + pruned).
+        // approve-trade.js reads this on [Approve] to enter a TRACKED position.
+        addPendingApproval({
+          id:             approvalId,
+          symbol,
+          side:           'short',
+          proposedEntry:  signal.entry,
+          proposedStop:   signal.stopLoss,
+          proposedShares: wouldBeSizing?.shares ?? null,
+          signalDate:     signal.signalDate,
+          rsiAtEntry:     signal.rsiAtEntry ?? null,
+          reason:         signal.reason,
+          sma50:          ltb.sma50 ?? null,
+          sma200:         ltb.sma200 ?? null,
+          createdAt:      new Date().toISOString(),
+          status:         'pending',
+        });
         tg.alertShortApprovalNeeded({
+          id:            approvalId,
           symbol,
           signalDate:    signal.signalDate,
           currentPrice:  signal.entry,
@@ -2472,7 +2632,7 @@ async function run() {
           reason:        signal.reason,
           mode:          CONFIG.tradingMode,
         }).catch(() => {});
-        continue; // do NOT size/execute — Alan approves + fires manually
+        continue; // do NOT size/execute — Alan approves via Telegram / manual flow
       }
     }
 
@@ -2572,28 +2732,25 @@ async function run() {
 
     appendTrade(row);
 
-    addOpenPosition({
+    // v2.3.0: build the position record via the SHARED factory so the schema
+    // stays identical to the approval-flow entry path (approve-trade.js).
+    addOpenPosition(buildEntryPositionRecord({
       id:               orderId,
       symbol,
       side:             signal.signal,
       entry:            signal.entry,
       stopLoss:         signal.stopLoss,
-      shares:           sizing.shares,       // legacy field — kept for back-compat
-      shares_total:     sizing.shares,        // V2.1: immutable original size
-      shares_remaining: sizing.shares,        // V2.1: drops to 50% after TP1
-      orig_stop:        signal.stopLoss,      // V2.1: kept for record; stopLoss field moves to BE after TP1
-      tp1_hit:          false,                // V2.1: flips true at RSI 50
+      shares:           sizing.shares,
       totalUsd:         sizing.totalUsd,
       riskUsd:          sizing.riskUsd,
       signalDate:       signal.signalDate,
       openDate:         now.toISOString().slice(0, 10),
       openTime:         now.toISOString().slice(11, 19),
       mode:             modeLabel,
-      strategy:         `${BOT_NAME} ${BOT_VERSION}`,
-      // V2.2: broker-order tracking for resting stop + intraday TP1 limit
+      strategyTag:      `${BOT_NAME} ${BOT_VERSION}`,
       brokerStopOrderId:   stopOrderId,
       clientOrderIdPrefix: clientOrderIdPrefix,
-    });
+    }));
 
     // Fire Telegram alert (best-effort, never blocks trading)
     tg.alertEntryFired({
@@ -2658,7 +2815,8 @@ if (_isDirectRun) {
   });
 }
 
-// Exports for test harnesses (do NOT affect the direct-run path above).
+// Exports for test harnesses + the v2.3.0 approval flow (approve-trade.js).
+// These do NOT affect the direct-run path above.
 export {
   detectEntrySignal,
   buildWeeklyDailyAligned,
@@ -2668,4 +2826,23 @@ export {
   calcMACD,
   calcSMA,
   CONFIG,
+  // v2.3.0 — shared so the approval flow reuses the exact schema + state I/O,
+  // never a hand-copied duplicate (prevents drift).
+  BOT_NAME,
+  BOT_VERSION,
+  buildEntryPositionRecord,
+  calcPositionSize,
+  fetchDailyCandles,
+  addOpenPosition,
+  loadOpenPositions,
+  saveOpenPositions,
+  loadAccount,
+  updateAccount,
+  appendTrade,
+  writeLog,
+  loadPendingApprovals,
+  savePendingApprovals,
+  prunePendingApprovals,
+  pendingApprovalId,
+  todayString,
 };

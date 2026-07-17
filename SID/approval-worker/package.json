@@ -1,0 +1,15 @@
+{
+  "name": "sid-approval-worker",
+  "version": "2.3.0",
+  "private": true,
+  "description": "Cloudflare Worker that receives SID Telegram approval button taps and dispatches the sid-approve-trade.yml GitHub workflow. Chat-id allowlist + webhook-secret header + least-privilege GitHub token. Places no trades itself.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

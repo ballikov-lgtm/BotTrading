@@ -1,0 +1,72 @@
+name: SID Approve Trade (Telegram Yes/No)
+
+# v2.3.0 — Fired when Alan taps [✅ Approve] on a SID short-approval Telegram
+# alert. The Cloudflare Worker (SID/approval-worker/) dispatches this workflow
+# with the approval_id; approve-trade.js reads pending-approvals-sid.json, finds
+# that id, and enters the trade as a PROPERLY TRACKED bot position (full TP1/TP2
+# management). Aborts safely if the id is unknown / already actioned / expired.
+#
+# Can also be dispatched manually for testing:
+#   gh workflow run sid-approve-trade.yml -f approval_id="UNH-2026-07-15-short"
+
+on:
+  workflow_dispatch:
+    inputs:
+      approval_id:
+        description: "Pending approval id (symbol-signalDate-side), e.g. UNH-2026-07-15-short"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Enter approved trade as a tracked position
+        working-directory: SID
+        env:
+          # ── The approval to action ─────────────────────────────────────────
+          APPROVAL_ID:         ${{ inputs.approval_id }}
+
+          # ── Alpaca execution (PAPER for this flow) ─────────────────────────
+          # If SID_TRADING_MODE is dry_run or the creds are missing, the executor
+          # falls back to dry_run and NO trade is placed (record stays pending).
+          SID_TRADING_MODE:    ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED:  ${{ secrets.SID_LIVE_CONFIRMED }}
+          ALPACA_KEY_ID:       ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
+
+          # ── Sizing config (same secrets the bot uses) ──────────────────────
+          SID_ACCOUNT_USD:     ${{ secrets.SID_ACCOUNT_USD }}
+          SID_RISK_PCT:        ${{ secrets.SID_RISK_PCT }}
+          SID_MAX_POS_PCT:     ${{ secrets.SID_MAX_POS_PCT }}
+
+          # ── Telegram alerts (best-effort) ──────────────────────────────────
+          TELEGRAM_BOT_TOKEN:       ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:         ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ALERTS_ENABLED:  ${{ secrets.TELEGRAM_ALERTS_ENABLED }}
+        run: node approve-trade.js
+
+      - name: Commit reconciled state back to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SID/open-positions-sid.json      || true
+          git add SID/pending-approvals-sid.json   || true
+          git add SID/trades-sid.csv               || true
+          git add SID/sid-account.json             || true
+          git add SID/sid-log.json                 || true
+          git diff --staged --quiet || git commit -m "SID approval entry $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase --autostash origin main
+          git push
