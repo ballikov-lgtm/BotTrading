@@ -1,21 +1,39 @@
-name: SID Account Reconcile (dry-run)
+name: SID Account Reconcile
 
-# READ-ONLY reconciliation report. Pulls the REAL Alpaca paper account (FILL
-# activities + equity), matches closed SID positions to actual fills, and prints
-# a before/after table of corrected P&L to the Actions log. Writes NOTHING and
-# commits NOTHING — this is how we safely produce the real cloud numbers for
-# Alan to eyeball before Phase 2 (the --write persist + dashboard re-point).
+# Reconciles SID's PAPER records against the REAL Alpaca paper account (FILL
+# activities + equity): matches closed positions to actual fills, reconstructs
+# orphan trades dropped from the records (e.g. the MCD paper stop-out), and
+# prints a before/after table of corrected P&L to the Actions log.
+#
+# TWO MODES (workflow_dispatch input `mode`):
+#   dry-run (DEFAULT) — prints the table, writes NOTHING, commits NOTHING.
+#   write             — persists corrected closed-positions-sid.json +
+#                       re-derived sid-account.json + alpaca-account-sid.json,
+#                       then commits + pushes ONLY those three state files.
+#
+# An UNPARAMETRIZED run (`gh workflow run sid-reconcile.yml`) defaults to
+# dry-run — identical to the read-only behaviour it has always had.
 #
 # Manual trigger ONLY (no schedule). To run: Actions tab -> "SID Account
-# Reconcile (dry-run)" -> Run workflow. Or: gh workflow run sid-reconcile.yml
+# Reconcile" -> Run workflow -> pick mode.
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run (report only) or write (persist + commit the corrected paper records)'
+        type: choice
+        required: true
+        default: dry-run
+        options:
+          - dry-run
+          - write
 
-# Deliberately NO `permissions: contents: write` — this job must not be able to
-# push. It only reads Alpaca and prints to the log.
+# `write` mode needs to commit the corrected state files. The dry-run path never
+# reaches the commit step (guarded by `if: inputs.mode == 'write'`), so a
+# dry-run run writes/commits nothing regardless of this permission.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   reconcile:
@@ -29,16 +47,39 @@ jobs:
 
       - run: npm install
 
-      - name: Run SID reconciliation (dry-run — writes nothing)
+      - name: Run SID reconciliation
         working-directory: SID
         env:
           # Alpaca execution — SAME secret names sid.yml uses. SID_TRADING_MODE
           # must be paper (or live) for the tool to reach Alpaca; if the keys are
           # unset the client construction fails and the tool reports every
-          # position as an estimate (still no crash, still writes nothing).
+          # position as an estimate (still no crash). The tool's own --write guard
+          # additionally REFUSES to persist without a live Alpaca connection, so a
+          # keyless write can never overwrite good records with estimates.
           SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
           SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
           ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
           ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_BASE_URL:    ${{ secrets.ALPACA_BASE_URL }}
-        run: node reconcile-account.js --dry-run
+        run: |
+          if [ "${{ inputs.mode }}" = "write" ]; then
+            echo "Running reconcile in WRITE mode — will persist corrected paper records."
+            node reconcile-account.js --write
+          else
+            echo "Running reconcile in DRY-RUN mode — writes nothing."
+            node reconcile-account.js --dry-run
+          fi
+
+      # Commit ONLY runs in write mode. Mirrors sid.yml's state-file-scoped add:
+      # stage the THREE corrected state files explicitly (never `git add -A`, never
+      # source or other files), commit, pull --rebase to avoid non-fast-forward
+      # against concurrent bot/dashboard runs, then push.
+      - name: Commit corrected state (write mode only)
+        if: ${{ inputs.mode == 'write' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add SID/closed-positions-sid.json SID/sid-account.json SID/alpaca-account-sid.json
+          git diff --staged --quiet || git commit -m "SID reconcile: correct paper records to Alpaca fills (paper-only, mode:paper)"
+          git pull --rebase --autostash origin main
+          git push

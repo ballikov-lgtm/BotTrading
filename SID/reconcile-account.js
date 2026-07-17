@@ -231,7 +231,7 @@ function allocateFillsFIFO(positions, allFills) {
 // reconstructed:true. Side is inferred from which leg came FIRST in time (an
 // early buy => long; an early sell => short).
 // Returns an array of reconstructed closed-position records.
-function reconstructOrphans(leftovers) {
+function reconstructOrphans(leftovers, reconcileMode = 'paper') {
   const recs = [];
   for (const [sym, { buyQ, sellQ }] of leftovers) {
     const buyQty  = buyQ.reduce((s, l) => s + l.qtyLeft, 0);
@@ -278,7 +278,7 @@ function reconstructOrphans(leftovers) {
       exit_strategy: 'reconstructed_from_fills',
       total_pnl: parseFloat(pnl.toFixed(2)),
       realizedPnl: parseFloat(pnl.toFixed(2)),
-      mode: 'paper',
+      mode: reconcileMode,   // matches the Alpaca account reconciled (paper now)
       strategy: 'SID (reconstructed from Alpaca fills)',
       pnl_source: 'alpaca_fill',
       reconstructed: true,
@@ -294,13 +294,36 @@ async function main() {
   console.log(`   Mode: ${DRY_RUN ? 'DRY-RUN (default) - writes NOTHING' : 'WRITE - will persist corrected files'}`);
   console.log('');
 
-  const closed  = loadJSON(CLOSED_PATH, null);
+  const allClosed = loadJSON(CLOSED_PATH, null);
   const account = loadJSON(ACCOUNT_PATH, null);
-  if (!Array.isArray(closed)) {
+  if (!Array.isArray(allClosed)) {
     console.error(`${FAIL} Could not read ${CLOSED_PATH}`);
     process.exit(1);
   }
-  console.log(`${OK} Loaded ${closed.length} closed record(s) from closed-positions-sid.json`);
+
+  // ── PAPER / LIVE SEGREGATION (hard guard — go-live safety) ────────────────
+  // The reconcile ONLY ever touches records matching the Alpaca account it is
+  // reconciling against. Right now that account is PAPER, so we reconcile ONLY
+  // mode:"paper" records (records with no mode are legacy paper — the V2 paper
+  // launch predates the mode field). Any mode:"live" record is QUARANTINED:
+  // passed through byte-for-byte, never re-priced, never summed into the paper
+  // ledger. The user's design: when they go live a FRESH live ledger starts
+  // (tradeCount 0, mode:live) and this paper history stays separate forever —
+  // paper P&L must NEVER leak into a future live ledger or the live-only tax
+  // report. reconcileMode is the account's own mode (paper unless the Alpaca
+  // account resolves to live), so a future live run reconciles the live set and
+  // quarantines paper symmetrically.
+  const reconcileMode = (resolveTradingMode() === 'live') ? 'live' : 'paper';
+  const recMode = (r) => String(r.mode || 'paper').toLowerCase();
+  const closed        = allClosed.filter(r => recMode(r) === reconcileMode);
+  const quarantined   = allClosed.filter(r => recMode(r) !== reconcileMode);
+
+  console.log(`${OK} Loaded ${allClosed.length} closed record(s) from closed-positions-sid.json`);
+  console.log(`${OK} Reconcile scope: ${reconcileMode.toUpperCase()} set = ${closed.length} record(s); ${quarantined.length} other-mode record(s) QUARANTINED (untouched)`);
+  if (quarantined.length) {
+    const q = quarantined.reduce((acc, r) => { acc[recMode(r)] = (acc[recMode(r)] || 0) + 1; return acc; }, {});
+    console.log(`       Quarantined by mode: ${Object.entries(q).map(([m, n]) => `${m}:${n}`).join(', ')} — these pass through unchanged, never re-priced or summed`);
+  }
   if (account) {
     console.log(`${OK} Loaded ledger: realizedPnl ${money(account.realizedPnl)}  tradeCount ${account.tradeCount}  accountUsd $${account.accountUsd}`);
   } else {
@@ -410,15 +433,17 @@ async function main() {
   // at commit a40456fc but never removed from the account totals, so the books
   // are ~$78 short of the paper account. Any symbol with a complete leftover
   // round-trip is such an orphan — rebuild it from the real fills.
-  const reconstructed = alpacaOk ? reconstructOrphans(leftovers) : [];
+  const reconstructed = alpacaOk ? reconstructOrphans(leftovers, reconcileMode) : [];
 
-  // ── MCD manual fallback ──────────────────────────────────────────────────
+  // ── MCD manual fallback (PAPER ONLY) ──────────────────────────────────────
   // If MCD's real fills are NOT in Alpaca's returned activity (window too tight,
   // paper history pruned, etc.) it won't be reconstructed above. Re-add the
   // KNOWN MCD record (−$78.14, from git commit 76a98edd) so the paper books
   // still tie — flagged reconstructed_manual so it's clearly not fill-derived.
   // NEVER fabricate a number: this uses the exact figure that was manually
   // reconciled from the two Alpaca stop-fill screenshots on 2026-06-05.
+  // GUARDED to reconcileMode==='paper' — MCD is a PAPER trade and must NEVER be
+  // injected into a live reconcile / live ledger / live tax report.
   const MCD_KNOWN = {
     symbol: 'MCD', side: 'long', entry: 281.67, exit_price: 271.9025,
     shares_total: 8, shares: 8, openDate: '2026-05-22', closeDate: '2026-06-04',
@@ -430,8 +455,8 @@ async function main() {
       '4sh @ $271.925 Jun 04). PAPER ONLY — must never appear in the live tax report.',
     reconciled_at: new Date().toISOString().slice(0, 10),
   };
-  const alreadyHaveMcd = [...closed, ...reconstructed].some(r => String(r.symbol).toUpperCase() === 'MCD');
-  const mcdFallbackUsed = alpacaOk && !alreadyHaveMcd;
+  const alreadyHaveMcd = [...allClosed, ...reconstructed].some(r => String(r.symbol).toUpperCase() === 'MCD');
+  const mcdFallbackUsed = alpacaOk && reconcileMode === 'paper' && !alreadyHaveMcd;
   if (mcdFallbackUsed) reconstructed.push(MCD_KNOWN);
 
   // Fold reconstructed records into the corrected set + total.
@@ -531,9 +556,19 @@ async function main() {
     process.exit(1);
   }
 
-  fs.writeFileSync(CLOSED_PATH, JSON.stringify(corrected, null, 2));
-  console.log(`${OK} Wrote ${corrected.length} corrected record(s) to closed-positions-sid.json`);
+  // SEGREGATION: the written file = reconciled-scope records + the QUARANTINED
+  // other-mode records passed through byte-for-byte. Never drop the quarantined
+  // set (that would delete e.g. live history) and never merge its P&L into the
+  // reconciled ledger. Order: reconciled scope first, then quarantined.
+  const fileOut = [...corrected, ...quarantined];
+  fs.writeFileSync(CLOSED_PATH, JSON.stringify(fileOut, null, 2));
+  console.log(`${OK} Wrote ${fileOut.length} record(s) to closed-positions-sid.json (${corrected.length} reconciled ${reconcileMode}, ${quarantined.length} quarantined pass-through)`);
 
+  // The ledger being re-derived is the RECONCILED-MODE ledger only. sid-account.json
+  // tracks one mode's account (paper now); its realizedPnl/tradeCount reflect the
+  // reconciled scope, never the quarantined records. When the user goes live, a
+  // FRESH live ledger is started separately (mode:live, tradeCount 0) — this tool
+  // reconciles whichever mode the Alpaca account resolves to.
   const newAccount = {
     ...(account || {}),
     accountUsd:  parseFloat((STARTING_LEDGER_USD + sumCorrected).toFixed(2)),
@@ -541,12 +576,12 @@ async function main() {
     realizedPnl: sumCorrected,
     tradeCount:  corrected.length,
     lastUpdated: new Date().toISOString().slice(0, 10),
-    mode:        account?.mode || (mode === 'live' ? 'live' : 'paper'),
+    mode:        reconcileMode,
     reconciledFromAlpaca: true,
     reconciledAt: new Date().toISOString().slice(0, 10),
   };
   fs.writeFileSync(ACCOUNT_PATH, JSON.stringify(newAccount, null, 2));
-  console.log(`${OK} Re-derived sid-account.json: realizedPnl ${money(sumCorrected)}  tradeCount ${corrected.length}  accountUsd $${newAccount.accountUsd}`);
+  console.log(`${OK} Re-derived sid-account.json (${reconcileMode}): realizedPnl ${money(sumCorrected)}  tradeCount ${corrected.length}  accountUsd $${newAccount.accountUsd}`);
 
   fs.writeFileSync(ALPACA_SNAP_PATH, JSON.stringify(snapshot, null, 2));
   console.log(`${OK} Wrote alpaca-account-sid.json: equity $${snapshot.equity}  netPnl ${money(snapshot.netPnl)}`);
