@@ -328,5 +328,6 @@ Bot detects bullish-asset short
 | `approve-trade.js` | v2.3.0 — enters an Approved short as a **tracked** bot position (full TP1/TP2); reuses the bot's shared entry-record factory + sizing |
 | `approval-worker/` | v2.3.0 — Cloudflare Worker (Telegram webhook receiver) + `wrangler.toml` + setup `README.md`. Validates chat-id + webhook secret, then dispatches `sid-approve-trade.yml` |
 | `SID-README.md` | This file |
-| `SID-DEPLOY-PROMPT.md` | **Deploy your own (guided)** — paste into a fresh Claude session for a step-by-step, pause-after-each-step first-run setup (Alpaca PAPER + GitHub Actions + dashboard) |
+| `SID-DEPLOY-PROMPT.md` | **Deploy your own (fresh)** — paste into a fresh Claude session for a step-by-step, pause-after-each-step first-run setup on your own fork (fork + clean-slate state + disable non-SID workflows + `upstream` remote + Alpaca PAPER + GitHub Actions + dashboard) |
+| `SID-UPDATE-PROMPT.md` | **Update to the latest revision** — paste into a fresh Claude session to pull a published SID revision (code + release notes only) from the `upstream` remote into your fork WITHOUT touching your trade state, account ledger, or secrets |
 | `research/SID/` | Original strategy source images |
