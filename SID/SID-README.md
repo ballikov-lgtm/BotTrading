@@ -281,6 +281,8 @@ SID ships with two execution modes. They trade identically at the **signal** lev
 
 **Which to choose.** If you fund **$25,000 or more** (roughly £19,000 — FX is approximate), use the **PDT version** for the best fills, and keep the account above $25,000 at all times. If you fund **under $25,000**, use **PDT-safe mode** so the account can never be locked out under the PDT rule — accepting the deferred-exit trade-offs above. **Default is the PDT version** (`SID_PDT_SAFE` unset or `false`). The fresh installer asks your funding size and sets this for you.
 
+**The $2,000 short-selling floor.** Separately from the PDT rule, Alpaca requires **$2,000+** equity to short at all — below that, the account is longs-only. So the real picture is **three tiers**: **under $2,000** → longs only; **$2,000–$24,999** → full long+short strategy in PDT-safe mode (no lockout); **$25,000+** → full strategy with the PDT version available. The headline: **PDT-safe mode runs the full long+short strategy from ~$2,000 — you don't need $25,000.** Full breakdown in [HOW-TO-FUND-ALPACA.md](HOW-TO-FUND-ALPACA.md).
+
 **This is not financial advice.** You are responsible for your own account type (cash vs margin), for staying within Alpaca's and FINRA's rules, and for the PDT threshold on your own account. Both modes run on **PAPER** by default.
 
 ---

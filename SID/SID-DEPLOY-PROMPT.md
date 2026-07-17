@@ -297,6 +297,22 @@ TRADER (PDT) rule (FINRA, enforced by Alpaca):
   trades, and shorting REQUIRES a margin account (you can't short in a cash account).
   So a cash account CANNOT run SID at all, and any account that CAN run SID is a
   margin account and is therefore PDT-subject.
+- SEPARATE $2,000 SHORT-SELLING FLOOR (important): Alpaca requires at least $2,000 in
+  account equity to short (or use any margin) at all. Below $2,000, the account is
+  limited to 1x buying power, so SHORTS won't fire — the bot will only take LONG
+  trades. This is a different threshold from the $25,000 PDT rule.
+
+So there are really THREE tiers — show me this table so I know exactly what I get:
+
+  | My account equity | What actually runs                                    | SID_PDT_SAFE |
+  |-------------------|-------------------------------------------------------|--------------|
+  | Under $2,000      | LONGS ONLY (Alpaca blocks shorting below $2,000)      | true         |
+  | $2,000–$24,999    | FULL strategy (longs + shorts), no PDT lockout        | true         |
+  | $25,000+          | Full strategy; can use the PDT version for best fills | false (or true) |
+
+  The big picture: PDT-safe mode drops the bar for the FULL long+short strategy from
+  $25,000 down to about $2,000. Only very small accounts (under $2,000) lose the short
+  side, and that's Alpaca's rule, not ours.
 
 Now branch on my answer:
 

@@ -14,6 +14,29 @@ minimum and staying safe. Written for people who have never done an internationa
 
 ---
 
+## How much do I actually need? (read this before you send anything)
+
+SID trades both **longs and shorts**, and shorting requires a **margin** account. Two
+separate rules decide what your balance unlocks — so there are **three tiers**:
+
+| Your account equity | What runs | Which mode |
+|---|---|---|
+| **Under $2,000** | **Longs only** — Alpaca blocks short-selling below $2,000 | PDT-safe (`SID_PDT_SAFE=true`) |
+| **$2,000 – $24,999** | **Full strategy (longs + shorts)**, and no PDT lockout | PDT-safe (`SID_PDT_SAFE=true`) |
+| **$25,000 or more** | Full strategy; can use the tighter "PDT version" for best fills | Either (`SID_PDT_SAFE=false` for best profit) |
+
+**The key point:** in **PDT-safe mode** you can run the **full long + short strategy with
+as little as ~$2,000** — you do *not* need $25,000. The $25,000 figure is only the
+threshold for the standard "PDT version" (which uses same-day broker stops for slightly
+better fills). PDT-safe mode never trades same-day, so it's never subject to that $25,000
+rule. (Trade-off: PDT-safe exits at the next day's open rather than intraday, costing a
+few percent — a fair price for trading well under $25k without lockout risk.)
+
+*The mode is picked for you during the guided install based on how much you plan to fund.
+This is information, not financial advice — see the notes at the end.*
+
+---
+
 ## The big picture (why funding needs a bit of thought)
 
 Alpaca accounts hold **US dollars only**. So from the UK you have to do two things:
