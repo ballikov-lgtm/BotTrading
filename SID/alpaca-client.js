@@ -191,6 +191,85 @@ export class AlpacaClient {
     return { entryOrder, stopOrder };
   }
 
+  // ── Account activities (fills) ──────────────────────────────────────────
+  /**
+   * Returns account activity records. For reconciliation we care about FILL
+   * activities — every partial/full order fill Alpaca actually executed, with
+   * the real price + qty + side + timestamp + the originating order id. This is
+   * the SOURCE OF TRUTH for realised P&L (vs the bot's simulated trigger-bar
+   * prices).
+   *
+   * Alpaca endpoint: GET /v2/account/activities/{activity_type}
+   *   - activity_type FILL returns both fills and partial_fills.
+   *   - Pagination is by `page_token` (from the last record's `id`) OR by
+   *     `after` (RFC-3339 / date). We page by `page_token` until a short page.
+   *
+   * Each FILL record shape (fields we use):
+   *   { id, activity_type:'FILL', transaction_time, type:'fill'|'partial_fill',
+   *     price, qty, side:'buy'|'sell'|'sell_short', symbol, order_id,
+   *     cum_qty, leaves_qty }
+   *
+   * @param {Object}  opts
+   * @param {string} [opts.activity_types='FILL']  comma-separated activity types
+   * @param {string} [opts.after]                  RFC-3339 lower bound (inclusive-ish)
+   * @param {string} [opts.until]                  RFC-3339 upper bound
+   * @param {number} [opts.page_size=100]          max 100 per Alpaca
+   * @param {string} [opts.direction='asc']        'asc' | 'desc'
+   * @param {boolean}[opts.paginate=true]          auto-follow page_token to the end
+   * @returns {Promise<Array>}  all matching activity records
+   */
+  async getActivities({
+    activity_types = 'FILL',
+    after,
+    until,
+    page_size = 100,
+    direction = 'asc',
+    paginate = true,
+  } = {}) {
+    const all = [];
+    let pageToken = null;
+    // Hard cap on pages so a misbehaving loop can never spin forever.
+    for (let page = 0; page < 500; page++) {
+      const params = { activity_types, page_size: String(page_size), direction };
+      if (after) params.after = after;
+      if (until) params.until = until;
+      if (pageToken) params.page_token = pageToken;
+      const qs = new URLSearchParams(params).toString();
+      const batch = await this._request('GET', `/v2/account/activities?${qs}`);
+      if (!Array.isArray(batch) || batch.length === 0) break;
+      all.push(...batch);
+      if (!paginate || batch.length < page_size) break;
+      const last = batch[batch.length - 1];
+      pageToken = last?.id;
+      if (!pageToken) break;
+    }
+    return all;
+  }
+
+  // ── Portfolio history (equity curve) ────────────────────────────────────
+  /**
+   * Returns the account's historical equity/P&L series. Handy for the dashboard
+   * headline (real Alpaca equity over time) as an alternative to a single
+   * getAccount() snapshot.
+   *
+   * Alpaca endpoint: GET /v2/account/portfolio/history
+   * Response: { timestamp:[...], equity:[...], profit_loss:[...],
+   *             profit_loss_pct:[...], base_value, timeframe }
+   *
+   * @param {Object}  opts
+   * @param {string} [opts.period='all']       e.g. '1D','1M','3M','1A','all'
+   * @param {string} [opts.timeframe]          e.g. '1D' (Alpaca picks a sane default)
+   * @param {boolean}[opts.extended_hours]
+   * @returns {Promise<Object>}  the portfolio-history object
+   */
+  async getPortfolioHistory({ period = 'all', timeframe, extended_hours } = {}) {
+    const params = { period };
+    if (timeframe) params.timeframe = timeframe;
+    if (extended_hours !== undefined) params.extended_hours = String(extended_hours);
+    const qs = new URLSearchParams(params).toString();
+    return this._request('GET', `/v2/account/portfolio/history?${qs}`);
+  }
+
   // ── Asset info ──────────────────────────────────────────────────────────
   async getAsset(symbol) {
     return this._request('GET', `/v2/assets/${encodeURIComponent(symbol)}`);

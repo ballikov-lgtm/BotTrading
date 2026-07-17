@@ -1,0 +1,44 @@
+name: SID Account Reconcile (dry-run)
+
+# READ-ONLY reconciliation report. Pulls the REAL Alpaca paper account (FILL
+# activities + equity), matches closed SID positions to actual fills, and prints
+# a before/after table of corrected P&L to the Actions log. Writes NOTHING and
+# commits NOTHING — this is how we safely produce the real cloud numbers for
+# Alan to eyeball before Phase 2 (the --write persist + dashboard re-point).
+#
+# Manual trigger ONLY (no schedule). To run: Actions tab -> "SID Account
+# Reconcile (dry-run)" -> Run workflow. Or: gh workflow run sid-reconcile.yml
+
+on:
+  workflow_dispatch:
+
+# Deliberately NO `permissions: contents: write` — this job must not be able to
+# push. It only reads Alpaca and prints to the log.
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run SID reconciliation (dry-run — writes nothing)
+        working-directory: SID
+        env:
+          # Alpaca execution — SAME secret names sid.yml uses. SID_TRADING_MODE
+          # must be paper (or live) for the tool to reach Alpaca; if the keys are
+          # unset the client construction fails and the tool reports every
+          # position as an estimate (still no crash, still writes nothing).
+          SID_TRADING_MODE:   ${{ secrets.SID_TRADING_MODE }}
+          SID_LIVE_CONFIRMED: ${{ secrets.SID_LIVE_CONFIRMED }}
+          ALPACA_KEY_ID:      ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY:  ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL:    ${{ secrets.ALPACA_BASE_URL }}
+        run: node reconcile-account.js --dry-run
