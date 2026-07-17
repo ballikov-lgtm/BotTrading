@@ -117,10 +117,17 @@ function fillMs(fill)    { const t = Date.parse(fill.transaction_time || fill.tr
 // cross-contamination. A position is "matched" only when BOTH legs fully cover
 // shares_total (a complete real round trip); otherwise we keep the estimate.
 //
-// Returns a Map: pos-identity -> { pnl, matched, entryQty, exitQty, entryAvg,
-// exitAvg, note }.
+// Returns { alloc, leftovers }:
+//   alloc     — Map pos-identity -> { pnl, matched, entryQty, exitQty, entryAvg,
+//               exitAvg, note }
+//   leftovers — Map symbol -> { buyQ, sellQ } of the FIFO lots STILL unconsumed
+//               after all known positions took their slices. A symbol whose
+//               leftovers contain a complete round-trip (matched buy + sell qty)
+//               is an ORPHAN trade missing from the records (e.g. the dropped MCD
+//               paper trade) — reconstructOrphans() rebuilds a record for it.
 function allocateFillsFIFO(positions, allFills) {
   const result = new Map();
+  const leftovers = new Map();
   // Group positions + fills by symbol.
   const bySymbolPos   = new Map();
   const bySymbolFills = new Map();
@@ -136,7 +143,31 @@ function allocateFillsFIFO(positions, allFills) {
     bySymbolFills.get(s).push(f);
   }
 
-  for (const [sym, posList] of bySymbolPos) {
+  // Draw `need` shares from a FIFO queue of { qtyLeft, price, ms } lots.
+  // Returns { qty, cost } consumed (mutates the lots' qtyLeft in place).
+  function draw(queue, need, afterMs) {
+    let qty = 0, cost = 0;
+    for (const lot of queue) {
+      if (qty >= need - 1e-9) break;
+      if (lot.qtyLeft <= 0) continue;
+      // Exit legs must occur at/after the entry (afterMs); a fill strictly
+      // before the position opened can't be its exit. Entry legs pass afterMs
+      // = null so no constraint.
+      if (afterMs != null && lot.ms < afterMs - 1) continue;
+      const take = Math.min(lot.qtyLeft, need - qty);
+      qty  += take;
+      cost += take * lot.price;
+      lot.qtyLeft -= take;
+    }
+    return { qty, cost };
+  }
+
+  // Iterate over EVERY symbol that has fills — not only symbols with a record —
+  // so a symbol whose entire trade was dropped from the records (MCD) still
+  // builds its queues and surfaces as a leftover round-trip.
+  const allSymbols = new Set([...bySymbolPos.keys(), ...bySymbolFills.keys()]);
+  for (const sym of allSymbols) {
+    const posList = (bySymbolPos.get(sym) || []).slice();
     // Positions in real chronological open order.
     posList.sort((a, b) => String(a.openDate || '').localeCompare(String(b.openDate || '')) ||
                             String(a.openTime || '').localeCompare(String(b.openTime || '')));
@@ -149,24 +180,6 @@ function allocateFillsFIFO(positions, allFills) {
       const kind = fillSideKind(f);
       if (kind === 'buy')  buyQ.push({ qtyLeft: fillQty(f), price: fillPrice(f), ms: fillMs(f) });
       if (kind === 'sell') sellQ.push({ qtyLeft: fillQty(f), price: fillPrice(f), ms: fillMs(f) });
-    }
-
-    // Draw `need` shares from a queue FIFO. Returns { qty, cost } consumed.
-    function draw(queue, need, afterMs) {
-      let qty = 0, cost = 0;
-      for (const lot of queue) {
-        if (qty >= need - 1e-9) break;
-        if (lot.qtyLeft <= 0) continue;
-        // Exit legs must occur at/after the entry (afterMs); a fill strictly
-        // before the position opened can't be its exit. Entry legs pass afterMs
-        // = -Infinity so no constraint.
-        if (afterMs != null && lot.ms < afterMs - 1) continue;
-        const take = Math.min(lot.qtyLeft, need - qty);
-        qty  += take;
-        cost += take * lot.price;
-        lot.qtyLeft -= take;
-      }
-      return { qty, cost };
     }
 
     for (const pos of posList) {
@@ -198,8 +211,81 @@ function allocateFillsFIFO(positions, allFills) {
         note: matched ? '' : `partial fills (entry ${entry.qty}/${need}, exit ${exit.qty}/${need})`,
       });
     }
+
+    // Capture whatever is left after all known positions took their slices.
+    const buyLeft  = buyQ.filter(l => l.qtyLeft > 1e-9);
+    const sellLeft = sellQ.filter(l => l.qtyLeft > 1e-9);
+    if (buyLeft.length || sellLeft.length) {
+      leftovers.set(sym, { buyQ: buyLeft, sellQ: sellLeft });
+    }
   }
-  return result;
+  return { alloc: result, leftovers };
+}
+
+// ── Orphan reconstruction ────────────────────────────────────────────────────
+// After known records take their fill slices, any symbol left with a COMPLETE
+// round-trip in its leftover lots (matched buy qty + sell qty) is a trade that
+// was dropped from closed-positions-sid.json (e.g. the MCD paper stop-out that
+// vanished at commit a40456fc). We rebuild a closed record for it from the real
+// fills — real entry/exit prices + dates, mode:"paper", pnl_source:"alpaca_fill",
+// reconstructed:true. Side is inferred from which leg came FIRST in time (an
+// early buy => long; an early sell => short).
+// Returns an array of reconstructed closed-position records.
+function reconstructOrphans(leftovers) {
+  const recs = [];
+  for (const [sym, { buyQ, sellQ }] of leftovers) {
+    const buyQty  = buyQ.reduce((s, l) => s + l.qtyLeft, 0);
+    const sellQty = sellQ.reduce((s, l) => s + l.qtyLeft, 0);
+    // Need BOTH legs to reconstruct a realised trade. A one-legged leftover
+    // (only buys, or only sells) is an OPEN position or a data-window edge — we
+    // do NOT invent an exit for it. Skip (it stays unmatched, flagged below).
+    const roundTrip = Math.min(buyQty, sellQty);
+    if (roundTrip < 0.5) continue;
+
+    const firstBuyMs  = buyQ.length  ? Math.min(...buyQ.map(l => l.ms))  : Infinity;
+    const firstSellMs = sellQ.length ? Math.min(...sellQ.map(l => l.ms)) : Infinity;
+    const isLong = firstBuyMs <= firstSellMs;   // whichever leg opened first
+
+    const entryLots = isLong ? buyQ  : sellQ;
+    const exitLots  = isLong ? sellQ : buyQ;
+    // Consume up to roundTrip from each leg (FIFO) for the reconstructed trade.
+    function take(lots, need) {
+      let qty = 0, cost = 0, firstMs = Infinity, lastMs = -Infinity;
+      for (const l of lots) {
+        if (qty >= need - 1e-9) break;
+        if (l.qtyLeft <= 0) continue;
+        const t = Math.min(l.qtyLeft, need - qty);
+        qty += t; cost += t * l.price; l.qtyLeft -= t;
+        firstMs = Math.min(firstMs, l.ms); lastMs = Math.max(lastMs, l.ms);
+      }
+      return { qty, cost, avg: qty ? cost / qty : null, firstMs, lastMs };
+    }
+    const entry = take(entryLots, roundTrip);
+    const exit  = take(exitLots,  roundTrip);
+    const pnl = isLong ? (exit.cost - entry.cost) : (entry.cost - exit.cost);
+    const openDate  = Number.isFinite(entry.firstMs) ? new Date(entry.firstMs).toISOString().slice(0, 10) : null;
+    const closeDate = Number.isFinite(exit.lastMs)   ? new Date(exit.lastMs).toISOString().slice(0, 10)   : null;
+
+    recs.push({
+      symbol: sym,
+      side: isLong ? 'long' : 'short',
+      entry: entry.avg != null ? parseFloat(entry.avg.toFixed(4)) : null,
+      exit_price: exit.avg != null ? parseFloat(exit.avg.toFixed(4)) : null,
+      shares_total: Math.round(roundTrip),
+      shares: Math.round(roundTrip),
+      openDate,
+      closeDate,
+      exit_strategy: 'reconstructed_from_fills',
+      total_pnl: parseFloat(pnl.toFixed(2)),
+      realizedPnl: parseFloat(pnl.toFixed(2)),
+      mode: 'paper',
+      strategy: 'SID (reconstructed from Alpaca fills)',
+      pnl_source: 'alpaca_fill',
+      reconstructed: true,
+      reconciled_at: new Date().toISOString().slice(0, 10),
+    });
+  }
+  return recs;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -252,17 +338,18 @@ async function main() {
   // avoids the earlier trap where the exit market-close carried no SID prefix.
   let fills = [];
   if (alpacaOk) {
-    // Earliest open across records bounds only the LOWER end of the window; the
-    // upper end is left open (now) so late runner exits (e.g. 2026-07-17) are
-    // always included even when the record's closeDate is an earlier target date.
-    const earliest = closed
-      .map(p => p.openDate)
-      .filter(Boolean)
-      .sort()[0];
-    const afterIso = earliest ? `${earliest}T00:00:00Z` : undefined;
+    // WIDE lower bound (SID paper inception) so ORPHAN trades dropped from the
+    // records are still captured. The old "earliest record openDate" bound would
+    // miss a symbol whose entire record was deleted if its open predates the
+    // surviving records. The upper end is left open (now) so late runner exits
+    // (e.g. 2026-07-17) are always included even when a record's closeDate is an
+    // earlier target date. SID V2 paper started 2026-05-16; 2026-05-01 is a safe
+    // margin. Env-overridable via SID_RECONCILE_SINCE=YYYY-MM-DD.
+    const sinceDate = process.env.SID_RECONCILE_SINCE || '2026-05-01';
+    const afterIso = `${sinceDate}T00:00:00Z`;
     try {
       fills = await client.getActivities({ activity_types: 'FILL', after: afterIso, page_size: 100, direction: 'asc' });
-      console.log(`${OK} Pulled ${fills.length} FILL activity record(s) from Alpaca since ${earliest || 'account start'}`);
+      console.log(`${OK} Pulled ${fills.length} FILL activity record(s) from Alpaca since ${sinceDate}`);
     } catch (err) {
       console.log(`${FAIL} getActivities failed: ${err.message} — will estimate all positions`);
     }
@@ -274,7 +361,9 @@ async function main() {
   // This disambiguates the 3 UNH shorts and searches exits through NOW (not the
   // record's closeDate), so runners that closed days after their recorded target
   // date (PYPL/ADBE on 2026-07-17) get their real exit fills.
-  const alloc = (alpacaOk && fills.length) ? allocateFillsFIFO(closed, fills) : new Map();
+  const { alloc, leftovers } = (alpacaOk && fills.length)
+    ? allocateFillsFIFO(closed, fills)
+    : { alloc: new Map(), leftovers: new Map() };
 
   const rows = [];
   const corrected = [];
@@ -316,6 +405,49 @@ async function main() {
     });
   }
 
+  // ── Reconstruct ORPHAN trades (dropped from records but real on Alpaca) ───
+  // The MCD paper stop-out (−$78.14) was deleted from closed-positions-sid.json
+  // at commit a40456fc but never removed from the account totals, so the books
+  // are ~$78 short of the paper account. Any symbol with a complete leftover
+  // round-trip is such an orphan — rebuild it from the real fills.
+  const reconstructed = alpacaOk ? reconstructOrphans(leftovers) : [];
+
+  // ── MCD manual fallback ──────────────────────────────────────────────────
+  // If MCD's real fills are NOT in Alpaca's returned activity (window too tight,
+  // paper history pruned, etc.) it won't be reconstructed above. Re-add the
+  // KNOWN MCD record (−$78.14, from git commit 76a98edd) so the paper books
+  // still tie — flagged reconstructed_manual so it's clearly not fill-derived.
+  // NEVER fabricate a number: this uses the exact figure that was manually
+  // reconciled from the two Alpaca stop-fill screenshots on 2026-06-05.
+  const MCD_KNOWN = {
+    symbol: 'MCD', side: 'long', entry: 281.67, exit_price: 271.9025,
+    shares_total: 8, shares: 8, openDate: '2026-05-22', closeDate: '2026-06-04',
+    exit_strategy: 'external_stop_fill', total_pnl: -78.14, realizedPnl: -78.14,
+    mode: 'paper', strategy: 'SID v2.1 (hybrid S&D — manual entry, Alpaca-side stops)',
+    pnl_source: 'reconstructed_manual', reconstructed: true,
+    reconstructed_note: 'MCD paper stop-out dropped from records at commit a40456fc; ' +
+      'known -$78.14 from git 76a98edd (two Alpaca stop fills: 4sh @ $271.88 May 26 + ' +
+      '4sh @ $271.925 Jun 04). PAPER ONLY — must never appear in the live tax report.',
+    reconciled_at: new Date().toISOString().slice(0, 10),
+  };
+  const alreadyHaveMcd = [...closed, ...reconstructed].some(r => String(r.symbol).toUpperCase() === 'MCD');
+  const mcdFallbackUsed = alpacaOk && !alreadyHaveMcd;
+  if (mcdFallbackUsed) reconstructed.push(MCD_KNOWN);
+
+  // Fold reconstructed records into the corrected set + total.
+  for (const rec of reconstructed) {
+    corrected.push(rec);
+    sumCorrected += rec.total_pnl;
+    rows.push({
+      symbol: rec.symbol, side: rec.side, closeDate: rec.closeDate || '',
+      oldPnl: 0, newPnl: rec.total_pnl, source: rec.pnl_source,
+      delta: parseFloat((rec.total_pnl).toFixed(2)),
+      detail: rec.pnl_source === 'reconstructed_manual'
+        ? 'RECONSTRUCTED (manual known figure — orphan not in Alpaca window)'
+        : `RECONSTRUCTED from fills (entry~$${rec.entry} exit~$${rec.exit_price}, ${rec.shares_total}sh)`,
+    });
+  }
+
   sumCorrected = parseFloat(sumCorrected.toFixed(2));
 
   // ── Print the before/after table ─────────────────────────────────────────
@@ -323,14 +455,18 @@ async function main() {
   console.log(`   ${pad('SYMBOL',7)} ${pad('SIDE',6)} ${pad('CLOSED',11)} ${padl('OLD P&L',10)} ${padl('NEW P&L',10)} ${padl('DELTA',9)}  SOURCE / NOTE`);
   console.log('   ' + '-'.repeat(88));
   for (const r of rows) {
-    const tag = r.source === 'alpaca_fill' ? OK : WARN;
+    const tag = (r.source === 'alpaca_fill') ? OK
+              : (r.source === 'reconstructed_manual') ? WARN
+              : WARN;
     console.log(`   ${pad(r.symbol,7)} ${pad(r.side,6)} ${pad(r.closeDate,11)} ${padl(money(r.oldPnl),10)} ${padl(money(r.newPnl),10)} ${padl(money(r.delta),9)}  ${tag} ${r.source} ${r.detail ? ARROW + ' ' + r.detail : ''}`);
   }
   console.log('   ' + '-'.repeat(88));
 
   const oldRecordsSum = parseFloat(closed.reduce((s, p) => s + (p.total_pnl ?? p.realizedPnl ?? 0), 0).toFixed(2));
   const matchedCount  = rows.filter(r => r.source === 'alpaca_fill').length;
-  const estimateCount = rows.length - matchedCount;
+  const reconManualCount = rows.filter(r => r.source === 'reconstructed_manual').length;
+  const estimateCount = rows.filter(r => r.source === 'estimate').length;
+  const reconstructedCount = reconstructed.length;
 
   console.log('');
   console.log('== Ledger reconciliation (internal $10K sizing base) ==');
@@ -339,13 +475,26 @@ async function main() {
   console.log(`   ${pad('tradeCount (distinct positions)',34)} ${padl(String(account?.tradeCount ?? '?'),12)} ${padl(String(corrected.length),12)}`);
   console.log(`   ${pad('accountUsd (10000 + realizedPnl)',34)} ${padl('$' + (account?.accountUsd ?? (STARTING_LEDGER_USD + oldRecordsSum)).toFixed(2),12)} ${padl('$' + (STARTING_LEDGER_USD + sumCorrected).toFixed(2),12)}`);
   console.log('');
+  if (reconstructedCount) {
+    console.log(`   Reconstructed orphans: ${reconstructedCount} trade(s) re-added (dropped from records but real on the paper account)`);
+  }
   console.log(`   Old records sum:      ${money(oldRecordsSum)}   (what the dashboard headline shows today)`);
-  console.log(`   Corrected records:    ${money(sumCorrected)}   (${matchedCount} matched to Alpaca fills, ${estimateCount} kept as estimate)`);
+  const breakdown = [`${matchedCount} matched to Alpaca fills`];
+  if (reconManualCount) breakdown.push(`${reconManualCount} reconstructed (manual known figure)`);
+  if (estimateCount)    breakdown.push(`${estimateCount} kept as estimate`);
+  console.log(`   Corrected records:    ${money(sumCorrected)}   (${breakdown.join(', ')})`);
   if (alpacaOk && alpacaEquity != null) {
     const alpacaNet = parseFloat((alpacaEquity - STARTING_ALPACA_USD).toFixed(2));
     console.log(`   Alpaca equity:        $${alpacaEquity.toFixed(2)}  -> net ${money(alpacaNet)} on $${STARTING_ALPACA_USD} base (SOURCE OF TRUTH)`);
     const gap = parseFloat((alpacaNet - sumCorrected).toFixed(2));
-    console.log(`   Corrected vs Alpaca:  gap ${money(gap)}  ${Math.abs(gap) < 1 ? OK + ' reconciled' : WARN + ' residual - see estimate rows above'}`);
+    // With 0 estimates the residual is "unmatched fills / trades not in records",
+    // not "see estimate rows". A small non-zero gap after reconstruction is
+    // typically fees/rounding on the paper account.
+    let gapNote;
+    if (Math.abs(gap) < 1)         gapNote = `${OK} reconciled to the dollar`;
+    else if (estimateCount === 0)  gapNote = `${WARN} residual = unmatched fills / trades not in records (likely fees/rounding)`;
+    else                           gapNote = `${WARN} residual — see the estimate rows above`;
+    console.log(`   Corrected vs Alpaca:  gap ${money(gap)}  ${gapNote}`);
   } else {
     console.log(`   Alpaca equity:        (unavailable offline - run in cloud to compare against +$182.18)`);
   }
@@ -359,15 +508,16 @@ async function main() {
     source:         'alpaca',
     mode,
     asOf:           new Date().toISOString(),
-    reconciledRecords: matchedCount,
-    estimateRecords:   estimateCount,
+    reconciledRecords:   matchedCount,
+    reconstructedRecords: reconstructedCount,
+    estimateRecords:     estimateCount,
   };
 
   // ── Write or dry-run ─────────────────────────────────────────────────────
   if (DRY_RUN) {
     console.log(`${OK} DRY-RUN complete. No files written. Re-run with --write to persist.`);
     console.log('     Files that WOULD change:');
-    console.log('       - closed-positions-sid.json  (P&L rewritten + pnl_source stamped)');
+    console.log(`       - closed-positions-sid.json  (P&L rewritten + pnl_source stamped${reconstructedCount ? `; +${reconstructedCount} reconstructed orphan record(s)` : ''})`);
     console.log('       - sid-account.json           (realizedPnl/accountUsd/tradeCount re-derived)');
     console.log('       - alpaca-account-sid.json    (real Alpaca equity snapshot, NEW)');
     return;
