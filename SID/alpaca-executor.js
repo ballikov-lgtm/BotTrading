@@ -258,6 +258,61 @@ class AlpacaExecutor {
   }
 
   /**
+   * V2.4.0 PDT-SAFE — submits ONLY the market entry, NO broker stop.
+   *
+   * This is the PDT-immune entry used when SID_PDT_SAFE=true. The whole point of
+   * PDT-safe mode is that NO broker order can fire intraday on the same day as
+   * the entry (a same-day round trip = a day trade = Pattern Day Trader exposure
+   * for a sub-$25K margin account). Since a resting GTC stop CAN fill same-day,
+   * we simply don't place one here. Downside protection is deferred to the
+   * daily-poll in checkPositions, which market-closes the position at the NEXT
+   * run's open if the tracked stop level was breached — always a later calendar
+   * day than entry. See CONFIG.pdtSafe + SID/CLAUDE.md § PDT-safe.
+   *
+   * Returns { entryOrderId, stopOrderId: null, clientOrderIdPrefix: null } — the
+   * null stopOrderId/prefix keep isV2_2Position(pos) === false so the position is
+   * routed through the daily-poll (never the broker-order path).
+   */
+  async openEntryNoStop({ signal, sizing, symbol }) {
+    if (!this.clock?.is_open) {
+      throw new Error(`Market closed — refusing to submit entry for ${symbol} (next open: ${this.clock?.next_open})`);
+    }
+
+    // Sanity: don't overspend the buying power
+    const cost = sizing.shares * signal.entry;
+    const bp   = parseFloat(this.account.buying_power);
+    if (cost > bp) {
+      throw new Error(`Insufficient buying power: need $${cost.toFixed(2)}, have $${bp.toFixed(2)}`);
+    }
+
+    const side = signal.signal === 'long' ? 'buy' : 'sell';
+    const prefix = clientOrderIdPrefix({
+      symbol,
+      side: signal.signal,
+      signalDate: signal.signalDate,
+    });
+
+    this.log.log(`    [Alpaca:${this.mode}] PDT-SAFE: Submitting ${side.toUpperCase()} ${sizing.shares} ${symbol} @ market — NO broker stop (daily-poll manages exits on a later day)`);
+
+    // Market entry ONLY — no GTC stop, no resting TP1 limit.
+    const entryOrder = await this.client.submitOrder({
+      symbol,
+      qty: sizing.shares,
+      side,
+      type: 'market',
+      time_in_force: 'day',
+      client_order_id: `${prefix}-entry`,
+    });
+    this.log.log(`    [Alpaca:${this.mode}] PDT-SAFE entry order ${entryOrder.id} submitted (status: ${entryOrder.status})`);
+
+    return {
+      entryOrderId: entryOrder.id,
+      stopOrderId: null,           // PDT-safe: no broker stop by design
+      clientOrderIdPrefix: null,   // PDT-safe: no resting orders to find/refresh
+    };
+  }
+
+  /**
    * V2.1 — Closes a PARTIAL portion of a position via Alpaca's positions
    * endpoint with explicit qty. Used for the 50% TP1 partial close at RSI 50.
    *

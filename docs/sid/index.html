@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SID // v2.3.0 TERMINAL</title>
+<title>SID // v2.4.0 TERMINAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
@@ -841,15 +841,15 @@
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.3.0 TELEGRAM APPROVAL FLOW 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.4.0 PDT-SAFE EXECUTION MODE 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>
 <div class="container">
 
   <!-- HEADER -->
   <header>
     <div>
-      <div class="brand">SID // v2.3.0 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
-      <div class="brand-sub">V2.3.0 TELEGRAM APPROVE/SKIP FLOW · TRACKED APPROVED ENTRIES · MAX 5 POSITIONS · 73.9% BACKTEST WR · PF 3.19</div>
+      <div class="brand">SID // v2.4.0 <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span></div>
+      <div class="brand-sub">V2.4.0 DUAL MODE: PDT VERSION (≥$25K) / PDT-SAFE (&lt;$25K) · MAX 5 POSITIONS · 73.9% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -862,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 09:59:06</span>
+        <span>SYS · 10:47:13</span>
       </div>
     </div>
   </header>
@@ -871,7 +871,7 @@
   <div class="beta-banner">
     <span class="badge">BETA</span>
     <div class="msg">
-      <strong>SID v2.3.0 is under active development.</strong> Currently in paper-trading validation phase.
+      <strong>SID v2.4.0 is under active development.</strong> Currently in paper-trading validation phase.
       Features in progress: Telegram alerts · sentiment integration · Alpaca live trading.
 The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live performance will differ. Note (v2.2.4): the backtest still fires bullish-asset shorts mechanically, but LIVE now GATES them for manual approval (a discipline overlay, not a rule change) — so live results deliberately diverge from the pure backtest on that subset.
       Performance pie defaults to BACKTEST data until 10 live paper trades close — then auto-flips to LIVE. Manual toggle available below.
@@ -940,14 +940,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <button class="tab-btn active" data-tab="signals">▰ LIVE SIGNALS</button>
     <button class="tab-btn"        data-tab="history">▰ TRADE HISTORY</button>
     <button class="tab-btn"        data-tab="heatmap">▰ HEATMAP</button>
-    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(22)</span></button>
+    <button class="tab-btn"        data-tab="updates">▰ UPDATES <span style="color:var(--magenta);font-size:9px;">(23)</span></button>
   </nav>
 
   <!-- TAB: SIGNALS -->
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 09:59:06 UTC</span></div>
+      <div class="panel-title">LIVE TRADES // 2 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-17 10:47:13 UTC</span></div>
       <div class="position-grid"><div class="position-card">
       <div class="pos-head">
         <div>
@@ -1206,7 +1206,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
                 <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>BACKTEST WINS</span><span style="color:#39ff14">207</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>BACKTEST LOSSES</span><span style="color:#ff0044">73</span></div>
               </div>
             </div>
-            <div class="perf-note">V2.3.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.4.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
@@ -1902,7 +1902,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <!-- TAB: UPDATES — strategy change log, most recent first -->
   <div id="tab-updates" class="tab-pane">
     <div class="panel">
-      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (22)</div>
+      <div class="panel-title">STRATEGY UPDATES // CHANGE LOG (23)</div>
       <div style="margin-bottom:12px;font-family:'Share Tech Mono', monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap;">
         <span><span style="display:inline-block;width:8px;height:8px;background:#39ff14;margin-right:4px"></span>FIX · bug/rule correction</span>
         <span><span style="display:inline-block;width:8px;height:8px;background:#00ffff;margin-right:4px"></span>INFRA · workflows/tooling</span>
@@ -1910,6 +1910,13 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
         <span><span style="display:inline-block;width:8px;height:8px;background:#ffaa00;margin-right:4px"></span>RELEASE · version launch</span>
       </div>
       <ul class="update-list"><li class="update-item">
+      <div class="update-meta">
+        <span class="update-date">2026-07-17</span>
+        <span class="update-cat" style="color:#ffaa00;border-color:#ffaa00">RELEASE</span>
+      </div>
+      <div class="update-title">V2.4.0 PDT-SAFE EXECUTION MODE — a PDT-immune option for accounts under $25,000, chosen at install</div>
+      <div class="update-summary">NEW OPT-IN EXECUTION MODE (not a signal-logic change). The standard bot places real broker GTC stops plus a resting intraday short-TP1 limit from the moment of entry — great for tight, intraday fills, but those broker orders CAN fill the SAME day as entry. A same-day round trip is a 'day trade', and a MARGIN account under $25,000 making 4+ day trades in 5 business days gets flagged as a Pattern Day Trader (PDT) by FINRA/Alpaca and can be RESTRICTED from day trading. SID takes SHORT trades, and shorting requires a margin account — so a sub-$25K SID account is PDT-subject. v2.4.0 restores the old v2.0 PDT-immune design as an OPT-IN mode. Set SID_PDT_SAFE=true and the bot places NO broker order that can fire intraday: it skips the resting GTC stop, skips the resting intraday short-TP1 limit, and skips the entry-time broker stop — for BOTH the normal entry path and the Telegram-approved entry path. PDT-safe positions are then managed SOLELY by the once-a-day poll (TP1 at RSI-50, TP2 on the 50/200-day SMA, break-even, or the 30-day timeout, and a stop breach → market close at the NEXT day's open). Because the daily poll only ever acts a day or more after entry and there are no broker orders at the exchange, no position can open and close on the same calendar day → it cannot trigger the PDT rule, so a sub-$25K account won't get locked out. HONEST TRADE-OFFS (stated plainly, they're inherent to being PDT-immune): there is no intraday stop, so a hard mid-day move against you isn't cut until the next run's open (gap/slippage), and you should expect a MODEST hit to profitability — on the order of a few percent — versus the standard PDT version; also a missed scheduled run leaves a position unmanaged for longer (no broker safety-net order). DEFAULT is FALSE = the standard PDT version (unchanged), so nothing changes for existing $25K+ setups. The fresh installer (SID-DEPLOY-PROMPT.md) now ASKS your funding size and recommends the mode: $25,000+ → PDT version (best fills, but you must keep the account above $25,000 at all times); under $25,000 → PDT-safe mode. This is not financial advice — you are responsible for your account type and Alpaca's/FINRA's rules. NO canon rule change — RSI 30/70, MACD alignment, the RSI-50 TP1 trigger, the earnings blackout and the AUTO-tier 80-ticker universe are all untouched, so the headline backtest numbers are unchanged. New: CONFIG.pdtSafe (env SID_PDT_SAFE) + executor.openEntryNoStop(); sid.yml + sid-approve-trade.yml pass SID_PDT_SAFE through.</div>
+    </li><li class="update-item">
       <div class="update-meta">
         <span class="update-date">2026-07-17</span>
         <span class="update-cat" style="color:#00ffff;border-color:#00ffff">INFRA</span>
@@ -2072,7 +2079,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.3.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 09:59:06 UTC</footer>
+  <footer>SID v2.4.0 // PRIVATE TERMINAL // GENERATED 2026-07-17 10:47:13 UTC</footer>
 
 </div>
 

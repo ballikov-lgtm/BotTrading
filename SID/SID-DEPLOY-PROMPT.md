@@ -274,9 +274,75 @@ until I confirm `git remote -v` shows both origin and upstream.
 STEP 8 — ALPACA PAPER KEYS (prompt me, then I add them to GitHub Secrets)
 ────────────────────────────────────────────────────────
 
-Now prompt me for the Alpaca PAPER credentials — but remember the security rules:
-you tell me where to get them and where to put them, and I enter them myself. You
-never see the values.
+── 8a — FIRST, ask me about funding (this decides my execution mode) ──
+
+Before the keys, ask me ONE question and wait for my answer:
+
+   "How much do you plan to fund your trading account with?"
+
+(This is about the LIVE account I might eventually fund — even though we start on
+PAPER, I should pick the right mode now so paper behaviour matches how I'd trade for
+real.) Based on my answer, recommend ONE of two execution modes and explain plainly.
+This is NOT financial advice — see the caveat at the end of this step.
+
+First, a plain factual explanation of the rule this is about — the PATTERN DAY
+TRADER (PDT) rule (FINRA, enforced by Alpaca):
+- A "day trade" is buying and selling (or shorting and covering) the SAME security on
+  the SAME day.
+- If a MARGIN account makes 4 or more day trades within 5 business days, the broker
+  flags it as a "Pattern Day Trader" and REQUIRES the account to keep at least
+  $25,000 in equity. If it drops below $25,000, the account can be RESTRICTED from
+  day trading until it's topped back up.
+- This rule applies ONLY to MARGIN accounts, not cash accounts. BUT: SID takes SHORT
+  trades, and shorting REQUIRES a margin account (you can't short in a cash account).
+  So a cash account CANNOT run SID at all, and any account that CAN run SID is a
+  margin account and is therefore PDT-subject.
+
+Now branch on my answer:
+
+▶ IF I say $25,000 OR MORE (note to me: that's roughly £19,000 — the exact GBP amount
+  depends on the current FX rate, which changes daily, so treat it as approximate):
+  Recommend the STANDARD "PDT VERSION" (best profit).
+  - WHY: it uses real broker stop orders on Alpaca from the moment of entry, giving
+    tight, intraday exits that capture the best fills. Those broker orders can create
+    same-day round trips (a day trade), which is exactly why this version needs the
+    account to stay at $25,000+ AT ALL TIMES.
+  - THE CATCH I must accept: if my account ever drops below $25,000, day-trade
+    activity can get the account flagged and LOCKED OUT of day trading under the PDT
+    rule. Staying above $25,000 is my responsibility.
+  - Secret to set: SID_PDT_SAFE = false  (or just leave it unset — false is the
+    default).
+
+▶ IF I say UNDER $25,000:
+  Recommend PDT-SAFE MODE.
+  - WHY: PDT-safe mode NEVER enters and exits on the same day. It places NO broker
+    stop and NO resting intraday take-profit order — every exit is decided by the
+    once-a-day bot run and executes at the NEXT day's open at the earliest. Because a
+    position can never open and close on the same day, it CANNOT count as a day trade,
+    so it CANNOT trigger the PDT rule and my account won't be locked out — even below
+    $25,000.
+  - THE HONEST TRADE-OFF I must accept: exits are DEFERRED to the next day's open
+    rather than filled intraday, so a hard mid-day move against me isn't cut until the
+    next run (gap/slippage risk), and I should expect a MODEST hit to profitability —
+    on the order of a few percent — versus the standard PDT version. Also, if a
+    scheduled daily run is missed, a position stays unmanaged for longer (there's no
+    broker safety net order sitting at the exchange). These are the inherent cost of
+    being PDT-immune.
+  - Secret to set: SID_PDT_SAFE = true
+
+IMPORTANT CAVEAT — say this to me verbatim: "This is not financial advice. YOU are
+responsible for your own account type (cash vs margin), for staying within Alpaca's
+and FINRA's rules, and for the PDT threshold on your own account. I'm helping you
+configure a setting, not advising you on trading or account decisions." Note that we
+are on PAPER for now regardless — this setting just makes paper behaviour match the
+mode I'd use for real.
+
+Remember which mode I chose — I'll add SID_PDT_SAFE with the other secrets just below.
+
+── 8b — Now prompt me for the Alpaca PAPER credentials ──
+
+Remember the security rules: you tell me where to get them and where to put them, and
+I enter them myself. You never see the values.
 
 Tell me to do this:
 1. Go to https://app.alpaca.markets and log into my account.
@@ -294,6 +360,9 @@ Tell me to do this:
    ALPACA_BASE_URL     <- https://paper-api.alpaca.markets   (the PAPER endpoint)
    SID_TRADING_MODE    <- paper
    SID_PAPER           <- true
+   SID_PDT_SAFE        <- the value from Step 8a: false if I'm funding $25,000+
+                          (standard PDT version), true if under $25,000 (PDT-safe
+                          mode). If unset, it defaults to false (standard PDT version).
 
    (Leave SID_LIVE_CONFIRMED unset — it's only needed to go live, which we are NOT
    doing. If ALPACA_KEY_ID / ALPACA_SECRET_KEY are ever unset, the bot automatically
@@ -410,12 +479,20 @@ EXIT MODEL (the v2.2.1 HYBRID model — how a position is managed once open):
     break-even.
 - TP2 on the runner fires on whichever comes FIRST: the 50-day SMA, the 200-day SMA,
   the break-even stop being hit, or a 30-trading-day timeout since TP1.
-- Stops are real broker GTC orders on Alpaca from the moment of entry, so the
-  position is never unprotected. (The v2.2.5 and v2.2.6 releases fixed a live
-  execution bug where the resting broker stop "held" the shares and blocked the TP1
-  and TP2 partial/runner closes — now the bot cancels the resting stop FIRST, submits
-  the close, confirms it filled, and raises a loud alert if it can't, so a close can
-  never fail silently.)
+- Stops (STANDARD PDT VERSION, SID_PDT_SAFE=false): real broker GTC orders on Alpaca
+  from the moment of entry, so the position is never unprotected. (The v2.2.5 and
+  v2.2.6 releases fixed a live execution bug where the resting broker stop "held" the
+  shares and blocked the TP1 and TP2 partial/runner closes — now the bot cancels the
+  resting stop FIRST, submits the close, confirms it filled, and raises a loud alert
+  if it can't, so a close can never fail silently.)
+- PDT-SAFE MODE (SID_PDT_SAFE=true, the choice I made in Step 8a if I funded under
+  $25,000): NO broker orders are placed at all — no GTC stop, no resting intraday
+  take-profit. Every exit (TP1, TP2, and a stop breach) is decided by the once-a-day
+  bot run and executes at the NEXT day's open at the earliest, so a position can never
+  open and close on the same day. This makes it PDT-immune, at the cost of no intraday
+  protection (a hard mid-day move isn't cut until the next run's open) and a modest
+  few-percent hit to profitability versus the standard PDT version. See the
+  "PDT version vs PDT-safe mode" section in SID-README.md for the full trade-off.
 - Concurrency: up to 5 positions open at once (default; SID_MAX_POSITIONS-overridable).
 - Sizing compounds off the bot's own internal ledger (SID/sid-account.json), not
   Alpaca's paper equity, so the risk math is consistent regardless of the paper
@@ -494,6 +571,11 @@ Make these points clearly, and do NOT change anything to live for me:
   the configuration (point ALPACA_BASE_URL at the live endpoint, set
   SID_TRADING_MODE=live, and set SID_LIVE_CONFIRMED to its required confirmation
   value). You are NOT to do that for me as part of this setup.
+- WHEN I decide to fund a live account: the cheapest + safest way to move money from the
+  UK into Alpaca (real exchange rate + FREE ACH via a Wise/Revolut USD account, avoiding
+  the $50 wire / 1.5% conversion fees) is written up step-by-step — with a safety
+  checklist and the tax/W-8BEN note — in SID/HOW-TO-FUND-ALPACA.md. Point me there; do
+  NOT move any money for me.
 - To pull a future published SID revision into my fork WITHOUT disturbing my trades,
   account ledger, or secrets, the EASIEST way is the one-click "Update SID to latest"
   Action (Actions tab -> "Update SID to latest" -> Run workflow — no commands, see

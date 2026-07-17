@@ -55,6 +55,30 @@ const CONFIG = {
   // non-bullish-asset shorts are UNAFFECTED and still auto-fire. Set
   // SID_SHORT_APPROVAL_GATE=false to revert to fully-mechanical bullish-asset shorts.
   shortApprovalGate:  process.env.SID_SHORT_APPROVAL_GATE !== 'false',
+  // ── V2.4.0 PDT-SAFE EXECUTION MODE ─────────────────────────────────────────
+  // DEFAULT FALSE = the standard "PDT version" (broker GTC stops + resting
+  // intraday short-TP1 limit placed from entry — tight, intraday fills). Those
+  // broker orders CAN fill the SAME day as entry → a day trade → Pattern Day
+  // Trader (PDT) exposure. A margin account under $25,000 making 4+ day trades
+  // in 5 business days gets flagged + restricted by Alpaca/FINRA. SID shorts
+  // require margin, so sub-$25K followers are PDT-subject.
+  //
+  // When SID_PDT_SAFE=true (the sub-$25K user OPTS IN), the bot places NO broker
+  // order that can fire intraday same-day: it SKIPS maintainV2_2BrokerOrders
+  // entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does
+  // not place the entry-time broker stop — for BOTH the normal entry path and
+  // the approved-entry path. Positions are then managed SOLELY by the daily-poll
+  // in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach
+  // → market close at the NEXT daily run's open). Because checkPositions only
+  // scans bars AFTER the entry date and there are NO broker orders, every exit
+  // lands on a LATER calendar day than entry → PDT-immune (v2.0's original
+  // design, restored as an opt-in). Honest trade-offs (see SID-README.md
+  // "PDT version vs PDT-safe mode"): no intraday stop (a hard mid-day move isn't
+  // cut until the next run's open → gap/slippage, expect a modest few-percent
+  // profit reduction vs the PDT version), and a missed scheduled run leaves a
+  // position unprotected longer (no broker safety net). Both are inherent to
+  // PDT-immunity.
+  pdtSafe:            process.env.SID_PDT_SAFE === 'true',
 };
 
 // ── RSI thresholds (named to match backtest-sid-bot-parity.py constants) ─────
@@ -81,8 +105,48 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.3.0'; // V2.3.0 TELEGRAM YES/NO APPROVAL FLOW (new capability, not a signal-logic change): the v2.2.4 short-approval gate now carries [✅ Approve] [❌ Skip] inline-keyboard buttons on its Telegram alert. Tapping Approve triggers a Cloudflare Worker (chat_id allowlist + webhook-secret header + least-privilege GitHub token) which dispatches sid-approve-trade.yml with the approval_id → approve-trade.js enters the trade as a PROPERLY TRACKED bot position (full TP1/TP2 management via checkPositions/maintainV2_2BrokerOrders), closing the old "untracked manual one-shot" gap. Bullish-asset shorts are queued to pending-approvals-sid.json (deterministic id `${symbol}-${signalDate}-${side}`, de-duped + pruned after SID_PENDING_TTL_DAYS=5). Approvals may arrive DAYS later at a different price: approve-trade.js enters at the CURRENT market price, recomputes the stop from the current setup (reuses the original stop level if still valid), sizes by 1% risk on the current entry→stop distance, logs the proposed-vs-actual entry delta, and aborts safely if the approval_id is unknown/stale/actioned. A new shared buildEntryPositionRecord() factory is the single schema source of truth for BOTH entry paths (no drift). Fires on PAPER (SID_TRADING_MODE). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
+const BOT_VERSION = 'v2.4.0'; // V2.4.0 PDT-SAFE EXECUTION MODE (new opt-in execution mode, NOT a signal-logic change): adds SID_PDT_SAFE (default FALSE = the standard "PDT version" with broker GTC stops + resting intraday short-TP1 limit). When SID_PDT_SAFE=true, the bot places NO broker order that can fire intraday same-day — it SKIPS maintainV2_2BrokerOrders entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does not place the entry-time broker stop, for BOTH the normal entry path (openEntryNoStop) AND the approved-entry path (approve-trade.js). PDT-safe positions carry pdt_safe:true + brokerStopOrderId:null → isV2_2Position()===false → they are managed SOLELY by the daily-poll in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach → market close at the NEXT run's open). GUARANTEE: because checkPositions only scans bars strictly AFTER the entry date, runs AFTER the entry loop adds the position, and there are no broker orders, no exit can fire on the same calendar day as entry → PDT-immune (v2.0's original design, restored as opt-in for sub-$25K margin accounts, which SID's shorts require). Standard mode (pdtSafe=false) is byte-for-byte unchanged. Honest trade-offs: no intraday stop (a hard mid-day move isn't cut until the next run's open → gap/slippage, ~few-% profit reduction) and a missed run leaves a position unprotected longer. The fresh installer (SID-DEPLOY-PROMPT.md Step 8) now asks the follower's funding size and branches: $25K+ → PDT version (SID_PDT_SAFE=false); under $25K → PDT-safe (true). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
 // Version history:
+//   v2.4.0 PDT-SAFE EXECUTION MODE (2026-07-17, paper trading):
+//        - MOTIVATION: the standard bot places broker GTC stops + a resting intraday
+//          short-TP1 limit from entry (maintainV2_2BrokerOrders). Those CAN fill the
+//          SAME day as entry → a day trade → Pattern Day Trader (PDT) exposure. A
+//          margin account under $25,000 making 4+ day trades in 5 business days gets
+//          flagged + restricted by Alpaca/FINRA. SID shorts require margin, so
+//          sub-$25K followers are PDT-subject. The old v2.0 design (no broker orders,
+//          daily-poll exits always land on a LATER day) was PDT-immune — restored here
+//          as an OPT-IN mode.
+//        - CONFIG: new pdtSafe (env SID_PDT_SAFE), DEFAULT FALSE = the standard "PDT
+//          version" (broker stops); the sub-$25K user opts IN with true.
+//        - ENTRY (pdtSafe=true): run() calls executor.openEntryNoStop() (market entry
+//          ONLY, no GTC stop) instead of openEntry(); approve-trade.js skips its
+//          placeStop() call. Both leave brokerStopOrderId=null + clientOrderIdPrefix
+//          =null and stamp pdt_safe:true on the position record.
+//        - MANAGEMENT (pdtSafe=true): pdt_safe positions get isV2_2Position()===false
+//          (guarded explicitly at the top of the fn), so maintainV2_2BrokerOrders is
+//          NEVER called and posIsV2_2=false routes them through the daily-poll TP1/TP2/
+//          stop close path in checkPositions. The daily-poll's cancel-first close is a
+//          no-op on the (null) broker stop, so no cancel is needed.
+//        - SAME-DAY GUARANTEE: checkPositions runs BEFORE the entry loop adds the new
+//          position (so it isn't scanned on entry day at all) AND, once scanned on the
+//          next run, only bars with date STRICTLY > openDate can trigger a close. With
+//          no broker orders, syncPositions can't detect a same-day fill either. Earliest
+//          possible exit is therefore the NEXT run's open — always a later calendar day.
+//        - STANDARD MODE (pdtSafe=false) is byte-for-byte unchanged: the added ternary
+//          resolves to openEntry(), the pdt_safe extra is {} (spreads to nothing), and
+//          the isV2_2Position guard only fires on pdt_safe===true (never set in standard).
+//        - TRADE-OFFS (inherent to PDT-immunity, stated plainly in the docs): no
+//          intraday stop (a hard mid-day move isn't cut until the next run's open →
+//          gap/slippage, ~few-% profit reduction vs the PDT version); a missed run
+//          leaves a position unprotected longer (no broker safety net).
+//        - INSTALLER: SID-DEPLOY-PROMPT.md Step 8a now asks the follower's funding size
+//          and recommends the PDT version ($25K+) or PDT-safe (under $25K), sets
+//          SID_PDT_SAFE accordingly, and explains the PDT rule + the cash-vs-margin fact
+//          + a not-financial-advice caveat. sid.yml + sid-approve-trade.yml pass
+//          SID_PDT_SAFE through.
+//        - NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger,
+//          earnings blackout, AUTO-80 all untouched); headline backtest numbers
+//          unchanged.
 //   v2.3.0 V2.3.0 TELEGRAM YES/NO TRADE-APPROVAL FLOW (2026-07-17, paper trading):
 //        - MOTIVATION: v2.2.4 gated bullish-asset shorts but "approve" meant Alan
 //          manually ran sid-manual-trade.yml, which creates an UNTRACKED off-strategy
@@ -793,6 +857,12 @@ const V2_2_TP1_RECOMPUTE_RSI     = 50;
 
 /** Is this position managed by V2.2 broker-side orders? */
 function isV2_2Position(pos) {
+  // V2.4.0 PDT-SAFE: a pdt_safe position has NO broker orders by design — it must
+  // ALWAYS be managed by the daily-poll (TP1/TP2/stop on a later day = PDT-immune),
+  // NEVER the broker-order path. Return false unconditionally, even if some future
+  // code accidentally stamped a brokerStopOrderId on it. This is the hard guarantee
+  // that maintainV2_2BrokerOrders is never called for a pdt_safe position.
+  if (pos.pdt_safe === true) return false;
   // Either explicitly tagged v2.2 OR has a brokerStopOrderId stamped at entry.
   // V2.1 GOOG runner (pre-migration) has neither → returns false → keeps legacy
   // daily-poll management.
@@ -2690,13 +2760,19 @@ async function run() {
 
     if (executor) {
       try {
-        const result        = await executor.openEntry({ signal, sizing, symbol });
+        // V2.4.0 PDT-SAFE: enter WITHOUT any broker stop so no order can fire
+        // intraday same-day (PDT-immune). The daily-poll in checkPositions
+        // manages TP1/TP2/stop on a later day. Standard mode (pdtSafe=false) is
+        // unchanged — openEntry places the broker GTC stop at entry as before.
+        const result        = CONFIG.pdtSafe
+          ? await executor.openEntryNoStop({ signal, sizing, symbol })
+          : await executor.openEntry({ signal, sizing, symbol });
         orderId             = result.entryOrderId;
-        stopOrderId         = result.stopOrderId;
-        clientOrderIdPrefix = result.clientOrderIdPrefix;
+        stopOrderId         = result.stopOrderId;             // null in pdtSafe mode
+        clientOrderIdPrefix = result.clientOrderIdPrefix;     // null in pdtSafe mode
         exchange            = `Alpaca/${CONFIG.tradingMode}`;
         modeLabel           = CONFIG.tradingMode;
-        console.log(`    Order ID : ${orderId} (stop ${stopOrderId})`);
+        console.log(`    Order ID : ${orderId}${CONFIG.pdtSafe ? ' (PDT-SAFE — no broker stop; daily-poll manages exits)' : ` (stop ${stopOrderId})`}`);
       } catch (err) {
         console.log(`    🚫 Alpaca entry FAILED: ${err.message}`);
         writeLog({
@@ -2734,6 +2810,10 @@ async function run() {
 
     // v2.3.0: build the position record via the SHARED factory so the schema
     // stays identical to the approval-flow entry path (approve-trade.js).
+    // v2.4.0: in PDT-safe mode, stamp pdt_safe:true and leave brokerStopOrderId/
+    // clientOrderIdPrefix null (already null from openEntryNoStop) so
+    // isV2_2Position()===false → the position is managed ONLY by the daily-poll
+    // (TP1/TP2/stop on a LATER day = PDT-immune). No broker order is ever placed.
     addOpenPosition(buildEntryPositionRecord({
       id:               orderId,
       symbol,
@@ -2748,9 +2828,9 @@ async function run() {
       openTime:         now.toISOString().slice(11, 19),
       mode:             modeLabel,
       strategyTag:      `${BOT_NAME} ${BOT_VERSION}`,
-      brokerStopOrderId:   stopOrderId,
-      clientOrderIdPrefix: clientOrderIdPrefix,
-    }));
+      brokerStopOrderId:   stopOrderId,          // null in pdtSafe mode
+      clientOrderIdPrefix: clientOrderIdPrefix,  // null in pdtSafe mode
+    }, CONFIG.pdtSafe ? { pdt_safe: true } : {}));
 
     // Fire Telegram alert (best-effort, never blocks trading)
     tg.alertEntryFired({

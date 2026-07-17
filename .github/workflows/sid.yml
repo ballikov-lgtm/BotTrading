@@ -35,6 +35,14 @@ jobs:
           SID_MAX_PER_DAY:     ${{ secrets.SID_MAX_PER_DAY }}
           SID_EARNINGS_WINDOW: ${{ secrets.SID_EARNINGS_WINDOW }}
           SID_PAPER:           ${{ secrets.SID_PAPER }}
+          # ── PDT-safe execution mode (default FALSE = standard "PDT version") ──
+          # SID_PDT_SAFE=true → NO broker orders (no GTC stop, no resting intraday
+          # short-TP1 limit). Positions are managed only by the daily-poll, so no
+          # exit can fire the same day as entry → cannot trigger the Pattern Day
+          # Trader rule. Recommended for accounts under $25,000. Leave unset/false
+          # for the standard PDT version (real broker stops, best fills, but the
+          # account must stay $25,000+ at all times). See SID-DEPLOY-PROMPT Step 8.
+          SID_PDT_SAFE:        ${{ secrets.SID_PDT_SAFE }}
 
           # ── Alpaca execution (see SID-ALPACA-SETUP.md for setup) ─────────
           # SID_TRADING_MODE controls what happens with each signal:

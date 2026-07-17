@@ -1051,6 +1051,116 @@ literal key (`backtest-sid-*.py`, `build-v2.1-excel-report.py`). The `-33` in th
 key name is now a cosmetic misnomer, documented here so nobody "fixes" it and
 breaks the backtests. Did NOT add a replacement ticker (separate strategy decision).
 
+### PDT-SAFE EXECUTION MODE (v2.4.0, 2026-07-17) — WORKING TREE, NOT COMMITTED
+
+Added an OPT-IN, PDT-immune execution mode alongside the existing standard "PDT
+version." **Status: WORKING TREE ONLY — nothing committed, pushed, or executed
+this session (per the brief). Return for review.**
+
+**Why.** The standard bot places broker GTC stops + a resting intraday short-TP1
+limit from entry (`maintainV2_2BrokerOrders`, called from `checkPositions` when
+`isV2_2Position(pos)` is true). Those broker orders CAN fill the SAME day as entry
+→ a day trade → Pattern Day Trader (PDT) exposure. A margin account under $25,000
+making 4+ day trades in 5 business days gets flagged + restricted by FINRA/Alpaca.
+SID shorts require margin, so sub-$25K followers are PDT-subject (a cash account
+can't run SID at all). v2.0's original design (no broker orders; daily-poll exits
+always land on a LATER day) was PDT-immune — restored here as opt-in.
+
+**The mode.** `CONFIG.pdtSafe = process.env.SID_PDT_SAFE === 'true'` — **DEFAULT
+FALSE = the standard PDT version** (broker stops); the sub-$25K user opts IN.
+
+**How pdtSafe skips the broker orders + how positions stay managed:**
+- ENTRY (bot path, `run()`): when `pdtSafe`, calls the new
+  `executor.openEntryNoStop({signal,sizing,symbol})` (market entry ONLY, no GTC
+  stop) instead of `openEntry()`. Returns `stopOrderId:null` +
+  `clientOrderIdPrefix:null`. The position record adds `pdt_safe:true` (extra).
+- ENTRY (approval path, `approve-trade.js`): when `pdtSafe`, skips its `placeStop()`
+  call, leaves `brokerStopOrderId=null`, sets `clientOrderIdPrefix:null`, adds
+  `pdt_safe:true`.
+- MANAGEMENT: `isV2_2Position(pos)` now returns **false unconditionally** when
+  `pos.pdt_safe === true` (guard added at the TOP of the fn — a hard guarantee
+  even if some future code stamped a brokerStopOrderId). With `posIsV2_2=false`:
+  `maintainV2_2BrokerOrders` is SKIPPED (line ~1766 `if (posIsV2_2 && executor)`);
+  a pdt_safe SHORT does NOT `continue` past Branch A (line ~1799
+  `if (posIsV2_2 && pos.side==='short') continue;`) so it runs the close-based
+  daily-poll TP1 (RSI≤50 for shorts) + the daily-poll stop-sim (`skipStopSim =
+  posIsV2_2` = false); and the Branch B daily-poll BE-stop checks are active
+  (`if (!posIsV2_2 && ...)`). The daily-poll cancel-first close guards
+  `if (pos.brokerStopOrderId)` (null→skip) and `findOpenOrder(...,'-stop')`
+  (nothing→no-op), so no cancel is needed — every exit is a plain market close at
+  the next run.
+
+**SAME-DAY-EXIT GUARANTEE (traced, confirmed).** In pdtSafe mode there is NO code
+path that can close a position on the calendar day it opened:
+1. In `run()`, `checkPositions(executor)` runs (line ~2490) BEFORE the entry loop
+   (`for (const symbol of WATCHLIST)`, ~2537). So on the entry day the new
+   position isn't in `open-positions-sid.json` yet → not scanned at all.
+2. On the NEXT run, `checkPositions` scans it, but `newBars = candles.filter(c =>
+   c.date > openDate)` and the exit loop `if (c.date <= scanFromDate) continue;`
+   (scanFromDate=openDate pre-TP1) STRICTLY exclude the entry-day bar. Earliest
+   triggerable bar is the day after entry, exited at that run's open.
+3. `syncPositions` (runs before checkPositions) only reacts to closes Alpaca
+   already made; with NO broker orders it can never detect a same-day fill and
+   never initiates a close. → Earliest possible exit is always a later calendar
+   day. PDT-immune.
+
+**Honest trade-offs (surfaced in README + installer + dashboard, as required):**
+no intraday stop → a hard mid-day move isn't cut until the next run's open
+(gap/slippage; expect a modest few-% profit reduction vs the PDT version); a
+missed scheduled run leaves a position unmanaged longer (no broker safety net).
+Inherent to PDT-immunity.
+
+**Standard mode is byte-for-byte unchanged.** The entry ternary resolves to
+`openEntry()`, the `pdt_safe` extra is `{}` (spreads to nothing), and the
+`isV2_2Position` guard only fires on `pdt_safe===true` (never set in standard).
+
+**Installer (SID-DEPLOY-PROMPT.md Step 8a).** Now ASKS "How much do you plan to
+fund your trading account with?" and branches: **$25,000+** (≈£19,000, FX
+approximate) → recommend the **PDT version** (best fills; account MUST stay
+$25,000+ at all times or risk a day-trade lockout), set `SID_PDT_SAFE=false` (or
+leave unset). **Under $25,000** → recommend **PDT-safe mode**, set
+`SID_PDT_SAFE=true`. Includes a plain PDT-rule explanation, the cash-account-can't-
+run-SID fact, and a "not financial advice — you're responsible for your account
+type + Alpaca's rules" caveat. `SID_PDT_SAFE` added to the installer's secrets
+list.
+
+**Env plumbing.** `SID_PDT_SAFE` added to BOTH `.github/workflows/sid.yml` and
+`.github/workflows/sid-approve-trade.yml` (must match between them). Was missing
+from both before.
+
+**Files changed (all working tree):** `bot-sid.js` (CONFIG.pdtSafe + BOT_VERSION
+v2.4.0 + history + isV2_2Position guard + entry-path ternary + pdt_safe extra),
+`alpaca-executor.js` (new `openEntryNoStop`), `approve-trade.js` (pdtSafe skips
+placeStop, v2.4.0 tags), `sid.yml` + `sid-approve-trade.yml` (SID_PDT_SAFE env),
+`SID-DEPLOY-PROMPT.md` (Step 8a funding question + branching + secrets list + the
+"How it works" stops caveat). Ship-check: `sid-dashboard.js` STRATEGY_VERSION 2.4.0
++ 3 hardcoded markers; `strategy-updates.json` new RELEASE entry at top (count auto
+22→23); regenerated `docs/sid/index.html` from the WORKTREE ROOT (`node
+SID/sid-dashboard.js` — worktree root has node_modules; the repo-root snapshot
+errors MODULE_NOT_FOUND) — v2.4.0 markers + count (23) confirmed; `SID-README.md`
+current-version line + v2.4.0 history row + a new "PDT version vs PDT-safe mode"
+section (comparison table + which-to-choose + not-financial-advice). No new file
+added → `.sid-update-manifest.txt` needs no change (all touched files already
+listed).
+
+**Tested (local, no network trades):** `node --check` on bot-sid/alpaca-executor/
+approve-trade → pass. `CONFIG.pdtSafe` = true under `SID_PDT_SAFE=true`, false when
+unset. `buildEntryPositionRecord(..., {pdt_safe:true})` stamps `pdt_safe:true` +
+`brokerStopOrderId:null`. `executor.openEntryNoStop` present on the prototype.
+`approve-trade.js` imports resolve + aborts safely without APPROVAL_ID. Both
+workflow YAMLs `yaml.safe_load` clean with SID_PDT_SAFE present. Dashboard rebuilt,
+markers v2.4.0, Updates tab + panel-title count both (23), PDT-safe RELEASE entry
+present. Routing traced against the live checkPositions lines (1766/1799/1800/
+2117/2126) — pdt_safe position skips maintainV2_2BrokerOrders and runs the
+daily-poll close path.
+
+**Queued / not done:** nothing committed/pushed/executed (per brief — return for
+review). If Alan approves, push via the standard protocol (fetch → pull --rebase
+--autostash → push; never without approval). No Pine change needed (visualiser is
+signal-level, not execution-level). A pre-existing stray
+`strategy-updates.json.tmp.37284.*` (Jun 14, not mine) is still untracked — left
+alone.
+
 ### Pitfall: Alpaca rejects SL stop for full position when TP1 limit already holds partial
 
 Confirmed 2026-05-22 on the MCD oneshot trade (entry filled 8 shares @ $281.67). Original `manual-trade.js` pattern was:

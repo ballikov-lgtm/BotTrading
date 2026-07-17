@@ -1,5 +1,5 @@
 /**
- * SID Approve-Trade — v2.3.0
+ * SID Approve-Trade — v2.4.0
  *
  * Fired by .github/workflows/sid-approve-trade.yml when Alan taps [✅ Approve]
  * on a SID short-approval Telegram alert (via the Cloudflare Worker). It turns a
@@ -19,9 +19,13 @@
  *      from the current setup — reuses the original proposed stop level if it's
  *      still valid for the direction, else derives a fresh stop. Sizes by 1%
  *      risk on the CURRENT entry→stop distance (reuses calcPositionSize).
- *   6. Places the broker GTC stop on the full position (so isV2_2Position()==true
- *      → the position is managed by the v2.2 broker-order path = TRACKED).
- *   7. Writes a FULL v2.3.0 open-positions record via the SHARED
+ *   6. STANDARD mode (SID_PDT_SAFE=false): places the broker GTC stop on the full
+ *      position (so isV2_2Position()==true → managed by the v2.2 broker-order path).
+ *      PDT-SAFE mode (SID_PDT_SAFE=true, v2.4.0): places NO broker stop — the position
+ *      is stamped pdt_safe:true + brokerStopOrderId:null → isV2_2Position()==false →
+ *      managed by the daily-poll (exits on a LATER day = PDT-immune). Either way the
+ *      position is a fully TRACKED bot position with TP1/TP2 management.
+ *   7. Writes a FULL v2.4.0 open-positions record via the SHARED
  *      buildEntryPositionRecord() factory (no schema drift), appends trades.csv,
  *      logs an approval_entry (incl. the proposed-vs-actual entry delta), marks
  *      the pending record 'approved', and Telegram-confirms.
@@ -57,8 +61,8 @@ import {
   todayString,
 } from './bot-sid.js';
 
-const APPROVE_VERSION = 'v2.3.0';
-const STRATEGY_TAG    = `${BOT_NAME} ${APPROVE_VERSION}`; // "SID v2.3.0"
+const APPROVE_VERSION = 'v2.4.0';
+const STRATEGY_TAG    = `${BOT_NAME} ${APPROVE_VERSION}`; // "SID v2.4.0"
 
 function log(msg)  { console.log(`[SID-APPROVE] ${msg}`); }
 function fail(msg) { console.error(`[SID-APPROVE] ABORT: ${msg}`); }
@@ -228,22 +232,31 @@ async function main() {
   const riskUsd = Math.abs(entry - finalStop) * shares;
 
   // ── 8) Place the broker GTC stop on the full position (makes it TRACKED) ────
+  // V2.4.0 PDT-SAFE: in PDT-safe mode we place NO broker stop — a resting stop
+  // could fill same-day as this entry (a day trade → PDT exposure). The position
+  // is left with brokerStopOrderId=null + pdt_safe:true so isV2_2Position()===false
+  // → it is managed SOLELY by the daily-poll (TP1/TP2/stop on a LATER day). This
+  // preserves PDT-immunity for the approved-entry path exactly like the bot path.
   let brokerStopOrderId = null;
-  try {
-    const stopRes = await executor.placeStop(
-      { symbol, side, clientOrderIdPrefix: prefix },
-      shares,
-      finalStop,
-      'stop',
-    );
-    brokerStopOrderId = stopRes.stopOrderId;
-    log(`Broker stop placed: ${shares}sh @ $${finalStop} (id ${brokerStopOrderId})`);
-  } catch (err) {
-    // Don't leave it naked silently — loud alert, but the position exists and
-    // the next bot run's maintainV2_2BrokerOrders will re-place the missing stop.
-    fail(`Stop placement failed for ${symbol}: ${err.message}. Position is UNPROTECTED on the broker side — next bot run will re-place it.`);
-    writeLog({ kind: 'approval_stop_fail', approval_id: approvalId, symbol, error: err.message });
-    await tg.sendMessage(`🚨 <b>SID approval</b> — ${symbol} ${side.toUpperCase()} filled ${shares}sh @ $${entry.toFixed(2)} but the STOP failed to place (${err.message}). The next bot run re-places it, but CHECK ALPACA now.`).catch(() => {});
+  if (CONFIG.pdtSafe) {
+    log(`PDT-SAFE — NO broker stop placed. Downside is managed by the daily-poll (market-close at the next run's open if the tracked stop $${finalStop} is breached).`);
+  } else {
+    try {
+      const stopRes = await executor.placeStop(
+        { symbol, side, clientOrderIdPrefix: prefix },
+        shares,
+        finalStop,
+        'stop',
+      );
+      brokerStopOrderId = stopRes.stopOrderId;
+      log(`Broker stop placed: ${shares}sh @ $${finalStop} (id ${brokerStopOrderId})`);
+    } catch (err) {
+      // Don't leave it naked silently — loud alert, but the position exists and
+      // the next bot run's maintainV2_2BrokerOrders will re-place the missing stop.
+      fail(`Stop placement failed for ${symbol}: ${err.message}. Position is UNPROTECTED on the broker side — next bot run will re-place it.`);
+      writeLog({ kind: 'approval_stop_fail', approval_id: approvalId, symbol, error: err.message });
+      await tg.sendMessage(`🚨 <b>SID approval</b> — ${symbol} ${side.toUpperCase()} filled ${shares}sh @ $${entry.toFixed(2)} but the STOP failed to place (${err.message}). The next bot run re-places it, but CHECK ALPACA now.`).catch(() => {});
+    }
   }
 
   // ── 9) Write the FULL tracked position via the shared factory ───────────────
@@ -262,9 +275,11 @@ async function main() {
     openDate:         now.toISOString().slice(0, 10),
     openTime:         now.toISOString().slice(11, 19),
     mode,
-    strategyTag:      STRATEGY_TAG,     // "SID v2.3.0" → isV2_2Position via brokerStopOrderId
-    brokerStopOrderId,
-    clientOrderIdPrefix: prefix,
+    // Standard mode: brokerStopOrderId set → isV2_2Position true (broker-order path).
+    // PDT-safe: brokerStopOrderId null + pdt_safe:true → daily-poll path (PDT-immune).
+    strategyTag:      STRATEGY_TAG,     // "SID v2.4.0"
+    brokerStopOrderId,                              // null in pdtSafe mode
+    clientOrderIdPrefix: CONFIG.pdtSafe ? null : prefix,  // no resting orders in pdtSafe mode
   }, {
     // Provenance — this position came through the approval flow.
     manual_watch:      true,            // it's a bullish-asset short → still S/R-watch the runner
@@ -273,6 +288,7 @@ async function main() {
     proposed_entry:    Number(rec.proposedEntry),
     proposed_stop:     Number(rec.proposedStop),
     entry_delta:       parseFloat(entryDelta.toFixed(4)),
+    ...(CONFIG.pdtSafe ? { pdt_safe: true } : {}),
   });
   addOpenPosition(pos);
 
@@ -340,7 +356,7 @@ async function main() {
     `Full TP1/TP2 management is now on. Bullish-asset short → runner is MANUAL-WATCH.${wildNote}`
   ).catch(() => {});
 
-  log(`DONE — ${symbol} ${side.toUpperCase()} ${shares}sh @ $${entry.toFixed(2)} is now a tracked v2.3.0 position.`);
+  log(`DONE — ${symbol} ${side.toUpperCase()} ${shares}sh @ $${entry.toFixed(2)} is now a tracked v2.4.0 position${CONFIG.pdtSafe ? ' (PDT-safe — daily-poll managed)' : ''}.`);
   process.exit(0);
 }
 

@@ -47,6 +47,12 @@ jobs:
           ALPACA_SECRET_KEY:   ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_BASE_URL:     ${{ secrets.ALPACA_BASE_URL }}
 
+          # ── PDT-safe execution mode — MUST match the bot's setting ─────────
+          # If SID_PDT_SAFE=true, an approved entry is placed WITHOUT a broker
+          # stop (daily-poll manages it on a later day = PDT-immune), matching the
+          # main bot. Default FALSE = standard PDT version (broker stop at entry).
+          SID_PDT_SAFE:        ${{ secrets.SID_PDT_SAFE }}
+
           # ── Sizing config (same secrets the bot uses) ──────────────────────
           SID_ACCOUNT_USD:     ${{ secrets.SID_ACCOUNT_USD }}
           SID_RISK_PCT:        ${{ secrets.SID_RISK_PCT }}

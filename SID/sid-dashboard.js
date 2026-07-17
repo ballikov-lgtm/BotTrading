@@ -29,7 +29,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.3.0';
+const STRATEGY_VERSION = '2.4.0';
+// v2.4.0 (2026-07-17) = PDT-SAFE EXECUTION MODE. New opt-in execution mode, NOT a
+// signal-logic change: adds SID_PDT_SAFE (default FALSE = the standard "PDT version"
+// with real broker GTC stops for tight intraday fills). When SID_PDT_SAFE=true, the
+// bot places NO broker order that can fire intraday same-day (no GTC stop, no resting
+// short-TP1 limit) — positions are managed solely by the once-a-day poll, so no exit
+// can land on the same calendar day as entry → cannot trigger the Pattern Day Trader
+// rule (recommended for accounts under $25,000, which run on margin because SID shorts
+// need it). Trade-off: exits deferred to the next day's open → ~few-% profit reduction
+// vs the PDT version, and no intraday broker safety net. The fresh installer now asks
+// the follower's funding size and picks the mode. NO canon rule change — the HEADLINE
+// backtest below is UNCHANGED. Details below carried from —
 // v2.3.0 (2026-07-17) = TELEGRAM YES/NO TRADE-APPROVAL FLOW. New capability, NOT a
 // signal-logic change: the v2.2.4 short-approval gate now carries [Approve]/[Skip]
 // inline buttons on its Telegram alert. Approve → a Cloudflare Worker (chat-id
@@ -1484,7 +1495,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.3.0 TELEGRAM APPROVAL FLOW 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.4.0 PDT-SAFE EXECUTION MODE 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1492,7 +1503,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.3.0 TELEGRAM APPROVE/SKIP FLOW · TRACKED APPROVED ENTRIES · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
+      <div class="brand-sub">V2.4.0 DUAL MODE: PDT VERSION (≥$25K) / PDT-SAFE (&lt;$25K) · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1609,7 +1620,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.3.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.4.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
