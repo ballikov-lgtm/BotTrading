@@ -82,74 +82,124 @@ function baseUrlForMode(mode) {
   return null;
 }
 
-// ── clientOrderIdPrefix (mirrors alpaca-executor, which does not export it) ──
-function computePrefix({ symbol, side, signalDate }) {
-  return `SID-${symbol}-${(signalDate || '').replace(/-/g, '')}-${side}`.slice(0, 40);
-}
-// A closed record's prefix: prefer the stored one, else reconstruct.
-function prefixForPos(pos) {
-  if (pos.clientOrderIdPrefix) return pos.clientOrderIdPrefix;
-  return computePrefix({ symbol: pos.symbol, side: pos.side, signalDate: pos.signalDate });
-}
-
 // ── File IO ──────────────────────────────────────────────────────────────────
 function loadJSON(p, fallback) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
 }
 
-// ── Per-position P&L from real fills ─────────────────────────────────────────
-// A "matched" position needs entry fills + exit fills that account for the
-// position's shares. Realised P&L is direction-agnostic:
-//   realised = (proceeds from sells) - (cost of buys), over the matched fills.
-// For a long:  buy(entry) then sell(exit)          -> sells - buys
-// For a short: sell_short(entry) then buy(exit)    -> sells - buys
-// So summing signed cashflow (sell:+price*qty, buy:-price*qty) across the
-// position's entry+exit fills yields realised P&L for a fully round-tripped
-// position of equal in/out share counts.
-function fillCashflow(fill) {
-  const qty   = parseFloat(fill.qty);
-  const price = parseFloat(fill.price);
-  if (!Number.isFinite(qty) || !Number.isFinite(price)) return null;
-  const side  = String(fill.side || '').toLowerCase();
-  const isSell = side === 'sell' || side === 'sell_short';
-  const isBuy  = side === 'buy'  || side === 'buy_to_cover';
-  if (!isSell && !isBuy) return null;
-  return isSell ? price * qty : -price * qty;   // signed cashflow
+// ── Fill-side classification ─────────────────────────────────────────────────
+// For a LONG position:  entry = buy,        exit = sell.
+// For a SHORT position: entry = sell_short, exit = buy (buy_to_cover).
+// Alpaca FILL activities carry side in {buy, sell, sell_short, buy_to_cover}.
+// We normalise to "entryFill"/"exitFill" per the position DIRECTION when
+// allocating (a buy is an entry for a long but an exit for a short).
+function fillSideKind(fill) {
+  const side = String(fill.side || '').toLowerCase();
+  if (side === 'buy' || side === 'buy_to_cover') return 'buy';
+  if (side === 'sell' || side === 'sell_short')  return 'sell';
+  return null;
 }
+function fillQty(fill)   { const q = parseFloat(fill.qty);   return Number.isFinite(q) ? q : 0; }
+function fillPrice(fill) { const p = parseFloat(fill.price); return Number.isFinite(p) ? p : 0; }
+function fillMs(fill)    { const t = Date.parse(fill.transaction_time || fill.transactionTime || ''); return Number.isFinite(t) ? t : 0; }
 
-/**
- * Given a position and the fills attributed to it, compute realised P&L +
- * a per-leg breakdown. Returns { pnl, buyQty, sellQty, entryAvg, exitAvg,
- * matched:boolean }.
- * matched === true only when in-qty and out-qty both cover shares_total (a
- * complete round trip) — otherwise we DON'T trust it and fall back.
- */
-function realisedFromFills(pos, fills) {
-  const sharesTotal = pos.shares_total ?? pos.shares ?? 0;
-  let buyQty = 0, sellQty = 0, buyCost = 0, sellProceeds = 0, cash = 0;
-  for (const f of fills) {
-    const cf = fillCashflow(f);
-    if (cf === null) continue;
-    cash += cf;
-    const qty = parseFloat(f.qty), price = parseFloat(f.price);
-    const side = String(f.side || '').toLowerCase();
-    if (side === 'sell' || side === 'sell_short') { sellQty += qty; sellProceeds += price * qty; }
-    else { buyQty += qty; buyCost += price * qty; }
+// ── FIFO per-symbol fill allocation ──────────────────────────────────────────
+// Disambiguates multiple same-symbol positions (e.g. the 3 UNH shorts) and does
+// NOT cap the exit search at the record's closeDate (the real close can post
+// days after the recorded target date — e.g. PYPL/ADBE runners sold 2026-07-17
+// vs recorded closeDate 07-02/07-15). For each symbol we build two FIFO queues:
+//   - "buy" fills (buys / buys-to-cover), time-ordered
+//   - "sell" fills (sells / short-sells), time-ordered
+// Positions are consumed in OPEN-DATE order. Each position draws its entry leg
+// from the queue matching its entry side and its exit leg from the other queue,
+// each up to shares_total. Because entries are chronological, the first UNH
+// short's entry short-sells are consumed before the second's, etc. — no
+// cross-contamination. A position is "matched" only when BOTH legs fully cover
+// shares_total (a complete real round trip); otherwise we keep the estimate.
+//
+// Returns a Map: pos-identity -> { pnl, matched, entryQty, exitQty, entryAvg,
+// exitAvg, note }.
+function allocateFillsFIFO(positions, allFills) {
+  const result = new Map();
+  // Group positions + fills by symbol.
+  const bySymbolPos   = new Map();
+  const bySymbolFills = new Map();
+  for (const pos of positions) {
+    const s = String(pos.symbol).toUpperCase();
+    if (!bySymbolPos.has(s)) bySymbolPos.set(s, []);
+    bySymbolPos.get(s).push(pos);
   }
-  // A complete round trip: both legs cover the position size (within a share of
-  // rounding). Short entry is a sell_short; long entry is a buy.
-  const legQty = Math.min(buyQty, sellQty);
-  const matched = sharesTotal > 0 && legQty >= sharesTotal - 0.5 &&
-                  buyQty >= sharesTotal - 0.5 && sellQty >= sharesTotal - 0.5;
-  return {
-    pnl: parseFloat(cash.toFixed(2)),
-    buyQty, sellQty,
-    entryAvg: pos.side === 'long'  ? (buyQty  ? buyCost / buyQty     : null)
-                                   : (sellQty ? sellProceeds / sellQty : null),
-    exitAvg:  pos.side === 'long'  ? (sellQty ? sellProceeds / sellQty : null)
-                                   : (buyQty  ? buyCost / buyQty      : null),
-    matched,
-  };
+  for (const f of allFills) {
+    const s = String(f.symbol || '').toUpperCase();
+    if (!s) continue;
+    if (!bySymbolFills.has(s)) bySymbolFills.set(s, []);
+    bySymbolFills.get(s).push(f);
+  }
+
+  for (const [sym, posList] of bySymbolPos) {
+    // Positions in real chronological open order.
+    posList.sort((a, b) => String(a.openDate || '').localeCompare(String(b.openDate || '')) ||
+                            String(a.openTime || '').localeCompare(String(b.openTime || '')));
+    // Two FIFO queues of remaining fill quantity, time-ordered.
+    const fillsForSym = (bySymbolFills.get(sym) || []).slice()
+      .sort((a, b) => fillMs(a) - fillMs(b));
+    const buyQ  = [];  // { qtyLeft, price, ms }
+    const sellQ = [];
+    for (const f of fillsForSym) {
+      const kind = fillSideKind(f);
+      if (kind === 'buy')  buyQ.push({ qtyLeft: fillQty(f), price: fillPrice(f), ms: fillMs(f) });
+      if (kind === 'sell') sellQ.push({ qtyLeft: fillQty(f), price: fillPrice(f), ms: fillMs(f) });
+    }
+
+    // Draw `need` shares from a queue FIFO. Returns { qty, cost } consumed.
+    function draw(queue, need, afterMs) {
+      let qty = 0, cost = 0;
+      for (const lot of queue) {
+        if (qty >= need - 1e-9) break;
+        if (lot.qtyLeft <= 0) continue;
+        // Exit legs must occur at/after the entry (afterMs); a fill strictly
+        // before the position opened can't be its exit. Entry legs pass afterMs
+        // = -Infinity so no constraint.
+        if (afterMs != null && lot.ms < afterMs - 1) continue;
+        const take = Math.min(lot.qtyLeft, need - qty);
+        qty  += take;
+        cost += take * lot.price;
+        lot.qtyLeft -= take;
+      }
+      return { qty, cost };
+    }
+
+    for (const pos of posList) {
+      const need = pos.shares_total ?? pos.shares ?? 0;
+      const openMs = pos.openDate ? Date.parse(`${pos.openDate}T00:00:00Z`) : -Infinity;
+      const isLong = pos.side === 'long';
+      // Entry leg first (no time floor), then exit leg constrained to >= entry.
+      const entryQueue = isLong ? buyQ  : sellQ;
+      const exitQueue  = isLong ? sellQ : buyQ;
+      const entry = draw(entryQueue, need, null);
+      const exit  = draw(exitQueue,  need, openMs);
+
+      const entryAvg = entry.qty ? entry.cost / entry.qty : null;
+      const exitAvg  = exit.qty  ? exit.cost  / exit.qty  : null;
+      // Realised P&L: (exit proceeds) - (entry cost) for a long; for a short the
+      // entry is the sell (proceeds) and exit is the buy (cost), so it's
+      // (entry proceeds) - (exit cost). In both cases:
+      //   long:  exit.cost(=sell proceeds) - entry.cost(=buy cost)
+      //   short: entry.cost(=sell proceeds) - exit.cost(=buy cost)
+      const pnl = isLong ? (exit.cost - entry.cost) : (entry.cost - exit.cost);
+      const matched = need > 0 && entry.qty >= need - 0.5 && exit.qty >= need - 0.5;
+
+      result.set(pos, {
+        pnl: parseFloat(pnl.toFixed(2)),
+        matched,
+        entryQty: parseFloat(entry.qty.toFixed(4)),
+        exitQty:  parseFloat(exit.qty.toFixed(4)),
+        entryAvg, exitAvg,
+        note: matched ? '' : `partial fills (entry ${entry.qty}/${need}, exit ${exit.qty}/${need})`,
+      });
+    }
+  }
+  return result;
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -196,11 +246,15 @@ async function main() {
   }
   console.log('');
 
-  // ── Pull FILL activities + order map (order_id -> client_order_id) ────────
+  // ── Pull FILL activities ──────────────────────────────────────────────────
+  // FIFO allocation works purely off the FILL stream (symbol + side + qty +
+  // price + time), so we DON'T need to resolve client_order_ids — which also
+  // avoids the earlier trap where the exit market-close carried no SID prefix.
   let fills = [];
-  let orderIdToClientId = new Map();
   if (alpacaOk) {
-    // Earliest open across records bounds the activity window.
+    // Earliest open across records bounds only the LOWER end of the window; the
+    // upper end is left open (now) so late runner exits (e.g. 2026-07-17) are
+    // always included even when the record's closeDate is an earlier target date.
     const earliest = closed
       .map(p => p.openDate)
       .filter(Boolean)
@@ -212,74 +266,36 @@ async function main() {
     } catch (err) {
       console.log(`${FAIL} getActivities failed: ${err.message} — will estimate all positions`);
     }
-    // Map order_id -> client_order_id so we can attribute fills by SID prefix.
-    try {
-      const symbols = [...new Set(closed.map(p => p.symbol))];
-      for (const sym of symbols) {
-        const orders = await client.listOrders({ status: 'all', symbols: sym, after: afterIso, limit: 500 });
-        for (const o of (orders || [])) {
-          if (o && o.id) orderIdToClientId.set(o.id, o.client_order_id || '');
-        }
-      }
-      console.log(`${OK} Built order map for ${orderIdToClientId.size} order(s) across ${new Set(closed.map(p=>p.symbol)).size} symbol(s)`);
-    } catch (err) {
-      console.log(`${WARN} Could not build full order map: ${err.message} — will match by symbol/side/time window`);
-    }
   }
   console.log('');
 
   // ── Reconcile each position ──────────────────────────────────────────────
+  // FIFO-allocate all fills across same-symbol positions in open-date order.
+  // This disambiguates the 3 UNH shorts and searches exits through NOW (not the
+  // record's closeDate), so runners that closed days after their recorded target
+  // date (PYPL/ADBE on 2026-07-17) get their real exit fills.
+  const alloc = (alpacaOk && fills.length) ? allocateFillsFIFO(closed, fills) : new Map();
+
   const rows = [];
   const corrected = [];
   let sumCorrected = 0;
 
   for (const pos of closed) {
-    const prefix = prefixForPos(pos);
-    const symU   = String(pos.symbol).toUpperCase();
     const oldPnl = pos.total_pnl ?? pos.realizedPnl ?? 0;
-
-    // Attribute fills to this position.
-    let posFills = [];
-    if (alpacaOk && fills.length) {
-      // (a) primary match: fill's order's client_order_id starts with our prefix
-      posFills = fills.filter(f => {
-        if (String(f.symbol || '').toUpperCase() !== symU) return false;
-        const cid = orderIdToClientId.get(f.order_id) || '';
-        return cid.startsWith(prefix);
-      });
-      // (b) fallback: symbol + time window [openDate, closeDate] when the order
-      //     map is incomplete OR the exit order had no SID client_order_id
-      //     (bot market closes carry no prefix). Keep it tight to the position's
-      //     own date window so it can't steal another position's fills.
-      if (!posFills.length || posFills.reduce((s, f) => s + parseFloat(f.qty || 0), 0) < (pos.shares_total ?? pos.shares ?? 0)) {
-        const openMs  = pos.openDate  ? Date.parse(`${pos.openDate}T00:00:00Z`)  : -Infinity;
-        const closeMs = pos.closeDate ? Date.parse(`${pos.closeDate}T23:59:59Z`) : Infinity;
-        const windowFills = fills.filter(f => {
-          if (String(f.symbol || '').toUpperCase() !== symU) return false;
-          const t = Date.parse(f.transaction_time || f.transactionTime || '');
-          return Number.isFinite(t) && t >= openMs && t <= closeMs;
-        });
-        // Prefer the union but de-dupe by activity id.
-        const byId = new Map();
-        for (const f of [...posFills, ...windowFills]) byId.set(f.id, f);
-        posFills = [...byId.values()];
-      }
-    }
+    const need   = pos.shares_total ?? pos.shares ?? 0;
 
     let newPnl = oldPnl;
     let source = 'estimate';
     let detail = '';
-    if (alpacaOk && posFills.length) {
-      const r = realisedFromFills(pos, posFills);
-      if (r.matched) {
-        newPnl = r.pnl;
-        source = 'alpaca_fill';
-        detail = `entry~$${r.entryAvg != null ? r.entryAvg.toFixed(2) : '?'} exit~$${r.exitAvg != null ? r.exitAvg.toFixed(2) : '?'} (${r.buyQty}b/${r.sellQty}s)`;
-      } else {
-        detail = `incomplete fills (${r.buyQty}b/${r.sellQty}s vs ${pos.shares_total ?? pos.shares} needed) - kept estimate`;
-      }
+    const a = alloc.get(pos);
+    if (alpacaOk && a && a.matched) {
+      newPnl = a.pnl;
+      source = 'alpaca_fill';
+      detail = `entry~$${a.entryAvg != null ? a.entryAvg.toFixed(2) : '?'} exit~$${a.exitAvg != null ? a.exitAvg.toFixed(2) : '?'} (${a.entryQty}/${a.exitQty} of ${need})`;
+    } else if (alpacaOk && a) {
+      detail = `${a.note || 'incomplete fills'} - kept estimate`;
     } else if (alpacaOk) {
-      detail = 'no fills matched - kept estimate';
+      detail = 'no fills for symbol - kept estimate';
     } else {
       detail = 'offline - kept estimate';
     }
