@@ -105,7 +105,8 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.4.0'; // V2.4.0 PDT-SAFE EXECUTION MODE (new opt-in execution mode, NOT a signal-logic change): adds SID_PDT_SAFE (default FALSE = the standard "PDT version" with broker GTC stops + resting intraday short-TP1 limit). When SID_PDT_SAFE=true, the bot places NO broker order that can fire intraday same-day — it SKIPS maintainV2_2BrokerOrders entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does not place the entry-time broker stop, for BOTH the normal entry path (openEntryNoStop) AND the approved-entry path (approve-trade.js). PDT-safe positions carry pdt_safe:true + brokerStopOrderId:null → isV2_2Position()===false → they are managed SOLELY by the daily-poll in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach → market close at the NEXT run's open). GUARANTEE: because checkPositions only scans bars strictly AFTER the entry date, runs AFTER the entry loop adds the position, and there are no broker orders, no exit can fire on the same calendar day as entry → PDT-immune (v2.0's original design, restored as opt-in for sub-$25K margin accounts, which SID's shorts require). Standard mode (pdtSafe=false) is byte-for-byte unchanged. Honest trade-offs: no intraday stop (a hard mid-day move isn't cut until the next run's open → gap/slippage, ~few-% profit reduction) and a missed run leaves a position unprotected longer. The fresh installer (SID-DEPLOY-PROMPT.md Step 8) now asks the follower's funding size and branches: $25K+ → PDT version (SID_PDT_SAFE=false); under $25K → PDT-safe (true). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
+const BOT_VERSION = 'v2.4.1'; // V2.4.1 ACCOUNTING RECONCILE (NOT a signal-logic change): (1) per-close real-fill booking — TP1 (Branch A), TP2 (Branch B), and recordExternalClose now book the CONFIRMED Alpaca filled_avg_price (from pollOrderFill / the closed-order fills) instead of the simulated bar/SMA trigger price; every closed record is stamped pnl_source ('alpaca_fill' when the real fill was read, 'estimate' on fallback) + mode. Falls back to the bar/SMA estimate only when the real fill is unavailable (never silently wrong). (2) The ledger (sid-account.json realizedPnl/tradeCount/accountUsd) is now RE-DERIVED from the on-disk records every close (realizedPnl = Σ closed records of the account's mode + Σ in-flight TP1 partials of that mode; tradeCount = distinct closed records of that mode; accountUsd = startingUsd + realizedPnl) instead of a running `+=` counter — so a deleted/edited record can NEVER leave a phantom loss again (the exact drift the account reconcile fixed retroactively: MCD phantom -$78.14 + inflated tradeCount). PAPER/LIVE SEGREGATED: the ledger sums ONLY the current mode's records; the other mode's records are ignored (a future live ledger starts fresh, mode:live, and never mixes with paper). NO canon rule change — the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout exits, share math, cancel-first stop logic, entry/arm/scan logic are all byte-for-byte unchanged; only the exit PRICE source + the ledger DERIVATION changed. Pairs with reconcile-account.js + alpaca-account-sid.json + the dashboard re-point at real Alpaca paper equity. (paper trading, 2026-07-18)
+// V2.4.0 PDT-SAFE EXECUTION MODE (new opt-in execution mode, NOT a signal-logic change): adds SID_PDT_SAFE (default FALSE = the standard "PDT version" with broker GTC stops + resting intraday short-TP1 limit). When SID_PDT_SAFE=true, the bot places NO broker order that can fire intraday same-day — it SKIPS maintainV2_2BrokerOrders entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does not place the entry-time broker stop, for BOTH the normal entry path (openEntryNoStop) AND the approved-entry path (approve-trade.js). PDT-safe positions carry pdt_safe:true + brokerStopOrderId:null → isV2_2Position()===false → they are managed SOLELY by the daily-poll in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach → market close at the NEXT run's open). GUARANTEE: because checkPositions only scans bars strictly AFTER the entry date, runs AFTER the entry loop adds the position, and there are no broker orders, no exit can fire on the same calendar day as entry → PDT-immune (v2.0's original design, restored as opt-in for sub-$25K margin accounts, which SID's shorts require). Standard mode (pdtSafe=false) is byte-for-byte unchanged. Honest trade-offs: no intraday stop (a hard mid-day move isn't cut until the next run's open → gap/slippage, ~few-% profit reduction) and a missed run leaves a position unprotected longer. The fresh installer (SID-DEPLOY-PROMPT.md Step 8) now asks the follower's funding size and branches: $25K+ → PDT version (SID_PDT_SAFE=false); under $25K → PDT-safe (true). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
 // Version history:
 //   v2.4.0 PDT-SAFE EXECUTION MODE (2026-07-17, paper trading):
 //        - MOTIVATION: the standard bot places broker GTC stops + a resting intraday
@@ -578,11 +579,63 @@ function loadAccount() {
   return initial;
 }
 
-function updateAccount(realizedPnl) {
-  const account      = loadAccount();
-  account.accountUsd  = parseFloat((account.accountUsd + realizedPnl).toFixed(2));
-  account.realizedPnl = parseFloat((account.realizedPnl + realizedPnl).toFixed(2));
-  account.tradeCount += 1;
+// Direction-aware realised P&L for a closed leg. Long profits when exit > entry;
+// short profits when entry > exit. Single source of truth for the exit-P&L
+// formula used by TP1 / TP2 / external-close booking (accounting only — no rule).
+function realisedPnlFor(side, entry, exit, shares) {
+  const pnl = side === 'long'
+    ? (exit - entry) * shares
+    : (entry - exit) * shares;
+  return parseFloat(pnl.toFixed(2));
+}
+
+// The record's mode (records with no mode are legacy PAPER — the V2 paper launch
+// predates the field). Used to keep the ledger segregated: the paper ledger sums
+// ONLY paper records; a future live ledger sums only live records.
+function recordMode(r) { return String(r?.mode || 'paper').toLowerCase(); }
+
+// Re-derive the ledger for the CURRENT trading mode straight from the on-disk
+// records — NEVER a running `+=` counter (that carried a phantom loss when a
+// record was later deleted but its delta wasn't reversed; see SID/CLAUDE.md
+// § accounting reconcile). realizedPnl = Σ closed records of this mode +
+// Σ in-flight TP1 partials on still-open positions of this mode (so a banked
+// TP1 compounds into sizing before the runner's record exists). tradeCount =
+// distinct CLOSED records of this mode. accountUsd = startingUsd + realizedPnl.
+// Paper/live are summed independently — the other mode's records are ignored.
+// `sources` lets a caller pass the IN-MEMORY closed/open arrays when the on-disk
+// files are not yet saved (checkPositions books P&L in-loop but persists the
+// arrays only at the end). Defaults to the on-disk files (recordExternalClose,
+// approve-trade, etc. save first, then call updateAccount).
+function deriveLedger(mode, sources = {}) {
+  const m = String(mode || 'paper').toLowerCase();
+  const closedAll = sources.closed ?? loadClosedPositions();
+  const openAll   = sources.open   ?? loadOpenPositions();
+  const closed = closedAll.filter(r => recordMode(r) === m);
+  const open   = openAll.filter(r => recordMode(r) === m);
+  const closedSum = closed.reduce((s, r) => s + (r.total_pnl ?? r.realizedPnl ?? 0), 0);
+  // In-flight TP1 partials: a still-open runner whose TP1 already banked. Its
+  // total_pnl record doesn't exist yet, so add the booked tp1_pnl leg.
+  const openTp1Sum = open.reduce((s, r) => s + (r.tp1_hit ? (r.tp1_pnl || 0) : 0), 0);
+  const realizedPnl = parseFloat((closedSum + openTp1Sum).toFixed(2));
+  return { realizedPnl, tradeCount: closed.length };
+}
+
+// Re-derive + persist the ledger for the current mode. Called after each close
+// booking (the record is written/pushed FIRST, then this re-derives from it) and
+// after each TP1 partial (open-position tp1_pnl is set first). The first arg is a
+// legacy delta hint that is now IGNORED — the value is always the record-derived
+// truth, so a phantom can never accumulate. Pass `sources` = { closed, open }
+// (the in-memory arrays) when the on-disk files aren't saved yet.
+function updateAccount(_deltaHintIgnored, sources = {}) {
+  const account = loadAccount();
+  const mode    = String(account.mode || CONFIG.tradingMode || 'paper').toLowerCase();
+  const startingUsd = account.startingUsd ?? CONFIG.accountUsd;
+  const { realizedPnl, tradeCount } = deriveLedger(mode, sources);
+  account.startingUsd = startingUsd;
+  account.realizedPnl = realizedPnl;
+  account.tradeCount  = tradeCount;
+  account.accountUsd  = parseFloat((startingUsd + realizedPnl).toFixed(2));
+  account.mode        = mode;
   account.lastUpdated = todayString();
   fs.writeFileSync(ACCOUNT_PATH, JSON.stringify(account, null, 2));
   return account;
@@ -763,19 +816,23 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
     console.warn(`[recordExternalClose] Failed to query Alpaca orders for ${pos.symbol} exit price: ${err.message}`);
   }
 
+  // pnl_source: 'alpaca_fill' when we read real fills off Alpaca (the normal
+  // case here — this path exists precisely because Alpaca closed the position);
+  // 'estimate' only on the stopLoss fallback when no fills were returned.
+  let pnlSource = fillsUsed.length > 0 ? 'alpaca_fill' : 'estimate';
+
   // Fallback: use the bot's tracked stop level. For Alpaca-side stops set at
   // bot's stopLoss, this is usually within a few cents of actual fill.
   if (exitPrice === null || !Number.isFinite(exitPrice)) {
     exitPrice = pos.stopLoss;
+    pnlSource = 'estimate';
     console.warn(`[recordExternalClose] No Alpaca fills found for ${pos.symbol} — using stopLoss $${exitPrice} as approximation`);
   }
 
   // ── Compute realised P&L ───────────────────────────────────────────
   const entry = pos.entry;
-  const pnl = pos.side === 'long'
-    ? (exitPrice - entry) * sharesClosed
-    : (entry - exitPrice) * sharesClosed;
-  const pnlRounded = parseFloat(pnl.toFixed(2));
+  const pnlRounded = realisedPnlFor(pos.side, entry, exitPrice, sharesClosed);
+  const pnl = pnlRounded;
   const exitPriceRounded = parseFloat(exitPrice.toFixed(4));
 
   // ── Append to closed-positions-sid.json ─────────────────────────────
@@ -792,6 +849,8 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
     total_pnl:     pnlRounded,
     realizedPnl:   pnlRounded,
     is_full_close: isFullClose,
+    pnl_source:    pnlSource,
+    mode:          pos.mode || CONFIG.tradingMode,
   };
   closed.push(closedRec);
   saveClosedPositions(closed);
@@ -818,7 +877,12 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
   ].join(','));
 
   // ── Update account state ────────────────────────────────────────────
-  updateAccount(pnlRounded);
+  // Re-derive from records (closed file was just saved above). Exclude the
+  // just-closed position from the open set — the caller saves the trimmed
+  // open-positions file only AFTER this returns, so reading it from disk would
+  // still contain this position and double-count its in-flight TP1 leg.
+  const openMinusClosed = loadOpenPositions().filter(p => p.id !== pos.id);
+  updateAccount(null, { open: openMinusClosed });
 
   // ── Telegram alert ──────────────────────────────────────────────────
   const pnlEmoji = pnlRounded >= 0 ? '📈' : '📉';
@@ -1829,11 +1893,14 @@ async function checkPositions(executor = null) {
             }
           }
 
-          const acct = updateAccount(realizedPnl);
           const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
           const icon = realizedPnl >= 0 ? '✅' : '❌';
 
-          closedPositions.push({
+          // Push the closed record FIRST, then re-derive the ledger from records
+          // (never a running counter — can't carry a phantom). This is a stop-out
+          // at the stop level (no pollOrderFill on this legacy path), so
+          // pnl_source is 'estimate' — flagged so it's visibly not a real fill.
+          const closedRec = {
             ...pos,
             // V2.1 fields
             tp1_date: c.date,
@@ -1847,6 +1914,8 @@ async function checkPositions(executor = null) {
             tp2_reason: 'stopped_before_tp1',
             total_pnl: realizedPnl,
             exit_strategy: 'v2.1-stop',
+            pnl_source: 'estimate',
+            mode: pos.mode || CONFIG.tradingMode,
             // v2.0-compat fields the dashboard reads
             exitLevel: 'sl',
             exitPrice,
@@ -1854,8 +1923,10 @@ async function checkPositions(executor = null) {
             closeDate: c.date,
             realizedPnl,
             outcome,
-            accountAfter: acct.accountUsd,
-          });
+          };
+          closedPositions.push(closedRec);
+          const acct = updateAccount(null, { closed: closedPositions, open: stillOpen });
+          closedRec.accountAfter = acct.accountUsd;
 
           tg.alertExitFired({
             symbol: pos.symbol, side: pos.side, exitPrice,
@@ -1898,16 +1969,22 @@ async function checkPositions(executor = null) {
             }
           }
 
-          const acct = updateAccount(realizedPnl);
           const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
           const icon = realizedPnl >= 0 ? '✅' : '❌';
-          closedPositions.push({
+          // Record first, then re-derive the ledger from records. No pollOrderFill
+          // on this v2.0 fallback path (closePosition returns no fill), so
+          // pnl_source is 'estimate'.
+          const closedRec = {
             ...pos,
             exitLevel: 'rsi50', exitPrice, exitRsi: rsi,
             closeDate: c.date, realizedPnl, outcome,
-            accountAfter: acct.accountUsd,
             exit_strategy: 'v2.0-rsi50-full',
-          });
+            pnl_source: 'estimate',
+            mode: pos.mode || CONFIG.tradingMode,
+          };
+          closedPositions.push(closedRec);
+          const acct = updateAccount(null, { closed: closedPositions, open: stillOpen });
+          closedRec.accountAfter = acct.accountUsd;
           tg.alertExitFired({
             symbol: pos.symbol, side: pos.side, exitPrice,
             exitReason: 'rsi50', realizedPnl, accountAfter: acct.accountUsd,
@@ -1920,14 +1997,19 @@ async function checkPositions(executor = null) {
           break;
         }
 
-        // V2.1 default — partial 50% close at RSI 50
-        const exitPrice  = c.close;
+        // V2.1 default — partial 50% close at RSI 50.
+        // exitPrice/tp1Pnl start as the SIMULATED bar-close estimate; after the
+        // real Alpaca partial fill confirms (pollOrderFill below) they are
+        // OVERWRITTEN with the actual filled_avg_price so the booked P&L matches
+        // the broker, not the bar. tp1PnlSource records which was used
+        // ('alpaca_fill' when the real fill was read, 'estimate' on fallback).
+        // ACCOUNTING ONLY — the RSI-50 trigger + share math + BE stop are
+        // unchanged (instructor rule untouched). These are `let` so the confirmed
+        // fill can override; the dry_run / re-protect paths keep the estimate.
         const tp1Shares  = Math.max(1, Math.floor(pos.shares_total * CONFIG.tp1Portion));
-        const tp1Pnl     = parseFloat((
-          pos.side === 'long'
-            ? (exitPrice - pos.entry) * tp1Shares
-            : (pos.entry - exitPrice) * tp1Shares
-        ).toFixed(2));
+        let   exitPrice  = c.close;
+        let   tp1Pnl     = realisedPnlFor(pos.side, pos.entry, exitPrice, tp1Shares);
+        let   tp1PnlSource = 'estimate';
 
         // ── BE stop price (needed up-front for the re-protect step) ─────────
         // Direction-aware penny rounding, ALWAYS locks ≥ 1¢/share profit.
@@ -2021,6 +2103,21 @@ async function checkPositions(executor = null) {
             break;
           }
 
+          // ── BOOK THE REAL FILL (accounting reconcile, v2.4.1) ──────────────
+          // The partial CONFIRMED — book the actual Alpaca filled_avg_price, not
+          // the simulated bar close (c.close). This is the same drift the account
+          // reconcile fixed retroactively; now we book it right at close time so
+          // the record never needs re-pricing. Falls back to the c.close estimate
+          // only if the fill price is somehow unavailable, flagged pnl_source.
+          if (Number.isFinite(fill.filledAvgPrice) && fill.filledAvgPrice > 0) {
+            exitPrice    = fill.filledAvgPrice;
+            tp1Pnl       = realisedPnlFor(pos.side, pos.entry, exitPrice, tp1Shares);
+            tp1PnlSource = 'alpaca_fill';
+          } else {
+            console.log(`\n    ⚠ TP1 fill price unavailable for ${pos.symbol} — booking bar-close estimate $${exitPrice.toFixed(2)}`);
+            tp1PnlSource = 'estimate';
+          }
+
           // (3) Fill confirmed — re-place the break-even stop on the RUNNER only.
           try {
             const rp = await executor.placeStop(pos, runnerShares, bePrice, 'stop');
@@ -2047,11 +2144,17 @@ async function checkPositions(executor = null) {
         pos.tp1_pnl          = tp1Pnl;
         pos.tp1_reason       = 'rsi50';
         pos.tp1_rsi          = rsi;
+        pos.tp1_pnl_source   = tp1PnlSource;   // 'alpaca_fill' | 'estimate'
         pos.shares_remaining = runnerShares;
         // BE stop — locks ≥ 1¢/share profit (computed above as bePrice).
         pos.stopLoss  = bePrice;
-        // Book TP1 partial P&L immediately so account compounds
-        const acctAfterTp1 = updateAccount(tp1Pnl);
+        // Book TP1 partial P&L immediately so account compounds. Re-derived from
+        // records + this in-flight TP1 partial (pos not yet in stillOpen, so pass
+        // it in). Never a running counter → can't carry a phantom.
+        const acctAfterTp1 = updateAccount(null, {
+          closed: closedPositions,
+          open: stillOpen.includes(pos) ? stillOpen : [...stillOpen, pos],
+        });
         appendTrade([
           c.date,
           (new Date()).toISOString().slice(11, 19),
@@ -2144,12 +2247,14 @@ async function checkPositions(executor = null) {
 
       if (!tp2Hit) continue;
 
-      // TP2 fires — close the remaining 50%
-      const tp2Pnl = parseFloat((
-        pos.side === 'long'
-          ? (tp2ExitPrice - pos.entry) * pos.shares_remaining
-          : (pos.entry - tp2ExitPrice) * pos.shares_remaining
-      ).toFixed(2));
+      // TP2 fires — close the remaining 50%. tp2ExitPrice/tp2Pnl start as the
+      // SIMULATED trigger-bar price (SMA touch / c.close); after the real Alpaca
+      // runner-close confirms (pollOrderFill below) they are OVERWRITTEN with the
+      // actual filled_avg_price so the booked P&L matches the broker, not the bar.
+      // tp2PnlSource records which was used. ACCOUNTING ONLY — the TP2 triggers
+      // (SMA50/200/BE/timeout) are unchanged (instructor rule untouched).
+      let tp2Pnl = realisedPnlFor(pos.side, pos.entry, tp2ExitPrice, pos.shares_remaining);
+      let tp2PnlSource = 'estimate';
 
       // ── CANCEL-FIRST TP2 runner-close (v2.2.6 fix) ──────────────────────
       // ROOT CAUSE (PYPL 12sh BE $41.41, ADBE 2sh BE $200.79; 2026-07-13→16):
@@ -2240,16 +2345,36 @@ async function checkPositions(executor = null) {
           positionHandled = true;
           break;
         }
+
+        // ── BOOK THE REAL FILL (accounting reconcile, v2.4.1) ──────────────
+        // The runner close CONFIRMED — book the actual Alpaca filled_avg_price,
+        // not the simulated SMA/bar price (tp2ExitPrice). This is exactly the
+        // drift the reconcile fixed retroactively (e.g. PYPL/ADBE runners booked
+        // at the historical SMA50 touch but really filled weeks later at the
+        // current market price). Falls back to the estimate only if the fill
+        // price is unavailable, flagged pnl_source.
+        if (Number.isFinite(fill.filledAvgPrice) && fill.filledAvgPrice > 0) {
+          tp2ExitPrice = fill.filledAvgPrice;
+          tp2Pnl       = realisedPnlFor(pos.side, pos.entry, tp2ExitPrice, pos.shares_remaining);
+          tp2PnlSource = 'alpaca_fill';
+        } else {
+          console.log(`\n    ⚠ TP2 fill price unavailable for ${pos.symbol} — booking bar/SMA estimate $${tp2ExitPrice.toFixed(2)}`);
+          tp2PnlSource = 'estimate';
+        }
       }
       // TP2 close confirmed (or dry_run) — fall through to book the trade.
       void tp2Confirmed;
 
-      const acctAfterTp2 = updateAccount(tp2Pnl);
       const totalPnl     = parseFloat(((pos.tp1_pnl || 0) + tp2Pnl).toFixed(2));
       const outcome      = totalPnl >= 0 ? 'WIN' : 'LOSS';
       const icon         = totalPnl >= 0 ? '✅' : '❌';
 
-      closedPositions.push({
+      // Combined pnl_source: alpaca_fill only if BOTH legs were real fills.
+      const tp1Src = pos.tp1_pnl_source || 'estimate';
+      const combinedSource = (tp1Src === 'alpaca_fill' && tp2PnlSource === 'alpaca_fill')
+        ? 'alpaca_fill' : 'estimate';
+
+      const tp2ClosedRec = {
         ...pos,
         tp2_date: c.date,
         tp2_price: tp2ExitPrice,
@@ -2259,6 +2384,8 @@ async function checkPositions(executor = null) {
         tp2_rsi: rsi,
         total_pnl: totalPnl,
         exit_strategy: 'v2.1-tp1+tp2',
+        pnl_source: combinedSource,
+        mode: pos.mode || CONFIG.tradingMode,
         // v2.0-compat fields the dashboard reads
         exitLevel: tp2Reason,
         exitPrice: tp2ExitPrice,
@@ -2266,8 +2393,16 @@ async function checkPositions(executor = null) {
         closeDate: c.date,
         realizedPnl: totalPnl,
         outcome,
-        accountAfter: acctAfterTp2.accountUsd,
+      };
+      // Push the closed record FIRST, then re-derive the ledger from records
+      // (never a running counter — can't carry a phantom). pos is being fully
+      // closed here (not re-added to stillOpen), so exclude it from the open set.
+      closedPositions.push(tp2ClosedRec);
+      const acctAfterTp2 = updateAccount(null, {
+        closed: closedPositions,
+        open: stillOpen.filter(p => p !== pos),
       });
+      tp2ClosedRec.accountAfter = acctAfterTp2.accountUsd;
 
       appendTrade([
         c.date,
@@ -2918,6 +3053,12 @@ export {
   saveOpenPositions,
   loadAccount,
   updateAccount,
+  // v2.4.1 — accounting reconcile: ledger is re-derived from records (never a
+  // running counter), paper/live segregated. Exported for unit tests.
+  deriveLedger,
+  realisedPnlFor,
+  recordMode,
+  loadClosedPositions,
   appendTrade,
   writeLog,
   loadPendingApprovals,

@@ -826,6 +826,26 @@ path, audit ALL of them (TP1, TP2, pre-TP1 stop-out, V2.0 fallback) for the same
 held-shares assumption. (Pre-TP1 stop-out + V2.0 fallback are legacy/non-v2.2 paths
 with no resting stop to release → left unchanged.)
 
+**✅ PROVEN FIXED — first live run to use v2.2.6 closed both runners cleanly (2026-07-17).**
+Alan manually dispatched `sid.yml` at 14:08 UTC (US market open) — the first run
+since v2.2.6 (commit 108bc65f) landed. Commit `eb93f10c` ("SID run 2026-07-17
+14:10 UTC") is decisive: it **ADDED both closed records (+88 lines)** and **REMOVED
+both from `open-positions-sid.json` (−61 lines)**, and updated `sid-account.json` — so
+this was a real close, not a stale-ledger cleanup. Booked as complete round-trips at
+the **SMA50 TP2 target (the historical touch bar), NOT today's market price**:
+- **PYPL** long — opened 2026-06-12, exit **$44.8828** (SMA50 touch 2026-07-02),
+  **+$73.70** total (TP1+runner), 23 sh.
+- **ADBE** long — opened 2026-06-26, exit **$231.3122** (SMA50 touch 2026-07-15),
+  **+$100.42** total, 4 sh.
+
+Open positions after the run: **0**. No `tp2_close_fail` recurred — the cancel-first
+close filled on the first attempt. The runners had been genuinely stuck (~4 days PYPL /
+~2 days ADBE) purely by the close-failure; v2.2.6 resolved it. **This is a go-live
+gate cleared** — TP2 now demonstrably exits a runner on a real (paper) fill.
+*Gotcha for future debugging:* `sid-log.json` only journals the entry-scan pass, NOT
+the position-close events — verify closes via the `closed-positions` diff of the run's
+commit (`git show <sha> -- SID/closed-positions-sid.json`), not the log.
+
 ### TELEGRAM YES/NO TRADE-APPROVAL FLOW (v2.3.0, 2026-07-17) — WORKING TREE, NOT DEPLOYED
 
 Built to close the "untracked manual trade" gap left by v2.2.4. Before this: the
@@ -1381,6 +1401,110 @@ strategy.exit("BE L", from_entry="Long", stop=entryPrice)    // new BE stop on r
 ```
 
 Without `strategy.cancel`, the original stop persists and may double-fire. See `sid-strategy-v2.1.pine` `tp1FireLong` / `tp1FireShort` blocks.
+
+### ACCOUNTING RECONCILE — Alpaca is the source of truth (v2.4.1, 2026-07-18) — WORKING TREE, NOT COMMITTED
+
+Full epic that made the SID paper books tie to the real Alpaca paper account, then
+made the bot book real fills so drift can't recur. **Status: WORKING TREE ONLY —
+Part 1 (the read-only tool + cloud --write) was pushed by the coordinator; the
+bot/dashboard change (Part B/A below) is uncommitted, return for review.**
+
+**The three numbers that didn't reconcile (all on `origin/main`):**
+- Alpaca paper equity (SOURCE OF TRUTH): **+$182.18** ($100,182.18 on a $100K base).
+- Our closed records summed: **−$57.69** (7 records).
+- Our ledger `sid-account.json` `realizedPnl`: **−$135.83** / tradeCount 11.
+
+**Root cause — TWO layers, both confirmed with git evidence:**
+1. **Phantom loss in the ledger.** `updateAccount` was a running `realizedPnl += pnl`
+   counter. The MCD paper stop-out (−$78.14) was added at commit `76a98edd` then the
+   record was **deleted at `a40456fc`** (the 2026-06-24 GLD run rewrote the file from
+   in-memory state that had lost MCD) — but the −$78.14 was never removed from the
+   counter. Arithmetic ties exactly: records (−$57.69) + MCD phantom (−$78.14) =
+   −$135.83. tradeCount 11 vs 7 records because it counted ledger EVENTS (TP1 partials,
+   TP2 closes, the deleted MCD), not distinct positions.
+2. **Simulated exit prices, not real fills.** TP1 booked `c.close` (RSI-50 bar), TP2
+   booked `tp2ExitPrice` (the historical SMA-touch bar). Alpaca actually fills at the
+   run-day market price. On late runner closes this diverges hugely — PYPL/ADBE runners
+   were booked at the SMA50 touch weeks before they really sold (2026-07-17). This is
+   the −$57.69-records-vs-+$182.18-Alpaca gap.
+
+**Part 1 — `reconcile-account.js` (read-only tool, PUSHED by coordinator).**
+- Pulls Alpaca FILL activities (`getActivities`, added to `alpaca-client.js` +
+  `getPortfolioHistory`) + account equity. **FIFO-allocates fills across same-symbol
+  positions in open-date order** (disambiguates the 3 UNH shorts) and searches exits
+  **through now** (not the record's closeDate — that's why PYPL/ADBE runner exits on
+  07-17 were initially missed; the closeDate window truncated them). Matches a position
+  only when BOTH legs cover `shares_total`; else keeps the estimate + `pnl_source:"estimate"`.
+- **Orphan reconstruction:** any symbol with a complete unallocated leftover round-trip
+  is rebuilt from real fills (this recovered MCD −$78.14, `pnl_source:"alpaca_fill"`).
+  Manual fallback re-adds the known MCD −$78.14 (`reconstructed_manual`) if its fills
+  aren't in Alpaca's window — never fabricates.
+- **PAPER/LIVE SEGREGATION guard:** only reconciles records matching the Alpaca account's
+  mode; other-mode records are QUARANTINED (passed through byte-for-byte, never re-priced
+  or summed). MCD fallback is paper-only.
+- `--dry-run` default (writes nothing), `--write` persists corrected records + re-derived
+  `sid-account.json` + writes `alpaca-account-sid.json` snapshot. `--write` REFUSES
+  without a live Alpaca connection (exit 1). Runs via `.github/workflows/sid-reconcile.yml`
+  (`workflow_dispatch`, `mode: dry-run|write`; write-mode commit is `if: inputs.mode=='write'`
+  and stages ONLY the 3 state files, mirrors `sid.yml`).
+- **RESULT (cloud --write, commit `661b2836`):** 8 records all `alpaca_fill` incl. MCD,
+  corrected total **+$182.37**, Alpaca **+$182.18**, residual **−$0.19** (fees). Ledger
+  → realizedPnl +$182.37 / tradeCount 8 / accountUsd $10,182.37. Snapshot netPnl +$182.18.
+
+**Part B — bot per-close reconcile (`bot-sid.js`, v2.4.1, UNCOMMITTED).** So drift can't recur:
+- **Book the real fill, not the bar.** TP1 (Branch A) and TP2 (Branch B) now overwrite
+  `exitPrice`/`tp2ExitPrice` with `fill.filledAvgPrice` (from the `pollOrderFill` already
+  in scope, AFTER the fill confirms) and recompute P&L via the new `realisedPnlFor(side,
+  entry,exit,shares)`. `recordExternalClose` already read real fills; now stamps
+  `pnl_source` (`alpaca_fill` when fills found, `estimate` on the stopLoss fallback).
+  Every closed record gets `pnl_source` + `mode`. Falls back to the estimate only when
+  the real fill is unavailable — never silently wrong. Combined TP1+TP2 record is
+  `alpaca_fill` only if BOTH legs were real fills.
+- **Ledger re-derived, never a counter.** `updateAccount(_deltaHintIgnored, sources={})`
+  now IGNORES the delta and calls `deriveLedger(mode, sources)`: realizedPnl = Σ closed
+  records of the account's mode + Σ in-flight TP1 partials of that mode (open runners
+  whose TP1 banked but whose record doesn't exist yet); tradeCount = distinct closed
+  records of that mode; accountUsd = startingUsd + realizedPnl. `sources` lets the caller
+  pass the in-memory arrays because `checkPositions` books P&L in-loop but persists the
+  files only at the end (each close-branch now pushes the record FIRST, then re-derives,
+  then sets `accountAfter`). **Phantom-proof** — a deleted/edited record can never leave
+  a residual. New exports: `deriveLedger`, `realisedPnlFor`, `recordMode`, `loadClosedPositions`.
+- **DID NOT TOUCH** the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout triggers, share math,
+  the cancel-first stop logic (cancel → close → pollOrderFill → re-protect — byte-identical,
+  verified by diff: zero close-mechanics lines removed), or entry/arm/scan. Only the exit
+  PRICE source + ledger DERIVATION changed.
+- **⚠ ORDERING GOTCHA (earned here):** in `checkPositions` the closed record must be pushed
+  to `closedPositions` BEFORE `updateAccount`, and `updateAccount` must be passed the
+  in-memory `{ closed, open }` (the on-disk files aren't saved until the end of the fn).
+  For TP1 (position stays open) pass `open: [...stillOpen, pos]`; for TP2 (fully closes)
+  pass `open: stillOpen.filter(p=>p!==pos)`; in `recordExternalClose` (saves closed file
+  first) pass `open: loadOpenPositions().filter(p=>p.id!==pos.id)` since the caller trims
+  open-positions only after it returns. Get this wrong and you double-count an in-flight
+  TP1 leg.
+
+**Part A — dashboard re-point (`sid-dashboard.js`, UNCOMMITTED).** The LIVE headline net-P&L
+reads `alpaca-account-sid.json` `netPnl` (+$182.18) + equity, labelled **"Paper account
+(simulated) · $100,182.18 on $100,000 base"** so it's never mistaken for real cash (room
+left for a future "Live — real cash" panel). **Falls back to the records-sum** if the
+snapshot is missing (verified: dashboard doesn't break, shows "realized (records)").
+
+**Tested (local, no network):** `node --check` all files. 17/18 ledger+P&L unit tests pass
+against the exported functions (the 1 "fail" was a wrong test expectation — `41.395→44.29
+×11` = 31.844999… → 31.84 by float, correct). 20/20 fill-booking tests (long+short, TP1+TP2,
+real-fill-booked vs estimate-fallback, combined source). End-to-end `updateAccount(999)`
+ignores the delta and re-derives +$182.37/8 from records; paper/live segregation verified
+(injected `mode:live` +$999.99 excluded from paper sum, isolated in the live sum). Dashboard
+regenerated from the WORKTREE ROOT (`node SID/sid-dashboard.js` — worktree root has
+node_modules; the repo-root snapshot errors MODULE_NOT_FOUND): v2.4.1 markers, updates count
+25, LIVE net-P&L span `+$182.18` + "Paper account (simulated)" label, snapshot-missing
+fallback confirmed.
+
+**Ship-check done (v2.4.1, FIX category):** `BOT_VERSION` v2.4.1 + history; `sid-dashboard.js`
+`STRATEGY_VERSION='2.4.1'` + banner/brand-sub/perf-note markers; `strategy-updates.json` new
+FIX entry at top (count auto → 25); regenerated `docs/sid/index.html`; `SID-README.md`
+current-version line + v2.4.1 history row; this append. **Queued:** nothing committed/pushed
+for Part A/B (return for review). If Alan approves, push via the standard protocol
+(fetch → pull --rebase --autostash → push; never without approval).
 
 ---
 

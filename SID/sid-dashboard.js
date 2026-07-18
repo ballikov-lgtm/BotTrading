@@ -29,7 +29,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.4.0';
+const STRATEGY_VERSION = '2.4.1';
+// v2.4.1 (2026-07-18) = ACCOUNTING RECONCILE. NOT a signal-logic change: the headline
+// LIVE net-P&L now reads the REAL Alpaca paper-account equity from
+// alpaca-account-sid.json (reconciled to the broker's fills) instead of summing the
+// internal records — labelled "Paper account (simulated)" so it's never mistaken for
+// real cash. Under the hood the bot now books each close at the CONFIRMED Alpaca fill
+// price (TP1/TP2/external) and re-derives the ledger from records (never a running
+// counter → no phantom loss), paper/live segregated. NO canon rule change — the
+// HEADLINE backtest below is UNCHANGED. Details below carried from —
 // v2.4.0 (2026-07-17) = PDT-SAFE EXECUTION MODE. New opt-in execution mode, NOT a
 // signal-logic change: adds SID_PDT_SAFE (default FALSE = the standard "PDT version"
 // with real broker GTC stops for tight intraday fills). When SID_PDT_SAFE=true, the
@@ -134,6 +142,11 @@ const classification = loadJSON('SID/asset-classification.json', null);
 const backtest       = loadJSON('SID/backtest-report_rsi75_lo_rsi3_weekly.json', null);
 const manualTrades   = loadJSON('SID/manual-trades-log.json', []);
 const strategyUpdates = loadJSON('SID/strategy-updates.json', []);
+// v2.4.1 — REAL Alpaca paper-account equity snapshot (written by reconcile-account.js
+// / the per-close reconcile). The headline P&L reads THIS (source of truth) rather
+// than summing the internal records, so the dashboard shows the actual paper account.
+// Falls back to null → the LIVE tile falls back to the records-sum (never breaks).
+const alpacaAccount  = loadJSON('SID/alpaca-account-sid.json', null);
 
 // Normalize closed positions — sometimes array, sometimes object
 const closedArr = Array.isArray(closed) ? closed : (Array.isArray(closed.positions) ? closed.positions : []);
@@ -183,6 +196,18 @@ function aggClosed(rows) {
 }
 
 const liveStats = aggClosed(closedArr);
+
+// ── LIVE headline P&L = REAL Alpaca paper equity (source of truth) ──────────
+// The dashboard headline now shows the actual paper-account net P&L from
+// alpaca-account-sid.json (reconciled to the broker's fills), NOT the internal
+// records-sum. Falls back to the records-sum if the snapshot is missing so the
+// dashboard never breaks. Labelled "Paper account (simulated)" so it's never
+// mistaken for real cash — a separate "Live — real cash" panel comes later.
+const hasAlpacaSnap  = alpacaAccount && Number.isFinite(alpacaAccount.netPnl);
+const liveHeadlineNetPnl = hasAlpacaSnap ? alpacaAccount.netPnl : liveStats.netPnl;
+const liveHeadlineEquity = hasAlpacaSnap ? alpacaAccount.equity : null;
+const liveHeadlineBase   = hasAlpacaSnap ? (alpacaAccount.startingEquity || 100000) : null;
+const liveHeadlineSource = hasAlpacaSnap ? 'Alpaca paper (real)' : 'records sum';
 
 // Classification breakdown
 const byTier = classification?.tickers
@@ -1495,7 +1520,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.4.0 PDT-SAFE EXECUTION MODE 2026-07-17 · NO REAL MONEY AT RISK · ALPACA PENDING ⚠
+  ⚠ PAPER TRADING · V2.4.1 ACCOUNTING RECONCILE 2026-07-18 · HEADLINE = REAL ALPACA PAPER EQUITY · NO REAL MONEY AT RISK ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1503,7 +1528,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.4.0 DUAL MODE: PDT VERSION (≥$25K) / PDT-SAFE (&lt;$25K) · MAX 5 POSITIONS · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
+      <div class="brand-sub">V2.4.1 ACCOUNTING RECONCILE · HEADLINE = REAL ALPACA PAPER EQUITY · DUAL MODE PDT / PDT-SAFE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1565,11 +1590,13 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
       <div class="stat-label">NET P&L</div>
       <div class="stat-value">
         <span class="perf-only-backtest">+$${HEADLINE_BACKTEST_PNL.toLocaleString()}</span>
-        <span class="perf-only-live">${liveStats.total ? fmtUSD(liveStats.netPnl) : '$0.00'}</span>
+        <span class="perf-only-live">${(hasAlpacaSnap || liveStats.total) ? fmtUSD(liveHeadlineNetPnl) : '$0.00'}</span>
       </div>
       <div class="stat-sub">
         <span class="perf-only-backtest">5y @ $200 risk</span>
-        <span class="perf-only-live">${liveStats.total ? 'realized' : 'no trades yet'}</span>
+        <span class="perf-only-live">${hasAlpacaSnap
+          ? `Paper account (simulated) · $${Number(liveHeadlineEquity).toLocaleString()} on $${Number(liveHeadlineBase).toLocaleString()} base`
+          : (liveStats.total ? 'realized (records)' : 'no trades yet')}</span>
       </div>
     </div>
 
@@ -1620,7 +1647,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.4.0 · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM — APPROVE VIA TELEGRAM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.4.1 · LIVE HEADLINE = REAL ALPACA PAPER EQUITY · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
