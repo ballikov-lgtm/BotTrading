@@ -837,7 +837,7 @@
   }
 </style>
 </head>
-<body data-perf-view="backtest" data-live-trades="8" data-live-threshold="10">
+<body data-perf-view="backtest" data-live-trades="9" data-live-threshold="10">
 
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
@@ -862,7 +862,7 @@
       </button>
       <div class="live-status">
         <span class="live-dot"></span>
-        <span>SYS · 15:03:27</span>
+        <span>SYS · 18:49:04</span>
       </div>
     </div>
   </header>
@@ -883,7 +883,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <div class="stat-grid">
     <div class="stat-tile" style="--accent:var(--cyan)">
     <div class="stat-label">OPEN POSITIONS</div>
-    <div class="stat-value">1</div>
+    <div class="stat-value">0</div>
     <div class="stat-sub">live</div>
   </div>
 
@@ -891,7 +891,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
       <div class="stat-label">TRADES</div>
       <div class="stat-value">
         <span class="perf-only-backtest">280</span>
-        <span class="perf-only-live">8</span>
+        <span class="perf-only-live">9</span>
       </div>
       <div class="stat-sub">
         <span class="perf-only-backtest">5y backtest</span>
@@ -903,7 +903,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
       <div class="stat-label">WIN RATE</div>
       <div class="stat-value">
         <span class="perf-only-backtest">73.9%</span>
-        <span class="perf-only-live">37.5%</span>
+        <span class="perf-only-live">44.4%</span>
       </div>
       <div class="stat-sub">
         <span class="perf-only-backtest">5y backtest</span>
@@ -947,71 +947,8 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
   <div id="tab-signals" class="tab-pane active">
     <!-- Live positions (bot + manual) full-width at the top -->
     <div class="panel">
-      <div class="panel-title">LIVE TRADES // 1 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-23 15:03:27 UTC</span></div>
-      <div class="position-grid"><div class="position-card">
-      <div class="pos-head">
-        <div>
-          <span class="pos-symbol">RIOT</span>
-          <span class="pos-side" style="color:#39ff14;text-shadow:0 0 6px #39ff14">▲ LONG</span>
-          
-          
-        </div>
-        <div class="pos-pnl" style="color:#39ff14;text-shadow:0 0 8px #39ff14">+22.65%</div>
-      </div>
-      
-      <svg viewBox="0 0 280 56" xmlns="http://www.w3.org/2000/svg" class="position-chart">
-        <defs>
-          <linearGradient id="grad-71c298f4-58fc-4aaf-a53a-744148aced14" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="-50%" stop-color="#ff0044" stop-opacity="0.45"/><stop offset="-50%" stop-color="#39ff14" stop-opacity="0.3"/><stop offset="100%" stop-color="#39ff14" stop-opacity="0.05"/>
-          </linearGradient>
-        </defs>
-        <!-- background band showing profit / loss zones -->
-        <rect x="12" y="22" width="256" height="12" fill="url(#grad-71c298f4-58fc-4aaf-a53a-744148aced14)" rx="2"/>
-        <!-- baseline -->
-        <line x1="12" y1="28" x2="268" y2="28" stroke="#1a4040" stroke-width="0.5"/>
-        <!-- stop marker -->
-        <line x1="12" y1="18" x2="12" y2="38" stroke="#ff0044" stroke-width="2" stroke-dasharray="2,2" style="filter: drop-shadow(0 0 4px #ff0044)"/>
-        <text x="12" y="54" text-anchor="middle" font-size="8" fill="#ff0044" font-family="Share Tech Mono, monospace">STOP</text>
-        <!-- entry marker -->
-        <line x1="-116" y1="16" x2="-116" y2="40" stroke="#00ffff" stroke-width="1.5" style="filter: drop-shadow(0 0 4px #00ffff)"/>
-        <text x="-116" y="54" text-anchor="middle" font-size="8" fill="#00ffff" font-family="Share Tech Mono, monospace">ENTRY</text>
-        <!-- current price pulsing dot -->
-        <circle cx="268" cy="28" r="5" fill="#39ff14" style="filter: drop-shadow(0 0 6px #39ff14)">
-          <animate attributeName="r" values="5;6.5;5" dur="1.6s" repeatCount="indefinite"/>
-        </circle>
-        <text x="268" y="18" text-anchor="middle" font-size="9" fill="#39ff14" font-family="Share Tech Mono, monospace" font-weight="700" style="filter: drop-shadow(0 0 4px #39ff14)">$24.10</text>
-      </svg>
-      <div class="pos-meta">
-        <span>ENTRY <strong>$19.65</strong></span>
-        <span>STOP <strong>$19.66</strong></span>
-        <span title="Snapshot from last scanner run (3×/day) — may lag real-time. Compare against your broker for live P&amp;L.">SNAPSHOT <strong>$24.10</strong></span>
-        
-        <span>QTY <strong>38</strong></span>
-        <span>RISK <strong>$100.70</strong></span>
-        <span>TO STOP <strong>18.4%</strong></span>
-        <span>DAYS <strong>3</strong></span>
-        <span>OPEN <strong>2026-07-20</strong></span>
-      </div>
-      
-      <div class="pos-exits" title="Dynamic exit targets from the last scanner run (3×/day). TP1 = RSI(14) reaches 50 (long ≥50 close / short ≤50 touch). TP2 = price touches daily SMA50 or SMA200 (closes the runner). BE STOP = current protective stop.">
-        <div class="pos-exit-row">
-          <span class="pos-exit-k" style="color:#00ffff">TP1 · RSI 50</span>
-          <span class="pos-exit-v" style="color:#00ffff">BANKED</span>
-        </div>
-        <div class="pos-exit-row">
-          <span class="pos-exit-k">TP2 · SMA50</span>
-          <span class="pos-exit-v">$24.67</span>
-        </div>
-        <div class="pos-exit-row">
-          <span class="pos-exit-k">TP2 · SMA200</span>
-          <span class="pos-exit-v">$18.55</span>
-        </div>
-        <div class="pos-exit-row">
-          <span class="pos-exit-k">BE STOP</span>
-          <span class="pos-exit-v">$19.66</span>
-        </div>
-      </div>
-    </div></div>
+      <div class="panel-title">LIVE TRADES // 0 OPEN <span style="color:var(--text-dim);font-size:11px;font-weight:400;letter-spacing:1px;">· SNAPSHOT AS OF 2026-07-23 18:49:04 UTC</span></div>
+      <div class="hud-empty">// NO OPEN POSITIONS // STANDING BY //</div>
     </div>
 
     <div class="two-col">
@@ -1022,73 +959,73 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <thead><tr><th></th><th>SYMBOL</th><th>STATE</th><th>RSI</th><th>PRICE</th><th>TIER</th></tr></thead>
     <tbody><tr class="signal-row">
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
+      <td class="sig-symbol">ORCL</td>
+      <td class="sig-state" style="color:#39ff14">SIGNAL LONG</td>
+      <td class="sig-rsi">29.6</td>
+      <td class="sig-price">$119.93</td>
+      <td class="sig-tier" style="color:#39ff14">AUTO</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">SOXS</td>
       <td class="sig-state" style="color:#39ff14">SIGNAL LONG</td>
-      <td class="sig-rsi">25.9</td>
-      <td class="sig-price">$46.17</td>
+      <td class="sig-rsi">26.0</td>
+      <td class="sig-price">$46.55</td>
       <td class="sig-tier" style="color:#ffaa00">MONITOR</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">IBM</td>
       <td class="sig-state" style="color:#00ffff">OVERSOLD · WAITING MACD</td>
-      <td class="sig-rsi">29.9</td>
-      <td class="sig-price">$205.84</td>
+      <td class="sig-rsi">29.7</td>
+      <td class="sig-price">$205.42</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">PYPL</td>
       <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
-      <td class="sig-rsi">74.5</td>
-      <td class="sig-price">$55.65</td>
+      <td class="sig-rsi">74.8</td>
+      <td class="sig-price">$55.79</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">USO</td>
       <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
       <td class="sig-rsi">71.9</td>
-      <td class="sig-price">$140.01</td>
+      <td class="sig-price">$140.07</td>
       <td class="sig-tier" style="color:#ffaa00">MONITOR</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
-      <td class="sig-symbol">XLE</td>
-      <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
-      <td class="sig-rsi">71.1</td>
-      <td class="sig-price">$60.15</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">XOM</td>
       <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
-      <td class="sig-rsi">73.0</td>
-      <td class="sig-price">$157.79</td>
+      <td class="sig-rsi">72.9</td>
+      <td class="sig-price">$157.74</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">CVX</td>
       <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
-      <td class="sig-rsi">73.2</td>
-      <td class="sig-price">$196.92</td>
+      <td class="sig-rsi">72.0</td>
+      <td class="sig-price">$195.49</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">TSLA</td>
       <td class="sig-state" style="color:#00ffff">OVERSOLD · WAITING MACD</td>
-      <td class="sig-rsi">29.7</td>
-      <td class="sig-price">$322.99</td>
+      <td class="sig-rsi">29.3</td>
+      <td class="sig-price">$320.61</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">RTX</td>
       <td class="sig-state" style="color:#00ffff">OVERBOUGHT · WAITING MACD</td>
-      <td class="sig-rsi">72.0</td>
-      <td class="sig-price">$209.81</td>
+      <td class="sig-rsi">71.0</td>
+      <td class="sig-price">$208.45</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#00ffff;text-shadow:0 0 8px #00ffff">◆</td>
       <td class="sig-symbol">AI</td>
       <td class="sig-state" style="color:#00ffff">OVERSOLD · WAITING MACD</td>
-      <td class="sig-rsi">29.3</td>
-      <td class="sig-price">$7.98</td>
+      <td class="sig-rsi">30.0</td>
+      <td class="sig-price">$8.05</td>
       <td class="sig-tier" style="color:#ffaa00">MONITOR</td>
     </tr></tbody>
   </table>
@@ -1101,79 +1038,51 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">GOOG</td>
       <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">31.9</td>
-      <td class="sig-price">$317.16</td>
+      <td class="sig-rsi">32.5</td>
+      <td class="sig-price">$319.15</td>
+      <td class="sig-tier" style="color:#39ff14">AUTO</td>
+    </tr><tr class="signal-row">
+      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
+      <td class="sig-symbol">XLE</td>
+      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
+      <td class="sig-rsi">69.6</td>
+      <td class="sig-price">$59.71</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
       <td class="sig-symbol">LMT</td>
       <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
-      <td class="sig-rsi">68.7</td>
-      <td class="sig-price">$569.85</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
-      <td class="sig-symbol">ORCL</td>
-      <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">30.1</td>
-      <td class="sig-price">$121.08</td>
+      <td class="sig-rsi">68.0</td>
+      <td class="sig-price">$566.82</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">XLC</td>
       <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">34.3</td>
-      <td class="sig-price">$105.89</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
-      <td class="sig-symbol">ABT</td>
-      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
-      <td class="sig-rsi">65.4</td>
-      <td class="sig-price">$101.53</td>
+      <td class="sig-rsi">34.0</td>
+      <td class="sig-price">$105.78</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">WMT</td>
       <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">34.1</td>
-      <td class="sig-price">$108.10</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
-      <td class="sig-symbol">HON</td>
-      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
-      <td class="sig-rsi">66.5</td>
-      <td class="sig-price">$248.67</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#ff1493;text-shadow:0 0 8px #ff1493">▼</td>
-      <td class="sig-symbol">JPM</td>
-      <td class="sig-state" style="color:#ff1493">APPROACHING SHORT</td>
-      <td class="sig-rsi">65.1</td>
-      <td class="sig-price">$348.53</td>
+      <td class="sig-rsi">33.7</td>
+      <td class="sig-price">$107.83</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">XLY</td>
       <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">30.5</td>
-      <td class="sig-price">$108.75</td>
+      <td class="sig-rsi">30.3</td>
+      <td class="sig-price">$108.67</td>
       <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr><tr class="signal-row">
       <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
       <td class="sig-symbol">AAL</td>
       <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">31.6</td>
-      <td class="sig-price">$13.81</td>
+      <td class="sig-rsi">31.0</td>
+      <td class="sig-price">$13.70</td>
       <td class="sig-tier" style="color:#ffaa00">MONITOR</td>
-    </tr><tr class="signal-row">
-      <td class="sig-arrow" style="color:#39ff14;text-shadow:0 0 8px #39ff14">▲</td>
-      <td class="sig-symbol">DIS</td>
-      <td class="sig-state" style="color:#39ff14">APPROACHING LONG</td>
-      <td class="sig-rsi">34.9</td>
-      <td class="sig-price">$92.68</td>
-      <td class="sig-tier" style="color:#39ff14">AUTO</td>
     </tr></tbody>
   </table>
         </div>
@@ -1204,17 +1113,17 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
           <div class="perf-only-live">
             <div class="donut-wrap">
               <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
-    <path d="M 110 22 A 88 88 0 0 1 172.22539674441617 172.22539674441617 L 148.57974598153805 148.57974598153803 A 54.56 54.56 0 0 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 172.22539674441617 172.22539674441617 A 88 88 0 1 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 1 0 148.57974598153805 148.57974598153803 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
+    <path d="M 110 22 A 88 88 0 0 1 140.09777261265884 192.69295062915995 L 128.6606190198485 161.26962939007916 A 54.56 54.56 0 0 0 110 55.44 Z" fill="#39ff14" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #39ff14)"/><path d="M 140.09777261265884 192.69295062915995 A 88 88 0 1 1 109.99999999999999 22 L 109.99999999999999 55.44 A 54.56 54.56 0 1 0 128.6606190198485 161.26962939007916 Z" fill="#ff0044" stroke="#000" stroke-width="1.5" style="filter: drop-shadow(0 0 6px #ff0044)"/>
     <circle cx="110" cy="110" r="52.56" fill="#000"/>
-    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">37.5%</text>
+    <text x="110" y="104" text-anchor="middle" fill="#00ffff" font-family="Orbitron, monospace" font-size="20" font-weight="700" style="filter: drop-shadow(0 0 4px #00ffff)">44.4%</text>
     <text x="110" y="124" text-anchor="middle" fill="#888" font-family="Share Tech Mono, monospace" font-size="9">LIVE WR</text>
   </svg>
               <div class="donut-legend">
-                <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>LIVE WINS</span><span style="color:#39ff14">3</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>LIVE LOSSES</span><span style="color:#ff0044">5</span></div>
+                <div class="legend-item"><span><span class="legend-swatch" style="background:#39ff14;color:#39ff14"></span>LIVE WINS</span><span style="color:#39ff14">4</span></div><div class="legend-item"><span><span class="legend-swatch" style="background:#ff0044;color:#ff0044"></span>LIVE LOSSES</span><span style="color:#ff0044">5</span></div>
               </div>
             </div>
             <div class="perf-note" id="perf-live-note">
-              LIVE PAPER · 8/10 TRADES BEFORE AUTO-SWITCH
+              LIVE PAPER · 9/10 TRADES BEFORE AUTO-SWITCH
             </div>
           </div>
         </div>
@@ -1238,6 +1147,14 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
       <table class="history-table">
     <thead><tr><th>DATE</th><th>SYMBOL</th><th>SIDE</th><th>ENTRY</th><th>EXIT</th><th>P&amp;L</th><th>REASON</th></tr></thead>
     <tbody><tr>
+      <td>2026-07-23</td>
+      <td class="sig-symbol">RIOT</td>
+      <td style="color:#39ff14">LONG</td>
+      <td>$19.65</td>
+      <td>$24.06</td>
+      <td style="color:#00ffff;text-shadow:0 0 6px #00ffff">+$146.19</td>
+      <td>—</td>
+    </tr><tr>
       <td>2026-07-15</td>
       <td class="sig-symbol">ADBE</td>
       <td style="color:#39ff14">LONG</td>
@@ -1346,565 +1263,565 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <text x="748.5" y="78" text-anchor="middle" fill="#ff1493" font-size="10" font-family="Orbitron, monospace" style="filter: drop-shadow(0 0 4px #ff1493)">▶ OVERBOUGHT</text>
   
     <g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="302.19" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>IBM · OVERSOLD_WAIT_MACD · AUTO_TRADE · RSI 29.9 · Score 100</title>
+      <circle cx="300.57" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>IBM · OVERSOLD_WAIT_MACD · AUTO_TRADE · RSI 29.7 · Score 100</title>
       </circle>
-      <text x="302.19" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IBM</text>
+      <text x="300.57" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IBM</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="318.39" cy="78" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>GOOG · APPROACHING_LONG · AUTO_TRADE · RSI 31.9 · Score 100</title>
+      <circle cx="323.25" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>GOOG · APPROACHING_LONG · AUTO_TRADE · RSI 32.5 · Score 100</title>
       </circle>
-      <text x="318.39" y="81" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GOOG</text>
+      <text x="323.25" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GOOG</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="393.72" cy="60" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>LUV · IDLE · MONITOR · RSI 41.2 · Score 100</title>
+      <circle cx="372.66" cy="60" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>LUV · IDLE · MONITOR · RSI 38.6 · Score 100</title>
       </circle>
-      <text x="393.72" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LUV</text>
+      <text x="372.66" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LUV</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="493.35" cy="60" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>AMC · IDLE · MONITOR · RSI 53.5 · Score 100</title>
+      <circle cx="502.26000000000005" cy="60" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>AMC · IDLE · MONITOR · RSI 54.6 · Score 100</title>
       </circle>
-      <text x="493.35" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMC</text>
+      <text x="502.26000000000005" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMC</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="635.91" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLE · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 71.1 · Score 100</title>
+      <circle cx="623.76" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLE · APPROACHING_SHORT · AUTO_TRADE · RSI 69.6 · Score 100</title>
       </circle>
-      <text x="635.91" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLE</text>
+      <text x="623.76" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLE</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="642.3900000000001" cy="78" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+      <circle cx="642.3900000000001" cy="60" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
         <title>USO · OVERBOUGHT_WAIT_MACD · MONITOR · RSI 71.9 · Score 100</title>
       </circle>
-      <text x="642.3900000000001" y="81" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">USO</text>
+      <text x="642.3900000000001" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">USO</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="663.45" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>PYPL · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 74.5 · Score 100</title>
+      <circle cx="665.88" cy="60" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>PYPL · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 74.8 · Score 100</title>
       </circle>
-      <text x="663.45" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PYPL</text>
+      <text x="665.88" y="63" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PYPL</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="616.47" cy="64.80000000000001" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>LMT · APPROACHING_SHORT · AUTO_TRADE · RSI 68.7 · Score 99</title>
+      <circle cx="610.8000000000001" cy="82.80000000000001" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>LMT · APPROACHING_SHORT · AUTO_TRADE · RSI 68.0 · Score 99</title>
       </circle>
-      <text x="616.47" y="67.80000000000001" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LMT</text>
+      <text x="610.8000000000001" y="85.80000000000001" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LMT</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="423.69" cy="84.00000000000003" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>JNUG · IDLE · MONITOR · RSI 44.9 · Score 95</title>
+      <circle cx="423.69" cy="88.80000000000003" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>JNUG · IDLE · MONITOR · RSI 44.9 · Score 94</title>
       </circle>
-      <text x="423.69" y="87.00000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JNUG</text>
+      <text x="423.69" y="91.80000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JNUG</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="424.5" cy="106.80000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>NUGT · IDLE · AUTO_TRADE · RSI 45.0 · Score 94</title>
+      <circle cx="426.92999999999995" cy="106.80000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>NUGT · IDLE · AUTO_TRADE · RSI 45.3 · Score 94</title>
       </circle>
-      <text x="424.5" y="109.80000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NUGT</text>
+      <text x="426.92999999999995" y="109.80000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NUGT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="534.66" cy="88.80000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>JNJ · IDLE · AUTO_TRADE · RSI 58.6 · Score 94</title>
+      <circle cx="374.28" cy="93.59999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>BA · IDLE · AUTO_TRADE · RSI 38.8 · Score 93</title>
       </circle>
-      <text x="534.66" y="91.80000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JNJ</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="389.67" cy="93.59999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>BA · IDLE · AUTO_TRADE · RSI 40.7 · Score 93</title>
-      </circle>
-      <text x="389.67" y="96.59999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BA</text>
+      <text x="374.28" y="96.59999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BA</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
       <circle cx="507.12000000000006" cy="93.59999999999998" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
         <title>SMCI · IDLE · MONITOR · RSI 55.2 · Score 93</title>
       </circle>
       <text x="507.12000000000006" y="96.59999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SMCI</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="303.81" cy="98.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>ORCL · APPROACHING_LONG · AUTO_TRADE · RSI 30.1 · Score 92</title>
+      <circle cx="537.0899999999999" cy="93.59999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>JNJ · IDLE · AUTO_TRADE · RSI 58.9 · Score 93</title>
       </circle>
-      <text x="303.81" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ORCL</text>
+      <text x="537.0899999999999" y="96.59999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JNJ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="437.46000000000004" cy="134.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>GDX · IDLE · AUTO_TRADE · RSI 46.6 · Score 92</title>
+      <circle cx="299.76" cy="98.39999999999998" r="12" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>ORCL · SIGNAL_LONG · AUTO_TRADE · RSI 29.6 · Score 92</title>
       </circle>
-      <text x="437.46000000000004" y="137.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GDX</text>
+      <text x="299.76" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ORCL</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="451.22999999999996" cy="98.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>B · IDLE · AUTO_TRADE · RSI 48.3 · Score 92</title>
+      <circle cx="439.08" cy="134.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>GDX · IDLE · AUTO_TRADE · RSI 46.8 · Score 92</title>
       </circle>
-      <text x="451.22999999999996" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">B</text>
+      <text x="439.08" y="137.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GDX</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="651.3" cy="98.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XOM · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 73.0 · Score 92</title>
+      <circle cx="453.65999999999997" cy="98.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>B · IDLE · AUTO_TRADE · RSI 48.6 · Score 92</title>
       </circle>
-      <text x="651.3" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XOM</text>
+      <text x="453.65999999999997" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">B</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="395.34" cy="121.19999999999999" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>SLV · IDLE · AUTO_TRADE · RSI 41.4 · Score 91</title>
+      <circle cx="650.4900000000001" cy="98.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XOM · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 72.9 · Score 92</title>
       </circle>
-      <text x="395.34" y="124.19999999999999" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SLV</text>
+      <text x="650.4900000000001" y="101.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XOM</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="489.3" cy="103.19999999999999" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>UNH · IDLE · AUTO_TRADE · RSI 53.0 · Score 91</title>
+      <circle cx="496.59000000000003" cy="121.19999999999999" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>UNH · IDLE · AUTO_TRADE · RSI 53.9 · Score 91</title>
       </circle>
-      <text x="489.3" y="106.19999999999999" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UNH</text>
+      <text x="496.59000000000003" y="124.19999999999999" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UNH</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="373.47" cy="125.99999999999999" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AMZN · IDLE · AUTO_TRADE · RSI 38.7 · Score 90</title>
+      </circle>
+      <text x="373.47" y="129" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMZN</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="391.28999999999996" cy="107.99999999999999" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>SLV · IDLE · AUTO_TRADE · RSI 40.9 · Score 90</title>
+      </circle>
+      <text x="391.28999999999996" y="110.99999999999999" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SLV</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="516.8399999999999" cy="125.99999999999999" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>HUT · IDLE · MONITOR · RSI 56.4 · Score 90</title>
+      <circle cx="528.18" cy="125.99999999999999" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>HUT · IDLE · MONITOR · RSI 57.8 · Score 90</title>
       </circle>
-      <text x="516.8399999999999" y="129" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HUT</text>
+      <text x="528.18" y="129" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HUT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="367.8" cy="112.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AMZN · IDLE · AUTO_TRADE · RSI 38.0 · Score 89</title>
+      <circle cx="513.6" cy="112.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>DE · IDLE · AUTO_TRADE · RSI 56.0 · Score 89</title>
       </circle>
-      <text x="367.8" y="115.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMZN</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="509.55" cy="148.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>DE · IDLE · AUTO_TRADE · RSI 55.5 · Score 89</title>
-      </circle>
-      <text x="509.55" y="151.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DE</text>
+      <text x="513.6" y="115.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DE</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="543.5699999999999" cy="112.8" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>EWZ · IDLE · MONITOR · RSI 59.7 · Score 89</title>
+      <circle cx="270.6" cy="117.6" r="12" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>SOXS · SIGNAL_LONG · MONITOR · RSI 26.0 · Score 88</title>
       </circle>
-      <text x="543.5699999999999" y="115.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWZ</text>
+      <text x="270.6" y="120.6" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SOXS</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="269.79" cy="117.6" r="12" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>SOXS · SIGNAL_LONG · MONITOR · RSI 25.9 · Score 88</title>
+      <circle cx="413.16" cy="135.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>SOXL · IDLE · MONITOR · RSI 43.6 · Score 88</title>
       </circle>
-      <text x="269.79" y="120.6" text-anchor="middle" fill="#fff" font-size="8" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SOXS</text>
+      <text x="413.16" y="138.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SOXL</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="414.78" cy="135.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>SOXL · IDLE · MONITOR · RSI 43.8 · Score 88</title>
+      <circle cx="524.1299999999999" cy="153.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>EWZ · IDLE · MONITOR · RSI 57.3 · Score 88</title>
       </circle>
-      <text x="414.78" y="138.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SOXL</text>
+      <text x="524.1299999999999" y="156.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWZ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="652.92" cy="127.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>CVX · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 73.2 · Score 86</title>
+      <circle cx="643.1999999999999" cy="127.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>CVX · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 72.0 · Score 86</title>
       </circle>
-      <text x="652.92" y="130.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CVX</text>
+      <text x="643.1999999999999" y="130.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CVX</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="387.23999999999995" cy="150" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>TQQQ · IDLE · AUTO_TRADE · RSI 40.4 · Score 85</title>
+      <circle cx="386.42999999999995" cy="150" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>TQQQ · IDLE · AUTO_TRADE · RSI 40.3 · Score 85</title>
       </circle>
-      <text x="387.23999999999995" y="153" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TQQQ</text>
+      <text x="386.42999999999995" y="153" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TQQQ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="396.96000000000004" cy="168" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>QQQ · IDLE · AUTO_TRADE · RSI 41.6 · Score 85</title>
+      <circle cx="396.15" cy="168" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>QQQ · IDLE · AUTO_TRADE · RSI 41.5 · Score 85</title>
       </circle>
-      <text x="396.96000000000004" y="171" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">QQQ</text>
+      <text x="396.15" y="171" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">QQQ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="423.69" cy="168" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>GLD · IDLE · AUTO_TRADE · RSI 44.9 · Score 85</title>
+      <circle cx="418.02" cy="168" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>GLD · IDLE · AUTO_TRADE · RSI 44.2 · Score 85</title>
       </circle>
-      <text x="423.69" y="171" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GLD</text>
+      <text x="418.02" y="171" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GLD</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="432.6" cy="186" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLK · IDLE · AUTO_TRADE · RSI 46.0 · Score 85</title>
+      <circle cx="430.17" cy="186" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLK · IDLE · AUTO_TRADE · RSI 45.7 · Score 85</title>
       </circle>
-      <text x="432.6" y="189" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLK</text>
+      <text x="430.17" y="189" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLK</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="509.55" cy="168" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>LLY · IDLE · AUTO_TRADE · RSI 55.5 · Score 85</title>
+      <circle cx="501.45000000000005" cy="150" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>LLY · IDLE · AUTO_TRADE · RSI 54.5 · Score 85</title>
       </circle>
-      <text x="509.55" y="171" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LLY</text>
+      <text x="501.45000000000005" y="153" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LLY</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="513.6" cy="190.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>IBB · IDLE · AUTO_TRADE · RSI 56.0 · Score 84</title>
+      <circle cx="335.40000000000003" cy="141.60000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLC · APPROACHING_LONG · AUTO_TRADE · RSI 34.0 · Score 83</title>
       </circle>
-      <text x="513.6" y="193.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IBB</text>
+      <text x="335.40000000000003" y="144.60000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLC</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="337.83" cy="141.60000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLC · APPROACHING_LONG · AUTO_TRADE · RSI 34.3 · Score 83</title>
+      <circle cx="503.87999999999994" cy="177.60000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>IBB · IDLE · AUTO_TRADE · RSI 54.8 · Score 83</title>
       </circle>
-      <text x="337.83" y="144.60000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLC</text>
+      <text x="503.87999999999994" y="180.60000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IBB</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="473.1" cy="146.40000000000003" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>LCID · IDLE · MONITOR · RSI 51.0 · Score 82</title>
+      <circle cx="475.53000000000003" cy="146.40000000000003" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>LCID · IDLE · MONITOR · RSI 51.3 · Score 82</title>
       </circle>
-      <text x="473.1" y="149.40000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LCID</text>
+      <text x="475.53000000000003" y="149.40000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LCID</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="396.15" cy="187.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>HD · IDLE · AUTO_TRADE · RSI 41.5 · Score 81</title>
+      <circle cx="391.28999999999996" cy="187.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>HD · IDLE · AUTO_TRADE · RSI 40.9 · Score 81</title>
       </circle>
-      <text x="396.15" y="190.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HD</text>
+      <text x="391.28999999999996" y="190.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HD</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="407.49" cy="205.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>INTC · IDLE · AUTO_TRADE · RSI 42.9 · Score 81</title>
+      <circle cx="396.96000000000004" cy="205.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>INTC · IDLE · AUTO_TRADE · RSI 41.6 · Score 81</title>
       </circle>
-      <text x="407.49" y="208.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">INTC</text>
+      <text x="396.96000000000004" y="208.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">INTC</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="589.74" cy="151.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>ABT · APPROACHING_SHORT · AUTO_TRADE · RSI 65.4 · Score 81</title>
+      <circle cx="578.4" cy="151.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>ABT · IDLE · AUTO_TRADE · RSI 64.0 · Score 81</title>
       </circle>
-      <text x="589.74" y="154.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ABT</text>
+      <text x="578.4" y="154.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ABT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="300.57" cy="155.99999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>TSLA · OVERSOLD_WAIT_MACD · AUTO_TRADE · RSI 29.7 · Score 80</title>
+      <circle cx="297.33" cy="155.99999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>TSLA · OVERSOLD_WAIT_MACD · AUTO_TRADE · RSI 29.3 · Score 80</title>
       </circle>
-      <text x="300.57" y="158.99999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TSLA</text>
+      <text x="297.33" y="158.99999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TSLA</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="525.75" cy="219.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLV · IDLE · AUTO_TRADE · RSI 57.5 · Score 78</title>
+      <circle cx="521.7" cy="183.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLV · IDLE · AUTO_TRADE · RSI 57.0 · Score 78</title>
       </circle>
-      <text x="525.75" y="222.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLV</text>
+      <text x="521.7" y="186.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLV</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="383.19" cy="206.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>NKE · IDLE · AUTO_TRADE · RSI 39.9 · Score 77</title>
+      <circle cx="376.71000000000004" cy="170.39999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>NKE · IDLE · AUTO_TRADE · RSI 39.1 · Score 77</title>
       </circle>
-      <text x="383.19" y="209.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NKE</text>
+      <text x="376.71000000000004" y="173.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NKE</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="450.42" cy="170.39999999999998" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>COIN · IDLE · MONITOR · RSI 48.2 · Score 77</title>
+      <circle cx="459.33" cy="170.39999999999998" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>COIN · IDLE · MONITOR · RSI 49.3 · Score 77</title>
       </circle>
-      <text x="450.42" y="173.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">COIN</text>
+      <text x="459.33" y="173.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">COIN</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="502.26000000000005" cy="211.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AMD · IDLE · AUTO_TRADE · RSI 54.6 · Score 76</title>
+      <circle cx="362.13" cy="193.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>NOW · IDLE · AUTO_TRADE · RSI 37.3 · Score 76</title>
       </circle>
-      <text x="502.26000000000005" y="214.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMD</text>
+      <text x="362.13" y="196.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NOW</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="526.5600000000001" cy="175.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AAPL · IDLE · AUTO_TRADE · RSI 57.6 · Score 76</title>
+      <circle cx="486.87" cy="193.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AMD · IDLE · AUTO_TRADE · RSI 52.7 · Score 76</title>
       </circle>
-      <text x="526.5600000000001" y="178.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AAPL</text>
+      <text x="486.87" y="196.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMD</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="336.21000000000004" cy="180" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>WMT · APPROACHING_LONG · AUTO_TRADE · RSI 34.1 · Score 75</title>
+      <circle cx="517.65" cy="211.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AAPL · IDLE · AUTO_TRADE · RSI 56.5 · Score 76</title>
       </circle>
-      <text x="336.21000000000004" y="183" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">WMT</text>
+      <text x="517.65" y="214.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AAPL</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="477.15000000000003" cy="180" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>TGT · IDLE · AUTO_TRADE · RSI 51.5 · Score 75</title>
+      <circle cx="332.97" cy="180" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>WMT · APPROACHING_LONG · AUTO_TRADE · RSI 33.7 · Score 75</title>
       </circle>
-      <text x="477.15000000000003" y="183" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TGT</text>
+      <text x="332.97" y="183" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">WMT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="493.35" cy="234" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>PFE · IDLE · AUTO_TRADE · RSI 53.5 · Score 75</title>
+      <circle cx="469.05" cy="198" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>TGT · IDLE · AUTO_TRADE · RSI 50.5 · Score 75</title>
       </circle>
-      <text x="493.35" y="237" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PFE</text>
+      <text x="469.05" y="201" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TGT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="507.12000000000006" cy="252" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>RIOT · IDLE · AUTO_TRADE · RSI 55.2 · Score 75</title>
+      <circle cx="484.44" cy="216" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>PFE · IDLE · AUTO_TRADE · RSI 52.4 · Score 75</title>
       </circle>
-      <text x="507.12000000000006" y="255" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RIOT</text>
+      <text x="484.44" y="219" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PFE</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="643.1999999999999" cy="180" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>RTX · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 72.0 · Score 75</title>
+      <circle cx="508.73999999999995" cy="234" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>RIOT · IDLE · AUTO_TRADE · RSI 55.4 · Score 75</title>
       </circle>
-      <text x="643.1999999999999" y="183" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RTX</text>
+      <text x="508.73999999999995" y="237" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RIOT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="372.66" cy="184.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>NOW · IDLE · AUTO_TRADE · RSI 38.6 · Score 74</title>
+      <circle cx="635.1" cy="180" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>RTX · OVERBOUGHT_WAIT_MACD · AUTO_TRADE · RSI 71.0 · Score 75</title>
       </circle>
-      <text x="372.66" y="187.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NOW</text>
+      <text x="635.1" y="183" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RTX</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="423.69" cy="220.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>LRCX · IDLE · AUTO_TRADE · RSI 44.9 · Score 74</title>
+      <circle cx="418.02" cy="202.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>LRCX · IDLE · AUTO_TRADE · RSI 44.2 · Score 74</title>
       </circle>
-      <text x="423.69" y="223.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LRCX</text>
+      <text x="418.02" y="205.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">LRCX</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="433.41" cy="238.8" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+      <circle cx="433.41" cy="220.8" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
         <title>CSCO · IDLE · MONITOR · RSI 46.1 · Score 74</title>
       </circle>
-      <text x="433.41" y="241.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CSCO</text>
+      <text x="433.41" y="223.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CSCO</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="459.33" cy="202.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>GE · IDLE · AUTO_TRADE · RSI 49.3 · Score 74</title>
+      <circle cx="453.65999999999997" cy="220.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>GE · IDLE · AUTO_TRADE · RSI 48.6 · Score 74</title>
       </circle>
-      <text x="459.33" y="205.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GE</text>
+      <text x="453.65999999999997" y="223.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GE</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="535.47" cy="202.8" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>ROKU · IDLE · MONITOR · RSI 58.7 · Score 74</title>
+      <circle cx="369.42" cy="212.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>CVNA · IDLE · MONITOR · RSI 38.2 · Score 72</title>
       </circle>
-      <text x="535.47" y="205.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ROKU</text>
+      <text x="369.42" y="215.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CVNA</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="494.16" cy="194.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>BLK · IDLE · AUTO_TRADE · RSI 53.6 · Score 72</title>
+      <circle cx="486.06" cy="248.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>BLK · IDLE · AUTO_TRADE · RSI 52.6 · Score 72</title>
       </circle>
-      <text x="494.16" y="197.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BLK</text>
+      <text x="486.06" y="251.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BLK</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="401.82000000000005" cy="235.20000000000002" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>ARM · IDLE · MONITOR · RSI 42.2 · Score 71</title>
+      <circle cx="522.51" cy="248.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>ROKU · IDLE · MONITOR · RSI 57.1 · Score 72</title>
       </circle>
-      <text x="401.82000000000005" y="238.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ARM</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="422.07" cy="253.20000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>EEM · IDLE · AUTO_TRADE · RSI 44.7 · Score 71</title>
-      </circle>
-      <text x="422.07" y="256.20000000000005" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EEM</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="598.65" cy="199.20000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>HON · APPROACHING_SHORT · AUTO_TRADE · RSI 66.5 · Score 71</title>
-      </circle>
-      <text x="598.65" y="202.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HON</text>
+      <text x="522.51" y="251.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ROKU</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="381.57" cy="240.00000000000003" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>CVNA · IDLE · MONITOR · RSI 39.7 · Score 70</title>
+      <circle cx="403.44" cy="235.20000000000002" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>ARM · IDLE · MONITOR · RSI 42.4 · Score 71</title>
       </circle>
-      <text x="381.57" y="243.00000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CVNA</text>
+      <text x="403.44" y="238.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ARM</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="381.57" cy="267.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>CRM · IDLE · AUTO_TRADE · RSI 39.7 · Score 68</title>
+      <circle cx="574.35" cy="199.20000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>HON · IDLE · AUTO_TRADE · RSI 63.5 · Score 71</title>
       </circle>
-      <text x="381.57" y="270.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CRM</text>
+      <text x="574.35" y="202.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">HON</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="419.64" cy="258" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>EEM · IDLE · AUTO_TRADE · RSI 44.4 · Score 70</title>
+      </circle>
+      <text x="419.64" y="261" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EEM</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="390.47999999999996" cy="285.59999999999997" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>PLTR · IDLE · MONITOR · RSI 40.8 · Score 68</title>
+      <circle cx="303" cy="213.59999999999997" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>AI · OVERSOLD_WAIT_MACD · MONITOR · RSI 30.0 · Score 68</title>
       </circle>
-      <text x="390.47999999999996" y="288.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PLTR</text>
+      <text x="303" y="216.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AI</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="436.65000000000003" cy="267.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLP · IDLE · AUTO_TRADE · RSI 46.5 · Score 68</title>
+      <circle cx="386.42999999999995" cy="249.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>CRM · IDLE · AUTO_TRADE · RSI 40.3 · Score 68</title>
       </circle>
-      <text x="436.65000000000003" y="270.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLP</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="482.01" cy="213.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>GS · IDLE · AUTO_TRADE · RSI 52.1 · Score 68</title>
-      </circle>
-      <text x="482.01" y="216.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GS</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="521.7" cy="267.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>SQQQ · IDLE · AUTO_TRADE · RSI 57.0 · Score 68</title>
-      </circle>
-      <text x="521.7" y="270.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SQQQ</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="580.02" cy="213.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>ABBV · IDLE · AUTO_TRADE · RSI 64.2 · Score 68</title>
-      </circle>
-      <text x="580.02" y="216.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ABBV</text>
+      <text x="386.42999999999995" y="252.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CRM</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="297.33" cy="218.39999999999998" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>AI · OVERSOLD_WAIT_MACD · MONITOR · RSI 29.3 · Score 67</title>
+      <circle cx="396.15" cy="267.59999999999997" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>PLTR · IDLE · MONITOR · RSI 41.5 · Score 68</title>
       </circle>
-      <text x="297.33" y="221.39999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AI</text>
+      <text x="396.15" y="270.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PLTR</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="376.71000000000004" cy="300" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>MCD · IDLE · AUTO_TRADE · RSI 39.1 · Score 65</title>
+      <circle cx="418.02" cy="285.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLP · IDLE · AUTO_TRADE · RSI 44.2 · Score 68</title>
       </circle>
-      <text x="376.71000000000004" y="303" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MCD</text>
+      <text x="418.02" y="288.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLP</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="522.51" cy="267.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>SQQQ · IDLE · AUTO_TRADE · RSI 57.1 · Score 68</title>
+      </circle>
+      <text x="522.51" y="270.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SQQQ</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="573.54" cy="231.59999999999997" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>ABBV · IDLE · AUTO_TRADE · RSI 63.4 · Score 68</title>
+      </circle>
+      <text x="573.54" y="234.59999999999997" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ABBV</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="484.44" cy="272.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>GS · IDLE · AUTO_TRADE · RSI 52.4 · Score 67</title>
+      </circle>
+      <text x="484.44" y="275.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GS</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="362.94" cy="246" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>MCD · IDLE · AUTO_TRADE · RSI 37.4 · Score 65</title>
+      </circle>
+      <text x="362.94" y="249" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MCD</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="419.64" cy="282" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>EWJ · IDLE · MONITOR · RSI 44.4 · Score 65</title>
+      <circle cx="418.83" cy="304.79999999999995" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>EWJ · IDLE · MONITOR · RSI 44.3 · Score 64</title>
       </circle>
-      <text x="419.64" y="285" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWJ</text>
+      <text x="418.83" y="307.79999999999995" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWJ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="470.67" cy="232.79999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>F · IDLE · AUTO_TRADE · RSI 50.7 · Score 64</title>
+      <circle cx="465.81" cy="250.79999999999998" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>F · IDLE · AUTO_TRADE · RSI 50.1 · Score 64</title>
       </circle>
-      <text x="470.67" y="235.79999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">F</text>
+      <text x="465.81" y="253.79999999999998" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">F</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="427.73999999999995" cy="309.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>DIA · IDLE · AUTO_TRADE · RSI 45.4 · Score 63</title>
+      <circle cx="418.83" cy="327.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>DIA · IDLE · AUTO_TRADE · RSI 44.3 · Score 63</title>
       </circle>
-      <text x="427.73999999999995" y="312.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIA</text>
+      <text x="418.83" y="330.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIA</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="432.6" cy="327.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>CAT · IDLE · AUTO_TRADE · RSI 46.0 · Score 63</title>
+      <circle cx="422.07" cy="237.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>CAT · IDLE · AUTO_TRADE · RSI 44.7 · Score 63</title>
       </circle>
-      <text x="432.6" y="330.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CAT</text>
+      <text x="422.07" y="240.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">CAT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="465.81" cy="255.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AMAT · IDLE · AUTO_TRADE · RSI 50.1 · Score 63</title>
+      <circle cx="455.28" cy="273.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AMAT · IDLE · AUTO_TRADE · RSI 48.8 · Score 63</title>
       </circle>
-      <text x="465.81" y="258.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMAT</text>
+      <text x="455.28" y="276.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AMAT</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="440.7" cy="206.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AXP · IDLE · AUTO_TRADE · RSI 47.0 · Score 62</title>
+      <circle cx="445.56" cy="242.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AXP · IDLE · AUTO_TRADE · RSI 47.6 · Score 62</title>
       </circle>
-      <text x="440.7" y="209.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AXP</text>
+      <text x="445.56" y="245.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AXP</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="587.31" cy="242.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>JPM · APPROACHING_SHORT · AUTO_TRADE · RSI 65.1 · Score 62</title>
+      <circle cx="581.64" cy="260.4" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>JPM · IDLE · AUTO_TRADE · RSI 64.4 · Score 62</title>
       </circle>
-      <text x="587.31" y="245.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JPM</text>
+      <text x="581.64" y="263.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">JPM</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="525.75" cy="247.20000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>IYR · IDLE · AUTO_TRADE · RSI 57.5 · Score 61</title>
+      <circle cx="305.43" cy="247.20000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLY · APPROACHING_LONG · AUTO_TRADE · RSI 30.3 · Score 61</title>
       </circle>
-      <text x="525.75" y="250.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IYR</text>
+      <text x="305.43" y="250.20000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLY</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="307.04999999999995" cy="252" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLY · APPROACHING_LONG · AUTO_TRADE · RSI 30.5 · Score 60</title>
+      <circle cx="499.8299999999999" cy="283.20000000000005" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>IYR · IDLE · AUTO_TRADE · RSI 54.3 · Score 61</title>
       </circle>
-      <text x="307.04999999999995" y="255" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLY</text>
+      <text x="499.8299999999999" y="286.20000000000005" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IYR</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="388.05" cy="324" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>MSTR · IDLE · MONITOR · RSI 40.5 · Score 60</title>
+      <circle cx="395.34" cy="288" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>MSTR · IDLE · MONITOR · RSI 41.4 · Score 60</title>
       </circle>
-      <text x="388.05" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MSTR</text>
+      <text x="395.34" y="291" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MSTR</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="413.16" cy="324" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>ADBE · IDLE · AUTO_TRADE · RSI 43.6 · Score 60</title>
+      <circle cx="405.87000000000006" cy="342" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>ADBE · IDLE · AUTO_TRADE · RSI 42.7 · Score 60</title>
       </circle>
-      <text x="413.16" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ADBE</text>
+      <text x="405.87000000000006" y="345" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">ADBE</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="426.92999999999995" cy="360" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>TNA · IDLE · AUTO_TRADE · RSI 45.3 · Score 60</title>
+      <circle cx="423.69" cy="360" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>TNA · IDLE · AUTO_TRADE · RSI 44.9 · Score 60</title>
       </circle>
-      <text x="426.92999999999995" y="363" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TNA</text>
+      <text x="423.69" y="363" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TNA</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="430.97999999999996" cy="342" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>IWM · IDLE · AUTO_TRADE · RSI 45.8 · Score 60</title>
+      </circle>
+      <text x="430.97999999999996" y="345" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IWM</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="428.55" cy="144" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>EXPE · IDLE · MONITOR · RSI 45.5 · Score 60</title>
+      <circle cx="444.75" cy="306" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>EXPE · IDLE · MONITOR · RSI 47.5 · Score 60</title>
       </circle>
-      <text x="428.55" y="147" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EXPE</text>
+      <text x="444.75" y="309" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EXPE</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="428.55" cy="144" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>META · IDLE · AUTO_TRADE · RSI 45.5 · Score 60</title>
+      <circle cx="472.29" cy="234" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>AVGO · IDLE · AUTO_TRADE · RSI 50.9 · Score 60</title>
       </circle>
-      <text x="428.55" y="147" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">META</text>
+      <text x="472.29" y="237" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AVGO</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="440.7" cy="288" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>IWM · IDLE · AUTO_TRADE · RSI 47.0 · Score 60</title>
+      <circle cx="481.2" cy="306" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>NVDA · IDLE · AUTO_TRADE · RSI 52.0 · Score 60</title>
       </circle>
-      <text x="440.7" y="291" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">IWM</text>
+      <text x="481.2" y="309" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NVDA</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="475.53000000000003" cy="288" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>AVGO · IDLE · AUTO_TRADE · RSI 51.3 · Score 60</title>
+      <circle cx="488.49" cy="324" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>TZA · IDLE · AUTO_TRADE · RSI 52.9 · Score 60</title>
       </circle>
-      <text x="475.53000000000003" y="291" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AVGO</text>
+      <text x="488.49" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TZA</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="477.96000000000004" cy="270" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>NVDA · IDLE · AUTO_TRADE · RSI 51.6 · Score 60</title>
+      <circle cx="493.35" cy="342" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>V · IDLE · AUTO_TRADE · RSI 53.5 · Score 60</title>
       </circle>
-      <text x="477.96000000000004" y="273" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NVDA</text>
+      <text x="493.35" y="345" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">V</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="485.25" cy="252" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>TZA · IDLE · AUTO_TRADE · RSI 52.5 · Score 60</title>
-      </circle>
-      <text x="485.25" y="255" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">TZA</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="486.87" cy="306" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>V · IDLE · AUTO_TRADE · RSI 52.7 · Score 60</title>
-      </circle>
-      <text x="486.87" y="309" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">V</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="493.35" cy="324" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+      <circle cx="493.35" cy="360" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
         <title>WFC · IDLE · AUTO_TRADE · RSI 53.5 · Score 60</title>
       </circle>
-      <text x="493.35" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">WFC</text>
+      <text x="493.35" y="363" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">WFC</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="515.22" cy="288" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLI · IDLE · AUTO_TRADE · RSI 56.2 · Score 60</title>
+      <circle cx="507.92999999999995" cy="306" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLI · IDLE · AUTO_TRADE · RSI 55.3 · Score 60</title>
       </circle>
-      <text x="515.22" y="291" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLI</text>
+      <text x="507.92999999999995" y="309" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLI</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="519.27" cy="306" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>FXI · IDLE · MONITOR · RSI 56.7 · Score 60</title>
+      <circle cx="512.79" cy="324" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>FXI · IDLE · MONITOR · RSI 55.9 · Score 60</title>
       </circle>
-      <text x="519.27" y="309" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">FXI</text>
+      <text x="512.79" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">FXI</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="529.8" cy="324" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLF · IDLE · AUTO_TRADE · RSI 58.0 · Score 60</title>
+      <circle cx="533.04" cy="288" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLF · IDLE · AUTO_TRADE · RSI 58.4 · Score 60</title>
       </circle>
-      <text x="529.8" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLF</text>
+      <text x="533.04" y="291" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLF</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="418.83" cy="148.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>SPY · IDLE · AUTO_TRADE · RSI 44.3 · Score 59</title>
+      <circle cx="436.65000000000003" cy="274.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>META · IDLE · AUTO_TRADE · RSI 46.5 · Score 59</title>
       </circle>
-      <text x="418.83" y="151.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SPY</text>
+      <text x="436.65000000000003" y="277.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">META</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="535.47" cy="292.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>KHC · IDLE · AUTO_TRADE · RSI 58.7 · Score 59</title>
+      <circle cx="416.4" cy="153.60000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>SPY · IDLE · AUTO_TRADE · RSI 44.0 · Score 58</title>
       </circle>
-      <text x="535.47" y="295.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">KHC</text>
+      <text x="416.4" y="156.60000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SPY</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="552.48" cy="261.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>SCHW · IDLE · AUTO_TRADE · RSI 60.8 · Score 58</title>
+      </circle>
+      <text x="552.48" y="264.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SCHW</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="392.09999999999997" cy="320.40000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>COST · IDLE · AUTO_TRADE · RSI 41.0 · Score 57</title>
+      </circle>
+      <text x="392.09999999999997" y="323.40000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">COST</text>
+    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
+      <circle cx="498.21000000000004" cy="158.40000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>KHC · IDLE · AUTO_TRADE · RSI 54.1 · Score 57</title>
+      </circle>
+      <text x="498.21000000000004" y="161.40000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">KHC</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="455.28" cy="315.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>MARA · IDLE · MONITOR · RSI 48.8 · Score 58</title>
+      <circle cx="345.93" cy="271.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>NIO · IDLE · MONITOR · RSI 35.3 · Score 56</title>
       </circle>
-      <text x="455.28" y="318.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MARA</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="569.49" cy="261.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>SCHW · IDLE · AUTO_TRADE · RSI 62.9 · Score 58</title>
-      </circle>
-      <text x="569.49" y="264.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SCHW</text>
-    </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="394.53" cy="356.40000000000003" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>COST · IDLE · AUTO_TRADE · RSI 41.3 · Score 57</title>
-      </circle>
-      <text x="394.53" y="359.40000000000003" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">COST</text>
+      <text x="345.93" y="274.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NIO</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="384.81" cy="379.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+      <circle cx="384.81" cy="343.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
         <title>EWG · IDLE · MONITOR · RSI 40.1 · Score 56</title>
       </circle>
-      <text x="384.81" y="382.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWG</text>
+      <text x="384.81" y="346.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EWG</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="315.96000000000004" cy="276" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>AAL · APPROACHING_LONG · MONITOR · RSI 31.6 · Score 55</title>
+      <circle cx="482.82" cy="379.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>MARA · IDLE · MONITOR · RSI 52.2 · Score 56</title>
       </circle>
-      <text x="315.96000000000004" y="279" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AAL</text>
+      <text x="482.82" y="382.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MARA</text>
+    </g><g class="heatmap-dot" data-tier="MONITOR">
+      <circle cx="311.1" cy="276" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>AAL · APPROACHING_LONG · MONITOR · RSI 31.0 · Score 55</title>
+      </circle>
+      <text x="311.1" y="279" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">AAL</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="545.19" cy="276" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLU · IDLE · AUTO_TRADE · RSI 59.9 · Score 55</title>
+      <circle cx="537.9" cy="312" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLU · IDLE · AUTO_TRADE · RSI 59.0 · Score 55</title>
       </circle>
-      <text x="545.19" y="279" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLU</text>
-    </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="352.40999999999997" cy="280.79999999999995" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>NIO · IDLE · MONITOR · RSI 36.1 · Score 54</title>
-      </circle>
-      <text x="352.40999999999997" y="283.79999999999995" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">NIO</text>
+      <text x="537.9" y="315" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLU</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="467.43" cy="339.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>MDLZ · IDLE · AUTO_TRADE · RSI 50.3 · Score 53</title>
+      <circle cx="448.8" cy="357.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>MDLZ · IDLE · AUTO_TRADE · RSI 48.0 · Score 53</title>
       </circle>
-      <text x="467.43" y="342.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MDLZ</text>
+      <text x="448.8" y="360.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MDLZ</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="517.65" cy="339.6" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XLRE · IDLE · AUTO_TRADE · RSI 56.5 · Score 53</title>
+      <circle cx="489.3" cy="177.60000000000002" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XLRE · IDLE · AUTO_TRADE · RSI 53.0 · Score 53</title>
       </circle>
-      <text x="517.65" y="342.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLRE</text>
+      <text x="489.3" y="180.60000000000002" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XLRE</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="475.53000000000003" cy="367.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>UVXY · IDLE · MONITOR · RSI 51.3 · Score 51</title>
+      <circle cx="396.15" cy="367.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>GME · IDLE · MONITOR · RSI 41.5 · Score 51</title>
       </circle>
-      <text x="475.53000000000003" y="370.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UVXY</text>
+      <text x="396.15" y="370.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GME</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="449.61" cy="336" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>RIVN · IDLE · MONITOR · RSI 48.1 · Score 50</title>
+      <circle cx="469.05" cy="331.2" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>UVXY · IDLE · MONITOR · RSI 50.5 · Score 51</title>
       </circle>
-      <text x="449.61" y="339" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RIVN</text>
+      <text x="469.05" y="334.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UVXY</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="392.91" cy="412.8" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>GME · IDLE · MONITOR · RSI 41.1 · Score 49</title>
+      <circle cx="443.94" cy="390" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>RIVN · IDLE · MONITOR · RSI 47.4 · Score 50</title>
       </circle>
-      <text x="392.91" y="415.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">GME</text>
+      <text x="443.94" y="393" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">RIVN</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="558.96" cy="304.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>MRK · IDLE · AUTO_TRADE · RSI 61.6 · Score 49</title>
+      <circle cx="552.48" cy="322.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>MRK · IDLE · AUTO_TRADE · RSI 60.8 · Score 49</title>
       </circle>
-      <text x="558.96" y="307.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MRK</text>
+      <text x="552.48" y="325.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">MRK</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="405.06" cy="296.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>BOIL · IDLE · MONITOR · RSI 42.6 · Score 47</title>
+      <circle cx="395.34" cy="386.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>BOIL · IDLE · MONITOR · RSI 41.4 · Score 47</title>
       </circle>
-      <text x="405.06" y="299.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BOIL</text>
+      <text x="395.34" y="389.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">BOIL</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="498.21000000000004" cy="355.20000000000005" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>KOLD · IDLE · MONITOR · RSI 54.1 · Score 46</title>
+      <circle cx="515.22" cy="355.20000000000005" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>KOLD · IDLE · MONITOR · RSI 56.2 · Score 46</title>
       </circle>
-      <text x="498.21000000000004" y="358.20000000000005" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">KOLD</text>
+      <text x="515.22" y="358.20000000000005" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">KOLD</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="416.4" cy="342" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>XHB · IDLE · AUTO_TRADE · RSI 44.0 · Score 45</title>
+      <circle cx="347.55" cy="324" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>DIS · IDLE · AUTO_TRADE · RSI 35.5 · Score 45</title>
       </circle>
-      <text x="416.4" y="345" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XHB</text>
+      <text x="347.55" y="327" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIS</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="342.69" cy="328.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>DIS · APPROACHING_LONG · AUTO_TRADE · RSI 34.9 · Score 44</title>
+      <circle cx="422.07" cy="378" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>XHB · IDLE · AUTO_TRADE · RSI 44.7 · Score 45</title>
       </circle>
-      <text x="342.69" y="331.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">DIS</text>
+      <text x="422.07" y="381" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">XHB</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="413.97" cy="387.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>UNG · IDLE · MONITOR · RSI 43.7 · Score 43</title>
+      <circle cx="401.82000000000005" cy="405.6" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>UNG · IDLE · MONITOR · RSI 42.2 · Score 43</title>
       </circle>
-      <text x="413.97" y="390.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UNG</text>
+      <text x="401.82000000000005" y="408.6" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">UNG</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="439.89" cy="388.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>SBUX · IDLE · AUTO_TRADE · RSI 46.9 · Score 39</title>
+      <circle cx="448.8" cy="334.8" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>SBUX · IDLE · AUTO_TRADE · RSI 48.0 · Score 39</title>
       </circle>
-      <text x="439.89" y="391.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SBUX</text>
+      <text x="448.8" y="337.8" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">SBUX</text>
     </g><g class="heatmap-dot" data-tier="AUTO_TRADE">
-      <circle cx="437.46000000000004" cy="421.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
-        <title>EFA · IDLE · AUTO_TRADE · RSI 46.6 · Score 36</title>
+      <circle cx="433.41" cy="421.2" r="7" fill="#39ff14" fill-opacity="0.4" stroke="#39ff14" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #39ff14)">
+        <title>EFA · IDLE · AUTO_TRADE · RSI 46.1 · Score 36</title>
       </circle>
-      <text x="437.46000000000004" y="424.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EFA</text>
+      <text x="433.41" y="424.2" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">EFA</text>
     </g><g class="heatmap-dot" data-tier="MONITOR">
-      <circle cx="439.89" cy="446.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
-        <title>PG · IDLE · MONITOR · RSI 46.9 · Score 27</title>
+      <circle cx="426.12" cy="446.4" r="7" fill="#ffaa00" fill-opacity="0.4" stroke="#ffaa00" stroke-width="1.5" style="filter: drop-shadow(0 0 8px #ffaa00)">
+        <title>PG · IDLE · MONITOR · RSI 45.2 · Score 27</title>
       </circle>
-      <text x="439.89" y="449.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PG</text>
+      <text x="426.12" y="449.4" text-anchor="middle" fill="#fff" font-size="7" font-family="Share Tech Mono, monospace" font-weight="700" pointer-events="none">PG</text>
     </g>
   </svg>
       <div style="margin-top:14px;display:flex;gap:20px;font-family:'Share Tech Mono', monospace;font-size:11px;flex-wrap:wrap;color:var(--text-dim)">
@@ -2110,7 +2027,7 @@ The 73.9% WR / 280-trade AUTO-tier 5y backtest comes from a simulated run; live 
     <strong>// CAUTION:</strong> SID is a private swing-trading strategy. Backtest performance is not a guarantee of future results. The 73.9% win rate is from a 5-year simulated backtest (280 trades, AUTO-tier 80 tickers, $200 fixed risk); live performance typically lags backtests by 5-10 percentage points due to slippage and next-day open fills. All trades carry risk of total loss. Position sizing is at 1% of account per trade — never exceed without recalculating drawdown impact. Earnings within 14 days, weekly trend reversals, and macro events can invalidate signals. This dashboard is not financial advice. Trade only what you can afford to lose.
   </div>
 
-  <footer>SID v2.4.1 // PRIVATE TERMINAL // GENERATED 2026-07-23 15:03:27 UTC</footer>
+  <footer>SID v2.4.1 // PRIVATE TERMINAL // GENERATED 2026-07-23 18:49:04 UTC</footer>
 
 </div>
 
