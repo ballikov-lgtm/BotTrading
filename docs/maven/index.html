@@ -157,7 +157,12 @@
   .radar-row.armed   .rbadge{background:var(--gold-soft);color:var(--gold);border-color:rgba(243,177,33,.4)} .radar-row.armed   .rdot{background:var(--gold);box-shadow:0 0 10px var(--gold)}
   .radar-row.armed   {background:rgba(243,177,33,.05)}
   .radar-row.watching .rbadge{background:var(--blu-soft);color:#7fb0ff;border-color:rgba(47,107,255,.4)}  .radar-row.watching .rdot{background:var(--blu);opacity:.85;box-shadow:0 0 7px var(--blu)}
-  .radar-row.gated   {opacity:.5} .radar-row.gated .rbadge{background:var(--card2);color:var(--mut);border-color:var(--line)} .radar-row.gated .rdot{background:var(--mut)}
+  .radar-row.gated .rsym,.radar-row.gated .rbadge,.radar-row.gated .rbar,.radar-row.gated .rrsi{opacity:.6} .radar-row.gated .rbadge{background:var(--card2);color:var(--mut);border-color:var(--line)} .radar-row.gated .rdot{background:var(--mut)}
+  .rgates{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .gcount{font-size:10px;font-weight:800;color:var(--mut);margin-right:2px;font-variant-numeric:tabular-nums}
+  .gchip{font-size:10px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:6px;border:1px solid;white-space:nowrap}
+  .gchip.ok{background:rgba(46,230,160,.12);color:var(--grn);border-color:rgba(46,230,160,.4)}
+  .gchip.no{background:rgba(255,92,122,.12);color:var(--red);border-color:rgba(255,92,122,.4)}
 
   /* ── RESEARCH ───────────────────────────────────── */
   .pill.regime{background:var(--blu-soft);color:#7fb0ff;border:1px solid rgba(47,107,255,.4)}
@@ -204,7 +209,7 @@
     <div class="card"><h2>Win / Loss record</h2>
       <div class="donut-card" id="donut"></div></div>
     <div class="card"><h2>Radar — coming into range</h2>
-      <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--gold)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--cyan)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet</div>
+      <div class="sub" style="margin:-4px 0 12px">Amber zone = RSI pullback (≤floor) · tick = RSI 50 · <b style="color:var(--gold)">ARMED</b> = gate open &amp; dipping · <b style="color:var(--cyan)">WATCHING</b> = trend up, waiting for a dip · <span style="color:var(--mut)">GATED</span> = no trend yet<br>Chips = the 4 entry gates (<span style="color:var(--grn)">green</span> = passed, <span style="color:var(--red)">red</span> = blocking) — a coin needs <b>all four</b> to arm</div>
       <div id="radar"></div></div>
     <div class="card"><h2>Open positions</h2><div id="open"></div></div>
     <div class="card"><h2>Watchlist</h2><div class="chips" id="watch"></div></div>
@@ -349,13 +354,20 @@ async function load(){
   renderDonut(s.closed||[]);
 
   const ORD={'IN-TRADE':0,'ARMED':1,'WATCHING':2,'GATED':3}; const scan=s.scan||{};
-  const rr=Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||(a[1].rsi-b[1].rsi));
+  const gopen=d=>(d.cross_ok?1:0)+(d.gap_ok?1:0)+(d.slope4h_up?1:0)+(d.dslope_up?1:0);
+  const rr=Object.entries(scan).sort((a,b)=>(ORD[a[1].status]??9)-(ORD[b[1].status]??9)||gopen(b[1])-gopen(a[1])||(a[1].rsi-b[1].rsi));
   document.getElementById('radar').innerHTML=rr.length?rr.map(([sym,d])=>{
     const floor=d.rsi_floor||35,rsi=Math.max(0,Math.min(100,d.rsi)),st2=d.status;
     const cls=st2==='IN-TRADE'?'intrade':st2==='ARMED'?'armed':st2==='WATCHING'?'watching':'gated';
+    let gates='';
+    if(d.cross_ok!==undefined){
+      const g=[['20&gt;200',d.cross_ok],['Gap '+fmt(d.gap_pct,1)+'%',d.gap_ok],['4h-200 '+(d.slope4h_up?'↑':'↓'),d.slope4h_up],['Day-200 '+(d.dslope_up?'↑':'↓'),d.dslope_up]];
+      const nopen=g.filter(x=>x[1]).length;
+      gates=`<div class="rgates"><span class="gcount">${nopen}/4 gates open</span>${g.map(x=>`<span class="gchip ${x[1]?'ok':'no'}">${x[0]}</span>`).join('')}</div>`;
+    }
     return `<div class="radar-row ${cls}"><div class="rsym">${esc(sym)}</div><div class="rbadge">${esc(st2)}</div>
       <div class="rbar"><div class="rzone" style="width:${floor}%"></div><div class="rtick" style="left:50%"></div><div class="rdot" style="left:${rsi}%"></div></div>
-      <div class="rrsi">RSI ${fmt(d.rsi,1)}</div></div>`;}).join(''):`<div class="empty">Scan updating on the next run…</div>`;
+      <div class="rrsi">RSI ${fmt(d.rsi,1)}</div>${gates}</div>`;}).join(''):`<div class="empty">Scan updating on the next run…</div>`;
 
   const open=Object.values(s.open||{});
   document.getElementById('open').innerHTML=open.length?`<table><tr><th>Coin</th><th>Entry</th><th>Stop</th><th>Risk $</th><th>Since</th></tr>
