@@ -3722,5 +3722,43 @@
     "closeDate": "2026-08-06",
     "closeTime": "09:00:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1785991888172",
+    "symbol": "VIRTUALUSDT",
+    "side": "long",
+    "entry": 0.57,
+    "stopLoss": 0.5567,
+    "takeProfit": 0.5796,
+    "qty": 8.835483,
+    "totalUsd": 5,
+    "openDate": "2026-08-06",
+    "openTime": "04:51:28",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.2526,
+    "exitLevel": "tp1",
+    "exitPrice": 0.5796,
+    "closeDate": "2026-08-06",
+    "closeTime": "12:30:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1786017806165",
+    "symbol": "XRPUSDT",
+    "side": "short",
+    "entry": 1.05,
+    "stopLoss": 1.0599,
+    "takeProfit": 1.0317,
+    "qty": 4.768262,
+    "totalUsd": 5,
+    "openDate": "2026-08-06",
+    "openTime": "12:03:26",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.2614,
+    "exitLevel": "tp1",
+    "exitPrice": 1.0317,
+    "closeDate": "2026-08-06",
+    "closeTime": "23:15:00",
+    "outcome": "WIN"
   }
 ]
