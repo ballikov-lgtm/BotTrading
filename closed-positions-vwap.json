@@ -4083,5 +4083,43 @@
     "closeDate": "2026-08-12",
     "closeTime": "09:45:00",
     "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1786506632498",
+    "symbol": "ONDOUSDT",
+    "side": "short",
+    "entry": 0.34,
+    "stopLoss": 0.3422,
+    "takeProfit": 0.3267,
+    "qty": 14.880952,
+    "totalUsd": 5,
+    "openDate": "2026-08-12",
+    "openTime": "03:50:32",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.5868,
+    "exitLevel": "tp1",
+    "exitPrice": 0.3267,
+    "closeDate": "2026-08-12",
+    "closeTime": "21:15:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1786506742771",
+    "symbol": "ONDOUSDT",
+    "side": "short",
+    "entry": 0.34,
+    "stopLoss": 0.3419,
+    "takeProfit": 0.3264,
+    "qty": 14.894251,
+    "totalUsd": 5,
+    "openDate": "2026-08-12",
+    "openTime": "03:52:22",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.6,
+    "exitLevel": "tp1",
+    "exitPrice": 0.3264,
+    "closeDate": "2026-08-12",
+    "closeTime": "21:15:00",
+    "outcome": "WIN"
   }
 ]
