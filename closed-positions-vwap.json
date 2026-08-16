@@ -4349,5 +4349,43 @@
     "closeDate": "2026-08-16",
     "closeTime": "02:00:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1786749336174",
+    "symbol": "BTCUSDT",
+    "side": "short",
+    "entry": 62920.2,
+    "stopLoss": 63339.4714,
+    "takeProfit": 62291.2929,
+    "qty": 0.000079,
+    "totalUsd": 4.97,
+    "openDate": "2026-08-14",
+    "openTime": "23:15:36",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.0994,
+    "exitLevel": "sl",
+    "exitPrice": 63339.4714,
+    "closeDate": "2026-08-16",
+    "closeTime": "16:30:00",
+    "outcome": "LOSS"
+  },
+  {
+    "id": "PAPER-1786810580662",
+    "symbol": "ONDOUSDT",
+    "side": "short",
+    "entry": 0.33,
+    "stopLoss": 0.3319,
+    "takeProfit": 0.3197,
+    "qty": 15.29052,
+    "totalUsd": 5,
+    "openDate": "2026-08-15",
+    "openTime": "16:16:20",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.0864,
+    "exitLevel": "sl",
+    "exitPrice": 0.3319,
+    "closeDate": "2026-08-16",
+    "closeTime": "15:00:00",
+    "outcome": "LOSS"
   }
 ]
