@@ -28,5 +28,26 @@
     "tp1_reason": "rsi50",
     "tp1_rsi": 50.07,
     "tp1_pnl_source": "alpaca_fill"
+  },
+  {
+    "id": "9c344898-9a70-4e0c-9078-56d5432519f0",
+    "symbol": "PYPL",
+    "side": "short",
+    "entry": 60.67499923706055,
+    "stopLoss": 63,
+    "shares": 17,
+    "shares_total": 17,
+    "shares_remaining": 17,
+    "orig_stop": 63,
+    "tp1_hit": false,
+    "totalUsd": 1031.47,
+    "riskUsd": 39.53,
+    "signalDate": "2026-08-13",
+    "openDate": "2026-08-17",
+    "openTime": "14:54:35",
+    "mode": "paper",
+    "strategy": "SID v2.4.1",
+    "brokerStopOrderId": null,
+    "clientOrderIdPrefix": "SID-PYPL-20260813-short"
   }
 ]
