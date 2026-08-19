@@ -4691,5 +4691,43 @@
     "closeDate": "2026-08-18",
     "closeTime": "14:30:00",
     "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1787052768121",
+    "symbol": "LINKUSDT",
+    "side": "long",
+    "entry": 9.46,
+    "stopLoss": 9.3261,
+    "takeProfit": 9.6634,
+    "qty": 0.528485,
+    "totalUsd": 5,
+    "openDate": "2026-08-18",
+    "openTime": "11:32:48",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": 0.3225,
+    "exitLevel": "tp1",
+    "exitPrice": 9.6634,
+    "closeDate": "2026-08-19",
+    "closeTime": "03:15:00",
+    "outcome": "WIN"
+  },
+  {
+    "id": "PAPER-1787057368809",
+    "symbol": "LINKUSDT",
+    "side": "short",
+    "entry": 9.43,
+    "stopLoss": 9.5654,
+    "takeProfit": 9.237,
+    "qty": 0.529998,
+    "totalUsd": 5,
+    "openDate": "2026-08-18",
+    "openTime": "12:49:28",
+    "strategy": "VWAP Scalper v1.3",
+    "realizedPnl": -0.2154,
+    "exitLevel": "sl",
+    "exitPrice": 9.5654,
+    "closeDate": "2026-08-19",
+    "closeTime": "03:00:00",
+    "outcome": "LOSS"
   }
 ]
