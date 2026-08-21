@@ -4236,6 +4236,10 @@
     {
       "t": "2026-08-20 23:50 UTC",
       "equity": 1003.89
+    },
+    {
+      "t": "2026-08-21 01:04 UTC",
+      "equity": 1003.89
     }
   ],
   "watchlist": [
@@ -4250,7 +4254,7 @@
     "SEIUSDT",
     "TRXUSDT"
   ],
-  "last_run": "2026-08-20 23:50 UTC",
+  "last_run": "2026-08-21 01:04 UTC",
   "events_last_run": [],
   "stats": {
     "closed_trades": 1,
@@ -4262,21 +4266,33 @@
   },
   "scan": {
     "ETHUSDT": {
-      "rsi": 93.0,
-      "price": 2252.9,
-      "gap_pct": 2.4,
+      "rsi": 93.6,
+      "price": 2327.06,
+      "gap_pct": 7.9,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": true,
-      "gap_ok": false,
+      "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": false,
       "status": "GATED"
     },
     "SOLUSDT": {
-      "rsi": 88.9,
-      "price": 85.39,
-      "gap_pct": 2.6,
+      "rsi": 85.8,
+      "price": 87.65,
+      "gap_pct": 6.6,
+      "rsi_floor": 35,
+      "gate_open": false,
+      "cross_ok": true,
+      "gap_ok": true,
+      "slope4h_up": true,
+      "dslope_up": false,
+      "status": "GATED"
+    },
+    "XRPUSDT": {
+      "rsi": 84.1,
+      "price": 1.268,
+      "gap_pct": 0.6,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": true,
@@ -4285,58 +4301,46 @@
       "dslope_up": false,
       "status": "GATED"
     },
-    "XRPUSDT": {
-      "rsi": 86.2,
-      "price": 1.1058,
-      "gap_pct": 4.5,
-      "rsi_floor": 35,
-      "gate_open": false,
-      "cross_ok": false,
-      "gap_ok": true,
-      "slope4h_up": false,
-      "dslope_up": false,
-      "status": "GATED"
-    },
     "SUIUSDT": {
-      "rsi": 71.3,
-      "price": 0.7059,
-      "gap_pct": 4.6,
+      "rsi": 70.5,
+      "price": 0.7339,
+      "gap_pct": 2.7,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
-      "gap_ok": true,
+      "gap_ok": false,
       "slope4h_up": false,
       "dslope_up": false,
       "status": "GATED"
     },
     "VIRTUALUSDT": {
-      "rsi": 68.9,
-      "price": 0.6081,
-      "gap_pct": 0.7,
+      "rsi": 71.5,
+      "price": 0.6442,
+      "gap_pct": 2.6,
       "rsi_floor": 35,
       "gate_open": false,
-      "cross_ok": false,
+      "cross_ok": true,
       "gap_ok": false,
       "slope4h_up": false,
       "dslope_up": false,
       "status": "GATED"
     },
     "HYPEUSDT": {
-      "rsi": 83.7,
-      "price": 69.702,
-      "gap_pct": 5.7,
+      "rsi": 83.4,
+      "price": 73.673,
+      "gap_pct": 12.0,
       "rsi_floor": 35,
-      "gate_open": false,
+      "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
-      "slope4h_up": false,
+      "slope4h_up": true,
       "dslope_up": true,
-      "status": "GATED"
+      "status": "WATCHING"
     },
     "APTUSDT": {
-      "rsi": 71.3,
-      "price": 0.5614,
-      "gap_pct": 8.6,
+      "rsi": 71.5,
+      "price": 0.5762,
+      "gap_pct": 6.1,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -4346,9 +4350,9 @@
       "status": "GATED"
     },
     "FETUSDT": {
-      "rsi": 64.7,
-      "price": 0.1312,
-      "gap_pct": 13.4,
+      "rsi": 76.8,
+      "price": 0.1431,
+      "gap_pct": 10.1,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -4358,9 +4362,9 @@
       "status": "GATED"
     },
     "SEIUSDT": {
-      "rsi": 67.7,
-      "price": 0.04123,
-      "gap_pct": 7.1,
+      "rsi": 76.8,
+      "price": 0.04369,
+      "gap_pct": 5.1,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
@@ -4370,9 +4374,9 @@
       "status": "GATED"
     },
     "TRXUSDT": {
-      "rsi": 58.3,
-      "price": 0.33459,
-      "gap_pct": 0.9,
+      "rsi": 60.2,
+      "price": 0.33749,
+      "gap_pct": 1.2,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": true,
