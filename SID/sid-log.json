@@ -1,5 +1,39 @@
 [
   {
+    "timestamp": "2026-08-25T15:21:18.766Z",
+    "symbol": "ABT",
+    "signal": "short",
+    "entry": 115.36000061035156,
+    "stopLoss": 118,
+    "shares": 8,
+    "totalUsd": 922.88,
+    "riskUsd": 21.12,
+    "rsiAtSignal": 77.84,
+    "rsiAtEntry": 71.93,
+    "signalDate": "2026-08-24",
+    "earningsDates": [],
+    "orderId": "93fe9b4b-8bc3-4305-aac6-11cb138c1d47",
+    "reason": "RSI armed short (RSI 77.8) on 2026-08-24 → RSI(71.9) & MACD both down, 1d into 3d arm"
+  },
+  {
+    "timestamp": "2026-08-25T15:21:17.986Z",
+    "symbol": "ABBV",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-08-25T15:21:17.490Z",
+    "symbol": "AAPL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-08-25T15:21:16.977Z",
+    "symbol": "AAL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
     "timestamp": "2026-08-24T15:10:46.963Z",
     "symbol": "XOM",
     "signal": null,
@@ -2985,30 +3019,6 @@
   {
     "timestamp": "2026-08-18T15:02:11.925Z",
     "symbol": "LLY",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-08-18T15:02:11.432Z",
-    "symbol": "LCID",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-08-18T15:02:10.974Z",
-    "symbol": "KOLD",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-08-18T15:02:10.536Z",
-    "symbol": "KHC",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-08-18T15:02:10.013Z",
-    "symbol": "JPM",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }

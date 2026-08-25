@@ -51,5 +51,26 @@
     "clientOrderIdPrefix": "SID-PYPL-20260813-short",
     "manual_watch": true,
     "manual_watch_reason": "bullish-asset short — plan an S/R exit for the runner after TP1"
+  },
+  {
+    "id": "93fe9b4b-8bc3-4305-aac6-11cb138c1d47",
+    "symbol": "ABT",
+    "side": "short",
+    "entry": 115.36000061035156,
+    "stopLoss": 118,
+    "shares": 8,
+    "shares_total": 8,
+    "shares_remaining": 8,
+    "orig_stop": 118,
+    "tp1_hit": false,
+    "totalUsd": 922.88,
+    "riskUsd": 21.12,
+    "signalDate": "2026-08-24",
+    "openDate": "2026-08-25",
+    "openTime": "15:21:18",
+    "mode": "paper",
+    "strategy": "SID v2.4.1",
+    "brokerStopOrderId": null,
+    "clientOrderIdPrefix": "SID-ABT-20260824-short"
   }
 ]
