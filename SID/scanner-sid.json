@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-08-31T22:02:27.884Z",
+  "scanDate": "2026-09-01T00:40:47.034Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
-  "tickersWithError": 0,
-  "elapsedMs": 306930,
+  "tickersWithError": 1,
+  "elapsedMs": 288487,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -194,7 +194,7 @@
       "dailySma200": 180.01,
       "rsi50Target": 197.33,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "LCID",
@@ -376,7 +376,7 @@
       "dailySma200": 151.35,
       "rsi50Target": 165.5,
       "note": null,
-      "transitionedFrom": "OVERBOUGHT_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "NIO",
@@ -402,7 +402,7 @@
       "dailySma200": 5.26,
       "rsi50Target": 4.58,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "MSTR",
@@ -1078,7 +1078,7 @@
       "dailySma200": 219.94,
       "rsi50Target": 218.75,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "AMC",
@@ -2381,32 +2381,6 @@
       "transitionedFrom": null
     },
     {
-      "symbol": "AAL",
-      "status": "IDLE",
-      "direction": null,
-      "score": 57,
-      "scoreBreakdown": {
-        "weeklyTrendDirection": 1.8,
-        "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 15,
-        "historicalExtremes": 0,
-        "meanReversionActive": 20
-      },
-      "weeklyTrend": "choppy",
-      "rsi": 36,
-      "macdDirection": "falling",
-      "weeklyAdx": 17.8,
-      "choppinessIdx": 34.3,
-      "daysToEarnings": null,
-      "earningsBlackout": false,
-      "lastClose": 13.430000305175781,
-      "dailySma50": 15.56,
-      "dailySma200": 13.92,
-      "rsi50Target": 14.52,
-      "note": null,
-      "transitionedFrom": null
-    },
-    {
       "symbol": "MARA",
       "status": "IDLE",
       "direction": null,
@@ -2925,6 +2899,10 @@
       "rsi50Target": 20.47,
       "note": null,
       "transitionedFrom": null
+    },
+    {
+      "symbol": "AAL",
+      "error": "1 Failed download:\n['AAL']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')"
     }
   ]
 }
