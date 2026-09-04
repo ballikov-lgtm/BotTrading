@@ -154,12 +154,29 @@ Always: `git fetch origin main` → `git pull --rebase --autostash origin main` 
 **Never push to `main` without explicit user approval.** The auto-mode classifier blocks silent pushes.
 
 ### Git credential hygiene — never embed a PAT in the remote URL
-Fixed 2026-06-29. The `origin` URL had a classic PAT (`bot-push`, repo+workflow, **no expiry**) embedded in plaintext (`https://<token>@github.com/...`). It lived in `.git/config` — not committed, so never leaked to the repo, but readable by anything with disk access.
+Fixed 2026-06-29. The `origin` URL previously had a personal access token embedded in
+plaintext (`https://<token>@github.com/...`), living in `.git/config`. It was never
+committed, so it did not reach the repo — but it was readable by anything with disk
+access, and trivially leaked by accident.
 
-**Correct setup (now in place on Alan's machine):** clean remote URL + **Git Credential Manager**, which is already the active helper system-wide (`C:/Program Files/Git/etc/gitconfig`, `credential.helper=manager`). GCM reads a stored GitHub credential from Windows Credential Manager and authenticates pushes silently — interactive AND non-interactive. The migration was just: `git remote set-url origin https://github.com/ballikov-lgtm/BotTrading.git` (no helper config needed — GCM was already system-wide).
-- **Never re-embed a token in a remote URL.** If auth breaks, the next push pops a one-time GCM sign-in; complete it once and it re-saves.
-- `cmdkey /list` can show NOTHING from a sandboxed shell even when credentials exist — shell-context limitation, not an empty vault. Verify from a normal terminal (`cmdkey /list | findstr github`) or the Credential Manager GUI.
-- The `bot-push` PAT is **pending rotation** (no expiry). Rotating invalidates the GCM-stored copy too → next push re-prompts (expected). Check Railway (`GITHUB_TOKEN`) / other machines for the same token BEFORE regenerating. (Cross-session note: user-memory `reference-git-credential-setup`.)
+**Correct setup (now in place):** a clean remote URL plus a system credential helper,
+which authenticates pushes silently in both interactive and non-interactive contexts.
+The migration was simply `git remote set-url origin https://github.com/ballikov-lgtm/BotTrading.git`.
+- **Never re-embed a token in a remote URL.** If auth breaks, complete the one-time
+  helper sign-in prompt and it re-saves.
+- `cmdkey /list` can show NOTHING from a sandboxed shell even when credentials exist —
+  a shell-context limitation, not an empty vault. Verify from a normal terminal or the
+  Credential Manager GUI.
+- **NEVER document credential specifics in this file — it is PUBLIC.** No token names,
+  scopes, expiry status, rotation state, or storage locations. Those belong only in the
+  private user-memory outside the repo. (Learned 2026-09-04: this section previously
+  advertised a non-expiring high-privilege token as unrotated — a target map for anyone
+  reading the public repo.)
+- **Secrets belong in `.env` (gitignored) and GitHub Secrets — never as a
+  `|| '<literal>'` fallback in code.** A hardcoded BitGet key/secret/passphrase triple
+  was committed here on 2026-05-10 and sat public for ~16 weeks before being revoked on
+  2026-09-04. Enable GitHub secret scanning + push protection so this is blocked at push
+  time rather than caught by audit.
 
 ### OneDrive stale `.git/config.lock` blocks config writes
 Sister issue to the stale `rebase-merge` dir. OneDrive can leave a stale `.git/config.lock` (repo root is `Trading Setup/.git`) that makes `git config` / `git remote set-url` fail with `could not lock config file ... File exists` — even when **no git.exe is running** (check `tasklist | grep -i git.exe`). If no git process is active, the lock is stale: `rm -f .git/config.lock` and retry. Seen 2026-06-29 with a 3-week-old lock.

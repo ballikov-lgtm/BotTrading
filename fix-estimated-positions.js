@@ -22,9 +22,19 @@ import fs        from 'fs';
 import crypto    from 'crypto';
 import { execSync } from 'child_process';
 
-const API_KEY    = process.env.BITGET_API_KEY    || 'bg_46c0aaf2c28b996a642a39f437a6f9dc';
-const SECRET     = process.env.BITGET_SECRET_KEY || '8008e0da0054e9878df767be2f67ddd5d3b9be20f228eaca229cbf7ec126dc8c';
-const PASSPHRASE = process.env.BITGET_PASSPHRASE || 'P4VlOvN4T4BeLkO';
+const API_KEY    = process.env.BITGET_API_KEY;
+const SECRET     = process.env.BITGET_SECRET_KEY;
+const PASSPHRASE = process.env.BITGET_PASSPHRASE;
+
+// SECURITY (2026-09-04): BitGet credentials come ONLY from the environment
+// (.env / GitHub Secrets). NEVER add a `|| '<literal>'` fallback here — a hardcoded
+// key/secret/passphrase triple was committed to this PUBLIC repo on 2026-05-10 and
+// sat exposed for ~16 weeks before being revoked. Fail loudly, never fall back.
+if (!process.env.BITGET_API_KEY || !process.env.BITGET_SECRET_KEY || !process.env.BITGET_PASSPHRASE) {
+  console.error('[FATAL] Missing BitGet credentials. Set BITGET_API_KEY, BITGET_SECRET_KEY and BITGET_PASSPHRASE in .env — never hardcode them.');
+  process.exit(1);
+}
+
 const BASE       = 'https://api.bitget.com';
 const CLOSED_PATH = 'closed-positions-ironclad.json';
 
