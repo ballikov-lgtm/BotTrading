@@ -1,5 +1,29 @@
 [
   {
+    "timestamp": "2026-09-04T16:41:54.327Z",
+    "kind": "external_close_recorded",
+    "symbol": "PYPL",
+    "sharesClosed": 8,
+    "exitPrice": 53.4775,
+    "pnl": 57.58,
+    "reason": "full_external_fill",
+    "isFullClose": true,
+    "fillsUsed": [
+      {
+        "orderId": "e903f7c2-c66d-4194-a73c-2868b804d3dc",
+        "filledAt": "2026-09-03T18:10:14.671498Z",
+        "qty": 2,
+        "price": 56.71
+      },
+      {
+        "orderId": "b312909a-772e-418b-a2c0-690fb1ff8130",
+        "filledAt": "2026-09-01T19:40:16.201083Z",
+        "qty": 6,
+        "price": 52.4
+      }
+    ]
+  },
+  {
     "timestamp": "2026-09-03T17:58:34.045Z",
     "symbol": "XOM",
     "signal": null,
@@ -3009,12 +3033,6 @@
   {
     "timestamp": "2026-08-27T23:52:29.247Z",
     "symbol": "JPM",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-08-27T23:52:28.834Z",
-    "symbol": "JNUG",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
