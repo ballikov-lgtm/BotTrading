@@ -401,6 +401,44 @@ class AlpacaExecutor {
   }
 
   /**
+   * v2.4.2 — Cancel EVERY open order on ONE symbol, whatever placed it: SID-tagged
+   * (`-stop`/`-tp1`/`-restop`), the entry `-stop`, OR a MANUAL/external order the
+   * user placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag →
+   * invisible to findOpenOrder + pos.brokerStopOrderId). Such a manual order would
+   * otherwise keep "holding" the shares, so waitForNoOpenOrders never reaches zero
+   * and the close/reset fails `insufficient qty available: 0`. Call this in the
+   * cancel-first step of any close/reset, BEFORE waitForNoOpenOrders.
+   *
+   * SYMBOL-SCOPED — the listOrders query is filtered to `symbol` AND every order is
+   * re-checked against `symbol` before cancel, so it can NEVER touch another symbol's
+   * orders. Per-order try/catch so one failure can't abort the sweep.
+   *
+   * @returns {number} count of orders it cancelled (or attempted)
+   */
+  async cancelAllOpenOrders(symbol) {
+    let orders = [];
+    try {
+      orders = await this.client.listOrders({ status: 'open', symbols: symbol, limit: 50 });
+    } catch (err) {
+      this.log.log(`    [Alpaca:${this.mode}] cancelAllOpenOrders listOrders failed for ${symbol}: ${err.message}`);
+      return 0;
+    }
+    let n = 0;
+    for (const o of (orders || [])) {
+      if (!o || !o.id) continue;
+      if (o.symbol && o.symbol !== symbol) continue;   // symbol-scoped guard — never touch another symbol
+      try {
+        await this.cancelOrderById(o.id);   // 404/422-tolerant (already-gone is fine)
+        n++;
+      } catch (err) {
+        this.log.log(`    [Alpaca:${this.mode}] cancelAllOpenOrders could not cancel ${o.id} on ${symbol}: ${err.message}`);
+      }
+    }
+    if (n) this.log.log(`    [Alpaca:${this.mode}] Swept ${n} open order(s) on ${symbol} before close/reset`);
+    return n;
+  }
+
+  /**
    * Poll an order until it reaches a terminal state (filled/canceled/rejected)
    * or timeout. Returns the last order snapshot seen. Used to CONFIRM the TP1
    * partial-close market order actually filled before we re-place the BE stop

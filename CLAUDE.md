@@ -177,6 +177,11 @@ The SID worktree lives at `.claude/worktrees/silly-robinson-abcf6c/SID/`. The pa
 
 Without both, the action fails with `No file in /home/runner/work/... matched to [**/requirements.txt or **/pyproject.toml]`. Cost the SID dashboard 6 days of downtime on 2026-05-18.
 
+### GitHub Actions scheduled crons can be DELAYED by hours — add redundant runs for time-critical trades
+GHA `schedule:` crons are **best-effort, not guaranteed on time** — under GitHub load they can start hours late. This is a real trade-execution hazard, not cosmetic. Confirmed on SID 2026-08: a single daily cron at `'35 14 * * 1-5'` (14:35 UTC, mid-session) actually started **23:51 UTC (Aug 27), 23:37 (Aug 28), 20:15 (Aug 31)** — every one AFTER the 20:00 UTC US market close. On a closed-market run the Alpaca executor refuses every order (`Market closed — refusing to submit ...`), so exits (TP1/TP2) and entries are silently skipped — a ripe SID TP1 never banked because no run landed in-hours.
+
+**Rule:** for any bot whose orders must land inside a market window, schedule **multiple staggered crons across the window** (SID now runs 14:35 / 16:35 / 18:35 UTC) so a multi-hour delay on one still leaves ≥1 run in-hours — but ONLY if the bot is **idempotent across same-day runs** (single-fire exit guards that persist in committed state, open-symbol + per-calendar-day entry caps, de-duped notification/approval queues). Verify idempotency BEFORE adding crons; if a path re-fires (e.g. an alert sent every run), guard it first. See `SID/CLAUDE.md` § "CRON REDUNDANCY" for the full idempotency audit + the notification de-dupe guard. (Distinct from the "use GHA cron not local schedulers" rule below — that's about WHERE trades fire; this is about the cron being LATE.)
+
 ### Dashboard commit-message glossary
 Different workflows write different commit messages — don't confuse them when grepping git log:
 

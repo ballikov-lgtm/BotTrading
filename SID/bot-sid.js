@@ -105,9 +105,54 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.4.1'; // V2.4.1 ACCOUNTING RECONCILE (NOT a signal-logic change): (1) per-close real-fill booking — TP1 (Branch A), TP2 (Branch B), and recordExternalClose now book the CONFIRMED Alpaca filled_avg_price (from pollOrderFill / the closed-order fills) instead of the simulated bar/SMA trigger price; every closed record is stamped pnl_source ('alpaca_fill' when the real fill was read, 'estimate' on fallback) + mode. Falls back to the bar/SMA estimate only when the real fill is unavailable (never silently wrong). (2) The ledger (sid-account.json realizedPnl/tradeCount/accountUsd) is now RE-DERIVED from the on-disk records every close (realizedPnl = Σ closed records of the account's mode + Σ in-flight TP1 partials of that mode; tradeCount = distinct closed records of that mode; accountUsd = startingUsd + realizedPnl) instead of a running `+=` counter — so a deleted/edited record can NEVER leave a phantom loss again (the exact drift the account reconcile fixed retroactively: MCD phantom -$78.14 + inflated tradeCount). PAPER/LIVE SEGREGATED: the ledger sums ONLY the current mode's records; the other mode's records are ignored (a future live ledger starts fresh, mode:live, and never mixes with paper). NO canon rule change — the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout exits, share math, cancel-first stop logic, entry/arm/scan logic are all byte-for-byte unchanged; only the exit PRICE source + the ledger DERIVATION changed. Pairs with reconcile-account.js + alpaca-account-sid.json + the dashboard re-point at real Alpaca paper equity. (paper trading, 2026-07-18)
+const BOT_VERSION = 'v2.4.2'; // V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbing, NOT a signal-logic change): a v2.2 SHORT's intraday TP1 had no working exit — maintainV2_2BrokerOrders left the full-size entry stop holding ALL shares (it cancelled the wrong id after a blind 800ms sleep, and findOpenOrder's endsWith('-stop')/('-tp1') MISSED the timestamped re-placed orders — the twin of the v2.2.6 closePosition bug), so the runner stop + TP1 OCO failed `insufficient qty available: 0` and, because Branch A skips the daily-poll TP1 for v2.2 shorts, the short could never bank TP1 (live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open). FIX: (1) findOpenOrder matches `<suffix>(-\\d+)?$` so timestamped re-places are found; (2) maintain cancels the resting stop by the TRACKED pos.brokerStopOrderId (robust to any client_order_id) + the suffix-found stop + (pre-TP1 short) any resting TP1 OCO, WAITS for release via waitForNoOpenOrders (not a sleep), then places the runner-only stop; (3) the TP1 half is placed as the OCO buy-limit at the RSI-50 target with shares now free — where price has already passed the target (PYPL) it is marketable → fills → banks TP1. (4) Before ANY close/reset the bot sweeps ALL open orders on that ONE symbol (new executor.cancelAllOpenOrders) — incl. a MANUAL break-even stop placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag) that the tracked-id/suffix cancels can't see and that would otherwise hold the shares + hang waitForNoOpenOrders. Symbol-scoped (never other symbols). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan all byte-for-byte unchanged; the v2.2.5/2.2.6 cancel-first CLOSE mechanics untouched — only a broader symbol-scoped sweep added ahead of them). Ships with the sid.yml cron-redundancy change. (paper trading, 2026-09-01)
+// V2.4.1 ACCOUNTING RECONCILE (NOT a signal-logic change): (1) per-close real-fill booking — TP1 (Branch A), TP2 (Branch B), and recordExternalClose now book the CONFIRMED Alpaca filled_avg_price (from pollOrderFill / the closed-order fills) instead of the simulated bar/SMA trigger price; every closed record is stamped pnl_source ('alpaca_fill' when the real fill was read, 'estimate' on fallback) + mode. Falls back to the bar/SMA estimate only when the real fill is unavailable (never silently wrong). (2) The ledger (sid-account.json realizedPnl/tradeCount/accountUsd) is now RE-DERIVED from the on-disk records every close (realizedPnl = Σ closed records of the account's mode + Σ in-flight TP1 partials of that mode; tradeCount = distinct closed records of that mode; accountUsd = startingUsd + realizedPnl) instead of a running `+=` counter — so a deleted/edited record can NEVER leave a phantom loss again (the exact drift the account reconcile fixed retroactively: MCD phantom -$78.14 + inflated tradeCount). PAPER/LIVE SEGREGATED: the ledger sums ONLY the current mode's records; the other mode's records are ignored (a future live ledger starts fresh, mode:live, and never mixes with paper). NO canon rule change — the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout exits, share math, cancel-first stop logic, entry/arm/scan logic are all byte-for-byte unchanged; only the exit PRICE source + the ledger DERIVATION changed. Pairs with reconcile-account.js + alpaca-account-sid.json + the dashboard re-point at real Alpaca paper equity. (paper trading, 2026-07-18)
 // V2.4.0 PDT-SAFE EXECUTION MODE (new opt-in execution mode, NOT a signal-logic change): adds SID_PDT_SAFE (default FALSE = the standard "PDT version" with broker GTC stops + resting intraday short-TP1 limit). When SID_PDT_SAFE=true, the bot places NO broker order that can fire intraday same-day — it SKIPS maintainV2_2BrokerOrders entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does not place the entry-time broker stop, for BOTH the normal entry path (openEntryNoStop) AND the approved-entry path (approve-trade.js). PDT-safe positions carry pdt_safe:true + brokerStopOrderId:null → isV2_2Position()===false → they are managed SOLELY by the daily-poll in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach → market close at the NEXT run's open). GUARANTEE: because checkPositions only scans bars strictly AFTER the entry date, runs AFTER the entry loop adds the position, and there are no broker orders, no exit can fire on the same calendar day as entry → PDT-immune (v2.0's original design, restored as opt-in for sub-$25K margin accounts, which SID's shorts require). Standard mode (pdtSafe=false) is byte-for-byte unchanged. Honest trade-offs: no intraday stop (a hard mid-day move isn't cut until the next run's open → gap/slippage, ~few-% profit reduction) and a missed run leaves a position unprotected longer. The fresh installer (SID-DEPLOY-PROMPT.md Step 8) now asks the follower's funding size and branches: $25K+ → PDT version (SID_PDT_SAFE=false); under $25K → PDT-safe (true). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
 // Version history:
+//   v2.4.2 SHORTS-TP1 OCO FIX (2026-09-01, paper trading):
+//        - ROOT CAUSE: a v2.2 SHORT's intraday TP1 relies SOLELY on the resting
+//          broker OCO — checkPositions Branch A `continue`s past the daily-poll TP1
+//          for v2.2 shorts (line ~1863). maintainV2_2BrokerOrders was meant to
+//          reduce the full-size entry stop to the runner half and place the TP1 OCO
+//          on the freed half, but (a) it cancelled `existingStop.id` from a suffix
+//          scan that used endsWith('-stop') and so MISSED every timestamped
+//          re-placed stop (`${prefix}-stop-${ts}`) — the twin of the v2.2.6
+//          closePosition bug — and (b) used a fixed 800ms sleep instead of waiting
+//          for share release. So the full-size stop kept holding ALL shares and both
+//          the runner stop AND the TP1 OCO failed `insufficient qty available: 0`
+//          (only console.warn'd) → the short had NO working TP1 mechanism at all.
+//          Live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open for days.
+//        - FIX (1) findOpenOrder now matches `<suffix>(-\\d+)?$` so bare AND
+//          timestamped `-stop`/`-tp1` are found. `-restop-<ts>` is intentionally NOT
+//          matched — it's cancelled directly via the tracked brokerStopOrderId.
+//        - FIX (2) maintain stop reset: cancel the TRACKED pos.brokerStopOrderId by
+//          id (robust to ANY client_order_id) + the suffix-found stop + (pre-TP1
+//          short) any resting TP1 OCO, then waitForNoOpenOrders (real release, not a
+//          sleep), then place the runner-only stop (shares_total − tp1). Resets only
+//          when the stop is missing / wrong-size / wrong-price → no steady-state churn.
+//        - FIX (3) the TP1 half is placed as the existing OCO buy-limit at the RSI-50
+//          target with its shares now free. Where price has already passed the target
+//          (short in profit beyond RSI-50), the buy-limit is marketable → fills
+//          immediately → banks TP1 (catch-up).
+//        - FIX (4) SYMBOL-SWEEP before ANY close/reset: new
+//          executor.cancelAllOpenOrders(symbol) cancels EVERY open order on the ONE
+//          symbol — SID-tagged AND a MANUAL/external order (e.g. a break-even stop the
+//          user placed via the Alpaca UI: Alpaca-generated client_order_id, no SID tag
+//          → invisible to the tracked-id + suffix cancels). Such an order would else
+//          hold the shares and hang waitForNoOpenOrders → `insufficient qty available:
+//          0`. Wired into maintain's reset AND both close branches (TP1 Branch A, TP2
+//          Branch B). Symbol-scoped (re-checks each order's symbol before cancel) +
+//          per-order try/catch so one failure can't abort the sweep.
+//        - PYPL VALIDATION: on the next market-hours maintain run the 17-share stop
+//          → 9-share runner stop + 8-share TP1 OCO @ the RSI-50 target; the OCO is
+//          marketable → fills → TP1 banks; syncPositions marks tp1_hit + BE next run.
+//        - Also fixes latent twins the same regex miss caused: the short TP1 OCO
+//          re-price/dedup (existingTp1 was never found), and long post-TP1 BE-stop
+//          maintenance (the timestamped BE stop was never matched).
+//        - NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2
+//          SMA50/200/BE/timeout, share math, entry/arm/scan all untouched); the
+//          v2.2.5/2.2.6 cancel-first CLOSE paths are byte-for-byte untouched. Broker
+//          -order plumbing only. Ships with the cron-redundancy sid.yml change.
 //   v2.4.0 PDT-SAFE EXECUTION MODE (2026-07-17, paper trading):
 //        - MOTIVATION: the standard bot places broker GTC stops + a resting intraday
 //          short-TP1 limit from entry (maintainV2_2BrokerOrders). Those CAN fill the
@@ -936,11 +981,23 @@ function isV2_2Position(pos) {
 
 /** Find an open Alpaca order by client_order_id suffix (e.g. "-tp1" or "-stop"). */
 async function findOpenOrder(alpacaClient, symbol, clientOrderIdSuffix) {
+  // v2.4.2 FIX — match the suffix at end-of-id OR immediately before a trailing
+  // `-<digits>`. placeStop()/maintainV2_2BrokerOrders() label RE-PLACED orders
+  // `${prefix}-stop-${Date.now()}` / `${prefix}-tp1-${Date.now()}`, so the old
+  // `endsWith('-stop')` / `endsWith('-tp1')` MISSED every re-placed order (they end
+  // in digits) — the exact twin of the v2.2.6 closePosition `-stop` bug. That miss
+  // is why maintain lost track of its own reduced stop, fell into the placement
+  // branch, and hit `insufficient qty available: 0` on the v2.2 short. Now
+  // `-stop(-\d+)?$` matches both the bare entry stop AND the timestamped re-places.
+  // NOTE: `-restop-<ts>` (the re-protect tag) is deliberately NOT matched here — it
+  // is cancelled directly via the tracked pos.brokerStopOrderId in the callers.
+  const escaped = clientOrderIdSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`${escaped}(-\\d+)?$`);
   try {
     const orders = await alpacaClient.listOrders({ status: 'open', symbols: symbol, limit: 50 });
     return (orders || []).find(o =>
       o && typeof o.client_order_id === 'string' &&
-      o.client_order_id.endsWith(clientOrderIdSuffix)
+      re.test(o.client_order_id)
     );
   } catch (err) {
     console.warn(`[V2.2] findOpenOrder failed for ${symbol}: ${err.message}`);
@@ -993,8 +1050,45 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
     if (runnerShares >= 1) stopShares = runnerShares;
   }
 
-  if (!existingStop) {
+  // ── (Re)establish the resting stop at the correct size/price ──────────────
+  // v2.4.2 ROBUST RESET — fixes the "insufficient qty available: 0" trap that left
+  // a v2.2 SHORT with a full-size entry stop holding ALL shares, so the runner stop
+  // + TP1 OCO could never be placed → the short had NO working TP1 (Branch A skips
+  // the daily-poll TP1 for v2.2 shorts). The OLD code cancelled `existingStop.id` (a
+  // suffix scan that MISSED timestamped stops) then slept a fixed 800ms — under a
+  // pending_cancel / closed-market race the re-submit hit `insufficient qty` and only
+  // console.warn'd. NOW: cancel the TRACKED stop BY ID (robust to ANY client_order_id,
+  // incl. -restop / timestamped), then the suffix-found stop, then — for a pre-TP1
+  // SHORT — any resting TP1 OCO, then WAIT for Alpaca to actually release the shares
+  // (waitForNoOpenOrders, not a blind sleep), THEN place the correctly-sized stop.
+  // The TP1 OCO (short) is re-placed in the section below once its shares are free.
+  const existingStopPrice = existingStop ? parseFloat(existingStop.stop_price) : null;
+  const existingStopQty   = existingStop ? parseInt(existingStop.qty, 10)      : null;
+  const stopPriceOk = existingStop && Math.abs(existingStopPrice - expectedStopPrice) <= V2_2_PRICE_DRIFT_TOLERANCE;
+  const stopQtyOk   = existingStop && existingStopQty === stopShares;
+
+  if (!existingStop || !stopPriceOk || !stopQtyOk) {
+    if (existingStop) {
+      console.log(`  [V2.2] Resetting stop for ${pos.symbol}: ${existingStopQty}sh @ $${existingStopPrice} → ${stopShares}sh @ $${expectedStopPrice}`);
+    }
     try {
+      // (1) Free the shares reliably before placing the correctly-sized stop.
+      if (pos.brokerStopOrderId) await executor.cancelOrderById(pos.brokerStopOrderId);
+      if (existingStop && existingStop.id !== pos.brokerStopOrderId) await executor.cancelOrderById(existingStop.id);
+      if (pos.side === 'short' && !pos.tp1_hit) {
+        // Cancel any resting TP1 OCO too so waitForNoOpenOrders can reach zero; the
+        // OCO is re-placed below with all its shares free.
+        const restingTp1 = await findOpenOrder(client, pos.symbol, '-tp1');
+        if (restingTp1) await executor.cancelOrderById(restingTp1.id);
+      }
+      // v2.4.2 SWEEP — also cancel any MANUAL/external order on this symbol (e.g. a
+      // break-even stop the user placed via the Alpaca UI: Alpaca-generated
+      // client_order_id, no SID tag → invisible to the tracked-id + suffix cancels
+      // above). Left uncancelled it holds the shares and hangs waitForNoOpenOrders →
+      // `insufficient qty available: 0`. Symbol-scoped only (never other symbols).
+      await executor.cancelAllOpenOrders(pos.symbol);
+      await executor.waitForNoOpenOrders(pos.symbol);
+      // (2) Place the correctly-sized stop (runner-only for a pre-TP1 short).
       const stopOrder = await client.submitOrder({
         symbol:          pos.symbol,
         qty:             stopShares,
@@ -1005,33 +1099,9 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
         client_order_id: `${prefix}-stop-${Date.now()}`,
       });
       pos.brokerStopOrderId = stopOrder.id;
-      console.log(`  [V2.2] Placed missing stop for ${pos.symbol}: ${stopShares}sh @ $${expectedStopPrice} (id ${stopOrder.id})`);
+      console.log(`  [V2.2] Placed stop for ${pos.symbol}: ${stopShares}sh @ $${expectedStopPrice} (id ${stopOrder.id})`);
     } catch (err) {
-      console.warn(`  [V2.2] Stop placement failed for ${pos.symbol}: ${err.message}`);
-    }
-  } else {
-    const existingStopPrice = parseFloat(existingStop.stop_price);
-    const existingStopQty   = parseInt(existingStop.qty, 10);
-    const priceMismatch = Math.abs(existingStopPrice - expectedStopPrice) > V2_2_PRICE_DRIFT_TOLERANCE;
-    const qtyMismatch   = existingStopQty !== stopShares;
-    if (priceMismatch || qtyMismatch) {
-      console.log(`  [V2.2] Refreshing stop for ${pos.symbol}: ${existingStopQty}sh @ $${existingStopPrice} → ${stopShares}sh @ $${expectedStopPrice}`);
-      try {
-        await client.cancelOrder(existingStop.id);
-        await new Promise(r => setTimeout(r, 800));
-        const stopOrder = await client.submitOrder({
-          symbol:          pos.symbol,
-          qty:             stopShares,
-          side:            exitSide,
-          type:            'stop',
-          stop_price:      expectedStopPrice,
-          time_in_force:   'gtc',
-          client_order_id: `${prefix}-stop-${Date.now()}`,
-        });
-        pos.brokerStopOrderId = stopOrder.id;
-      } catch (err) {
-        console.warn(`  [V2.2] Stop refresh failed for ${pos.symbol}: ${err.message}`);
-      }
+      console.warn(`  [V2.2] Stop (re)placement failed for ${pos.symbol}: ${err.message}`);
     }
   }
 
@@ -2045,6 +2115,10 @@ async function checkPositions(executor = null) {
             // (id may have rotated via maintainV2_2BrokerOrders across runs).
             const lingeringStop = await findOpenOrder(executor.client, pos.symbol, '-stop');
             if (lingeringStop) await executor.cancelOrderById(lingeringStop.id);
+            // v2.4.2 SWEEP — also cancel any MANUAL/external order on this symbol (e.g.
+            // a break-even stop placed via the Alpaca UI, no SID client_order_id) so it
+            // can't hold the shares + hang waitForNoOpenOrders. Symbol-scoped only.
+            await executor.cancelAllOpenOrders(pos.symbol);
             // Wait for Alpaca to actually free the held shares before the close.
             await executor.waitForNoOpenOrders(pos.symbol);
           } catch (err) {
@@ -2288,6 +2362,10 @@ async function checkPositions(executor = null) {
           // (id may have rotated via maintainV2_2BrokerOrders across runs).
           const lingeringStop = await findOpenOrder(executor.client, pos.symbol, '-stop');
           if (lingeringStop) await executor.cancelOrderById(lingeringStop.id);
+          // v2.4.2 SWEEP — also cancel any MANUAL/external order on this symbol (e.g. a
+          // break-even stop placed via the Alpaca UI, no SID client_order_id) so it
+          // can't hold the runner shares + hang waitForNoOpenOrders. Symbol-scoped only.
+          await executor.cancelAllOpenOrders(pos.symbol);
           // Wait for Alpaca to actually free the held shares before the close.
           await executor.waitForNoOpenOrders(pos.symbol);
         } catch (err) {
@@ -2811,6 +2889,21 @@ async function run() {
         });
         // v2.3.0: append to the pending-approvals queue (de-duped + pruned).
         // approve-trade.js reads this on [Approve] to enter a TRACKED position.
+        //
+        // CRON-REDUNDANCY (2026-09-01): sid.yml now runs 3× per market day so a
+        // delayed GitHub Actions run can't miss the trading window. The approval
+        // QUEUE is already idempotent (deterministic id, de-duped in
+        // addPendingApproval), but the Telegram alert below used to fire on EVERY
+        // run — so a bullish-asset short that persists across all 3 daily runs
+        // would spam up to 3 identical [Approve]/[Skip] messages/day. Gate the
+        // alert on whether this id is NEWLY queued (checked against the same
+        // pruned view addPendingApproval uses) so a persisting setup is announced
+        // exactly ONCE — re-announced only after the 5-day TTL prunes the record.
+        // A tapped [Skip] leaves the record 'pending' in the queue, which also
+        // suppresses re-alerts until TTL. NOTHING about trade firing changes — this
+        // only de-dupes a notification.
+        const alreadyPending = prunePendingApprovals(loadPendingApprovals())
+          .some(r => r.id === approvalId && r.status === 'pending');
         addPendingApproval({
           id:             approvalId,
           symbol,
@@ -2826,17 +2919,21 @@ async function run() {
           createdAt:      new Date().toISOString(),
           status:         'pending',
         });
-        tg.alertShortApprovalNeeded({
-          id:            approvalId,
-          symbol,
-          signalDate:    signal.signalDate,
-          currentPrice:  signal.entry,
-          proposedEntry: signal.entry,
-          proposedStop:  signal.stopLoss,
-          shares:        wouldBeSizing?.shares,
-          reason:        signal.reason,
-          mode:          CONFIG.tradingMode,
-        }).catch(() => {});
+        if (!alreadyPending) {
+          tg.alertShortApprovalNeeded({
+            id:            approvalId,
+            symbol,
+            signalDate:    signal.signalDate,
+            currentPrice:  signal.entry,
+            proposedEntry: signal.entry,
+            proposedStop:  signal.stopLoss,
+            shares:        wouldBeSizing?.shares,
+            reason:        signal.reason,
+            mode:          CONFIG.tradingMode,
+          }).catch(() => {});
+        } else {
+          console.log(`    (approval already queued for ${approvalId} — Telegram alert de-duped this run)`);
+        }
         continue; // do NOT size/execute — Alan approves via Telegram / manual flow
       }
     }
@@ -3040,6 +3137,11 @@ export {
   calcRSI,
   calcMACD,
   calcSMA,
+  // v2.4.2 — exported for the shorts-TP1 broker-order (OCO/runner-stop) unit tests.
+  // No runtime effect on the direct-run path; exports are inert when `node bot-sid.js`.
+  findOpenOrder,
+  maintainV2_2BrokerOrders,
+  rsiTargetPrice,
   CONFIG,
   // v2.3.0 — shared so the approval flow reuses the exact schema + state I/O,
   // never a hand-copied duplicate (prevents drift).

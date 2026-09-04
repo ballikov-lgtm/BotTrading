@@ -1506,6 +1506,215 @@ current-version line + v2.4.1 history row; this append. **Queued:** nothing comm
 for Part A/B (return for review). If Alan approves, push via the standard protocol
 (fetch → pull --rebase --autostash → push; never without approval).
 
+### CRON REDUNDANCY — GHA delay past market close was silently skipping exits (2026-09-01) — WORKING TREE, NOT COMMITTED
+
+**Go-live-blocking reliability bug.** `sid.yml` had a SINGLE weekday cron (`'35 14 * * 1-5'`,
+14:35 UTC / mid-session — the time itself is correct). But **GitHub Actions scheduled crons are
+best-effort and can be delayed by hours** under load. Observed delays (from the GHA run history +
+the `SID run` commit timestamps on origin/main): Aug 27 landed **23:51 UTC**, Aug 28 **23:37 UTC**,
+Aug 31 **20:15 UTC** — all AFTER the 20:00 UTC US market close. Normal days land ~15:00–16:00 UTC
+and work fine.
+
+**Why it breaks exits (root cause, traced in code):** on a closed-market run the executor
+(`alpaca-executor.js`) throws `Market closed — refusing to submit ...` from `openEntry`/
+`openEntryNoStop` (L202/278), `closePartial` (L338) and `closePosition` (L482). `run()` only LOGS
+"Market is closed — will read positions but place no orders" (bot-sid.js ~L2533) and proceeds —
+so `checkPositions` still runs but every close is refused. Confirmed on the live PYPL short:
+`sid-log.json` has `{"kind":"tp1_close_fail","symbol":"PYPL","error":"Market closed — refusing to
+submit partial close for PYPL","reprotected":true}` at `2026-08-28T23:37Z`. PYPL (17 sh short,
+entry $60.675, `tp1_hit:false`, `shares_remaining:17`) had RSI well under the short's RSI-50 TP1
+trigger but never banked because no run landed in-hours.
+
+**Fix (WORKING TREE):** `.github/workflows/sid.yml` now schedules THREE staggered weekday
+market-hours crons — `'35 14 * * 1-5'` / `'35 16 * * 1-5'` / `'35 18 * * 1-5'` (14:35 / 16:35 /
+18:35 UTC, all inside US RTH 14:30–21:00 UTC). A multi-hour delay on any one still leaves ≥1 run
+in-hours. `workflow_dispatch` kept. This is redundancy, NOT higher cadence.
+
+**Idempotency across same-day runs — VERIFIED from code (all safe):**
+- **TP1 fires once** — Branch A is gated `if (!pos.tp1_hit)`; `tp1_hit` persists in
+  `open-positions-sid.json` (committed each run). Live proof: IBM `tp1_hit:true`, runner 2 sh.
+- **TP2 fires once** — Branch B requires `tp1_hit`; a successful TP2 removes the position from
+  open-positions (not pushed to `stillOpen`); a failed close re-protects + retries, never
+  double-books. `positionHandled`/`break` bounds it to one close per scan.
+- **No double-open** — `openSymbols` set (from committed state) skips already-open symbols;
+  `countTodayTrades()` reads committed `trades-sid.csv` filtered to today's date so
+  `maxPerDay` (default 1) is a per-CALENDAR-day cap across ALL of the day's runs, not per-run;
+  `addOpenPosition` also de-dups on id. (Theoretical overlap risk only if two runs ran
+  concurrently — GHA crons are hours apart + sequential, so N/A.)
+- **Approval queue** — de-duped by deterministic id `${symbol}-${signalDate}-${side}`;
+  `approve-trade.js` aborts on already-actioned. QUEUE is idempotent.
+- **The one gap I fixed:** the short-approval **Telegram alert** (`tg.alertShortApprovalNeeded`)
+  was fired UNCONDITIONALLY every run the gate triggered — so with 3 runs/day a persisting
+  bullish-asset short would send up to 3 identical [Approve]/[Skip] messages/day. Added a guard
+  in `bot-sid.js` (~L2812): alert only when the id is NEWLY queued (checked against the same
+  pruned view `addPendingApproval` uses). Persisting setup → announced once (re-announced only
+  after the 5-day TTL prunes it). Notification-only — zero effect on trade firing.
+
+**Version decision: NO bot-version bump (stays v2.4.1), INFRA category.** Justification: no
+entry/exit/sizing/signal rule changed; the only bot-sid.js edit changes NOTIFICATION cadence, not
+what trades fire or how P&L books. Matches the precedent for the one-click updater + tax tool
+(both INFRA, version unchanged). Ship-check done: one INFRA entry at top of `strategy-updates.json`
+(count auto 25 → 26); dashboard regenerated locally to VERIFY (26 badge + entry render) then
+RESTORED to HEAD — the regen used the stale worktree state (0 positions); the real rebuild runs
+from cloud state via `sid-dashboard.yml`. No README version-history row (not a version bump).
+
+**Tested:** `node --check bot-sid.js` pass; `strategy-updates.json` valid (26 entries); dashboard
+build succeeds and shows the (26) count badge + the new entry title.
+
+**⚠ SEPARATE FINDING — NOT fixed this session (assessment only), a real bug queued for a fix:**
+the resting intraday short-TP1 OCO cannot reliably COEXIST with the entry stop, so for a v2.2
+SHORT the intraday auto-TP1 often never rests — see next section.
+
+### QUEUED BUG — v2.2 short TP1 OCO vs entry stop "insufficient qty" (assessed 2026-09-01 — ✅ FIXED in v2.4.2, see the section below)
+
+Assessment only (do not implement without Alan's go-ahead). Monday 2026-08-31's run logged for the
+PYPL short: `[V2.2] Stop placement failed ... insufficient qty available (requested: 9, available:
+0)` and `[V2.2] TP1 OCO placement failed ... (requested: 8, available: 0)` while the entry stop
+(`brokerStopOrderId 6e93db0c`) held all 17 shares.
+
+**Design intent (v2.2.5):** for a short with `tp1_hit:false`, `maintainV2_2BrokerOrders` reserves
+only the RUNNER half for the stop (`shares_total − floor(shares_total*tp1Portion)` = 17−8 = 9) and
+places the TP1 half (8) as an OCO — 9 + 8 = 17, so they're MEANT to coexist. The design is sound
+in principle.
+
+**Why it fails in practice (two code-visible causes):**
+1. **The initial entry stop is placed FULL-size** (`openEntry` → `${prefix}-stop`, all 17 sh).
+   `maintain` must CANCEL/reduce it to 9 before the OCO (8) can be placed. That reduction uses a
+   fixed `await new Promise(r => setTimeout(800))` between cancel and re-submit — NOT
+   `executor.waitForNoOpenOrders(symbol)` like the close paths use. When Alpaca hasn't freed the
+   held shares in 800 ms (routine when the order goes `pending_cancel`, especially on a
+   closed-market delayed run — the exact Part-1 scenario), the re-submit fails `insufficient qty`
+   and is only `console.warn`'d.
+2. **`findOpenOrder(symbol, '-stop')` uses `endsWith('-stop')`** (bot-sid.js L938-944). The entry
+   stop `${prefix}-stop` matches, but every stop that `maintain`/`placeStop` re-places is
+   `${prefix}-stop-${Date.now()}` (ends in DIGITS → does NOT match). Once the id rotates, maintain
+   loses track of its own stop → falls into the `!existingStop` PLACEMENT branch (which has NO
+   cancel) → tries to place a fresh stop while the timestamped one still holds the shares →
+   `insufficient qty available: 0`. **This is the SAME `endsWith('-stop')` bug already documented
+   for `closePosition` in the v2.2.6 TP2 pitfall — it was fixed there but the latent twin still
+   lives in `maintainV2_2BrokerOrders` and in the Branch A/B belt-and-braces `findOpenOrder(...,
+   '-stop')`.**
+
+**Why this is go-live-serious for SHORTS:** for a v2.2 short, `checkPositions` Branch A does
+`if (posIsV2_2 && pos.side === 'short') continue;` (L1863) — the daily-poll RSI-50 TP1 is SKIPPED;
+the short's ONLY TP1 mechanism is the resting broker OCO. So if the OCO never rests (causes above),
+the short has NO working TP1 at all (broker OCO failed to place AND daily-poll skipped). PYPL is
+the live example. (A short with NO brokerStopOrderId — e.g. current ABT — is `isV2_2Position=false`
+→ does NOT `continue` → DOES get daily-poll TP1; and pdt_safe shorts likewise.)
+
+**Recommended fix (for a future session, with approval):**
+- Preferred: for shorts, place a runner-only entry stop (9) + the TP1 OCO (8) AT ENTRY, so there's
+  never a full-size stop to reduce (eliminates the fragile cancel-then-replace) — mirrors the
+  documented `manual-trade.js` OCO pattern.
+- And/or: make maintain's reduction robust — cancel by the tracked `pos.brokerStopOrderId`
+  directly (not the suffix search) + use `waitForNoOpenOrders` instead of the 800 ms sleep; and
+  fix `findOpenOrder` to match `/-stop(-\d+)?$/` (or `.includes('-stop-')` OR `endsWith('-stop')`).
+- PDT-safe mode (`SID_PDT_SAFE=true`) sidesteps this ENTIRE broker-order class of bug (no broker
+  orders; daily-poll manages everything, and a pdt_safe short DOES get daily-poll TP1) — at the
+  cost of re-depending on the daily poll landing in-hours, which the cron redundancy above now
+  addresses. The two fixes are complementary.
+
+### SHORTS-TP1 OCO FIX (v2.4.2, 2026-09-01) — WORKING TREE, NOT COMMITTED
+
+Alan approved **option B (fix the OCO directly)** and wants to validate by banking the live PYPL
+short's TP1. This is the fix for the QUEUED BUG above. **Status: WORKING TREE ONLY — nothing
+committed/pushed/executed. Built on top of the same-session cron-redundancy changes (they ship
+together). Deploy + validate on PYPL via a manual market-hours `sid.yml` dispatch after review.**
+
+**Root cause recap (for a v2.2 SHORT, tp1_hit=false):** its ONLY TP1 mechanism is the resting
+broker OCO (Branch A `continue`s past the daily-poll TP1 at L1863). `maintainV2_2BrokerOrders`
+must reduce the full-size entry stop (17 sh) to the runner half (9) so the TP1 OCO half (8) has
+free shares — but (1) `findOpenOrder(sym,'-stop')` used `endsWith('-stop')`, which MISSES the
+timestamped `${prefix}-stop-${ts}` that `placeStop`/maintain create (twin of the v2.2.6
+`closePosition` bug), so maintain lost track of its own stop and fell into the placement branch;
+and (2) the refresh used a fixed `setTimeout(800ms)` instead of waiting for share release. Net:
+the 17-sh stop kept holding everything → runner stop + TP1 OCO both failed `insufficient qty
+available: 0` (only `console.warn`'d) → the short had NO working TP1. Live PYPL: 17 sh short,
+entry $60.675, RSI ~32.9 ≪ 50, `tp1_hit:false`, `shares_remaining:17`, `brokerStopOrderId
+6e93db0c`, stuck 100% open.
+
+**What changed (bot-sid.js + alpaca-executor.js — broker-order plumbing):**
+1. **`findOpenOrder` regex.** `endsWith(suffix)` → `new RegExp(esc(suffix)+'(-\\d+)?$')`, so
+   `-stop`/`-tp1` match BOTH the bare id AND the timestamped re-places. `-restop-<ts>` is
+   deliberately NOT matched (no `-stop` substring after a hyphen) — it's cancelled directly via
+   the tracked `brokerStopOrderId`. This also fixes two latent twins the miss caused: the short
+   TP1 OCO re-price/dedup (`existingTp1` was never found → it re-placed every run) and long
+   post-TP1 BE-stop maintenance (the timestamped BE stop was never matched).
+2. **`maintainV2_2BrokerOrders` stop reset (replaces the place/refresh block).** Resets only when
+   the stop is missing / wrong-size / wrong-price (`!stopPriceOk || !stopQtyOk`, same trigger
+   conditions as before → no steady-state churn). On reset: `executor.cancelOrderById(pos.brokerStopOrderId)`
+   (the TRACKED id, robust to any client_order_id) → `cancelOrderById(existingStop.id)` (if
+   different) → for a pre-TP1 short, cancel any resting `-tp1` OCO too → `executor.waitForNoOpenOrders(symbol)`
+   (real release, NOT a sleep) → place the runner-only stop (`shares_total − tp1`). The TP1 OCO
+   section below is UNCHANGED (the existing `submitTp1Oco`) — it now succeeds because its 8 shares
+   are free. Where price has already passed the RSI-50 target (short in profit), the OCO buy-limit
+   at `rsiTargetPrice(closes,14,50)` is marketable → fills immediately → banks TP1.
+3. **Test-only exports:** added `findOpenOrder`, `maintainV2_2BrokerOrders`, `rsiTargetPrice` to
+   the `export {}` block (inert on the direct-run path).
+4. **SYMBOL-SCOPED SWEEP (mid-session addition, same v2.4.2).** The tracked-id + suffix cancels
+   above only see SID-tagged orders. The user placed a break-even buy-stop on PYPL's runner via
+   the **Alpaca UI** → Alpaca-generated `client_order_id`, no SID tag → invisible to those cancels,
+   so it would keep holding the shares and `waitForNoOpenOrders` would HANG → same `insufficient
+   qty available: 0` wall on the runner's TP2 close/reset. Fix: new `executor.cancelAllOpenOrders(symbol)`
+   (alpaca-executor.js) — `listOrders({status:'open',symbols:symbol})` → `cancelOrderById` each
+   (per-order try/catch), **symbol-scoped** (re-checks each order's `symbol` before cancel, so it
+   can NEVER touch another symbol). Called in the cancel-first step of maintain's reset AND BOTH
+   close branches (TP1 Branch A, TP2 Branch B), immediately BEFORE `waitForNoOpenOrders`, keeping
+   the existing tracked-id + suffix cancels as belt-and-braces. Only runs on a close/reset path
+   (never steady-state — verified). After the sweep, `waitForNoOpenOrders` reaches zero and the
+   shares are free; maintain then re-places the runner stop + OCO / the close proceeds as before.
+
+**PYPL trace (verified in the test harness):** maintain → cancels 6e93db0c by id → waits → places
+9-sh buy-stop @ $63 (`-stop-<ts>`) → places 8-sh OCO buy-limit @ $61.60 (rsiTargetPrice) / stop
+$63 (`-tp1-<ts>`); $61.60 > last close $56.40 → marketable → fills → TP1 banks. `syncPositions`
+marks `tp1_hit` + migrates the runner stop to BE on a subsequent run. Book reserves exactly
+9 + 8 = 17.
+
+**DELIBERATELY did NOT change `openEntry`.** The coordinator's brief said "prefer placing the OCO
+AT ENTRY." I did the maintain-path fix instead because: (a) it fixes the LIVE PYPL (already open
+with a full-size stop — only maintain can touch it), (b) it fully fixes NEW shorts too (their
+first maintain run reliably reduces the stop + places the OCO), (c) an at-entry OCO needs a
+`closes`/`rsiTargetPrice` plumbing refactor into `openEntry` + entry-fill polling and introduces
+same-day-fill/PDT surface — more regression risk during the validation window. Flagged for the
+coordinator to direct if they still want the at-entry version as a follow-up.
+
+**⚠ ONE THING TO WATCH ON THE LIVE VALIDATION RUN:** whether Alpaca accepts an OCO whose
+take-profit limit is already MARKETABLE (PYPL's case). The OCO submission is the EXISTING
+`submitTp1Oco` (unchanged) — the coordinator's brief explicitly expects it to fill immediately —
+but I could not test against live Alpaca. If Alpaca rejects a marketable OCO, the fallback would be
+to submit the already-in-the-money short TP1 as a plain marketable limit (the SL leg is moot once
+it fills). Watch the manual dispatch's run log for `[V2.2] Placed TP1 OCO` vs `TP1 OCO placement
+failed`.
+
+**Tested (local, no network — `scratchpad/test-oco-fix.mjs`, 26/26 pass):** uses a REAL
+`AlpacaExecutor` wrapping a mock client (so the real `cancelAllOpenOrders`/`waitForNoOpenOrders`/
+`cancelOrderById` run). findOpenOrder matches timestamped + bare `-stop`/`-tp1`, excludes
+`-restop-<ts>`/`-entry`/a MANUAL non-SID id; PYPL 17-sh full-stop reset → cancel-by-id + sweep +
+wait-reaches-zero + 9-sh runner stop + 8-sh OCO @ rsiTargetPrice, marketable (target > last close),
+book = 9+8=17; **standalone `cancelAllOpenOrders('PYPL')` cancels a SID stop AND a manual UI stop
+(count 2) while sparing an AAPL order** (symbol-scoped); **maintain reset with a MANUAL BE stop on a
+post-TP1 runner** → sweep cancels the UI stop, `waitForNoOpenOrders` reaches zero (would've hung
+without the sweep), SID runner BE stop placed; no-regression: steady-state short (NO sweep, no
+churn), LONG pre-TP1 (timestamped stop matched → no reset/sweep/OCO). Float note: post-TP1 short BE
+= `parseFloat((60.675).toFixed(2))` = `60.67` (60.675 stores as 60.6749…). `node --check`
+bot-sid.js + alpaca-executor.js pass. `BOT_VERSION` imports as `v2.4.2`.
+
+**Ship-check (v2.4.2, FIX):** `BOT_VERSION` v2.4.2 + one-liner + detailed history entry;
+`sid-dashboard.js` `STRATEGY_VERSION='2.4.2'` + beta-banner / brand-sub / perf-note markers;
+`strategy-updates.json` new FIX entry at top (count auto 26 → 27; the cron INFRA entry's version
+line reconciled to note it ships with v2.4.2); `SID-README.md` current-version line + a v2.4.2
+history row (inserted at the top of the recent descending block, before v2.4.1); regenerated
+`docs/sid/index.html` to VERIFY (v2.4.2 markers + (27) badge) then RESTORED to HEAD (real rebuild
+runs from cloud state via `sid-dashboard.yml`). No Pine change (visualiser is signal-level, not
+execution-level). `.sid-update-manifest.txt` needs no change (bot-sid.js/sid-dashboard.js/README/
+updates JSON already listed).
+
+**Queued / not done:** nothing committed/pushed/executed (per brief — return for review). If Alan
+approves: push via the standard protocol (fetch → pull --rebase --autostash → push; never without
+approval), then manually dispatch `sid.yml` DURING US market hours and confirm PYPL banks TP1 via
+the `closed-positions`/`open-positions` diff of that run's commit (NOT sid-log — it only journals
+the entry scan). Optional follow-up: the at-entry short OCO (see the DELIBERATELY-did-NOT note).
+
 ---
 
 ## See also

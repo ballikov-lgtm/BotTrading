@@ -4,10 +4,24 @@ on:
   workflow_dispatch: # Manual trigger for testing
 
   schedule:
-    # ── WEEKDAYS ONLY — once per day at 14:35 UTC (9:35am ET) ────────────────
-    # Runs 5 minutes after US market open to allow the daily candle to settle.
-    # SID is a daily-chart swing strategy — one scan per day is all that's needed.
-    - cron: '35 14 * * 1-5'
+    # ── WEEKDAYS ONLY — REDUNDANT market-hours runs (14:35 / 16:35 / 18:35 UTC) ──
+    # WHY 3 runs, not 1: GitHub Actions scheduled crons are best-effort and can be
+    # DELAYED by hours under load. Real delays observed 2026-08 on the single 14:35
+    # cron: it landed 23:51 (Aug 27), 23:37 (Aug 28) and 20:15 (Aug 31) UTC — all
+    # AFTER the 20:00 UTC US market close. On a closed-market run the executor
+    # refuses every order ("Market closed — refusing to submit ..."), so TP1/TP2
+    # exits AND entries are silently skipped and a ripe TP1 (e.g. the PYPL short,
+    # RSI well under 50) never banks. Three staggered runs across the session mean a
+    # multi-hour delay on any one still leaves at least one execution inside US
+    # regular hours (14:30–21:00 UTC). The bot is idempotent across same-day runs
+    # (tp1_hit / tp2Hit-once guards, open-symbol skip + per-calendar-day entry cap
+    # via countTodayTrades, deterministic de-duped approval queue), so extra runs
+    # never double-open, double-bank, or double-alert. The first run that lands
+    # in-hours does the work; later ones are cheap no-ops. SID is still a
+    # daily-chart swing strategy — this is redundancy, not higher cadence.
+    - cron: '35 14 * * 1-5'   # 14:35 UTC (09:35 ET) — 5 min after open
+    - cron: '35 16 * * 1-5'   # 16:35 UTC (12:35 ET) — mid-session backup
+    - cron: '35 18 * * 1-5'   # 18:35 UTC (14:35 ET) — late-session backup
 
 permissions:
   contents: write
