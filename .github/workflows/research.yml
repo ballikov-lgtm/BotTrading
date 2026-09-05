@@ -32,6 +32,9 @@ jobs:
         run: node monitor.js
 
       - name: Run research agent
+        # Must not block the dashboard publish below: a research.js failure would
+        # otherwise silently stale SID's Scanner/Heatmap tabs. (2026-09-04)
+        continue-on-error: true
         env:
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
         run: node research.js

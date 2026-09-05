@@ -1,6 +1,13 @@
 import 'dotenv/config';
 import fetch from 'node-fetch';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ESM has no __dirname. State paths MUST anchor to this file's directory, not the
+// process cwd -- a run from the repo root previously created a SHADOW ledger
+// (root sid-account.json, zeroed) instead of SID/sid-account.json. (2026-09-04)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import { createExecutor, resolveTradingMode } from './alpaca-executor.js';
 import { rsiTargetPrice } from './rsi-target-price.js';
@@ -472,14 +479,14 @@ const BOT_VERSION = 'v2.4.2'; // V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbin
 //        - DEFERRED to v2.1: Telegram approval flow for HUMAN-tier signals
 //          (currently LOG-only).
 
-const TRADES_PATH     = './trades-sid.csv';
-const POSITIONS_PATH  = './open-positions-sid.json';
-const CLOSED_PATH     = './closed-positions-sid.json';
-const ACCOUNT_PATH    = './sid-account.json';
-const SAFETY_LOG_PATH = './sid-log.json';
-const WATCHLIST_PATH  = './watchlist-sid.json';
-const EVENT_DATES_PATH= './event-dates.json';
-const PENDING_PATH    = './pending-approvals-sid.json';  // v2.3.0: Telegram Yes/No approval queue
+const TRADES_PATH     = path.join(__dirname, 'trades-sid.csv');
+const POSITIONS_PATH  = path.join(__dirname, 'open-positions-sid.json');
+const CLOSED_PATH     = path.join(__dirname, 'closed-positions-sid.json');
+const ACCOUNT_PATH    = path.join(__dirname, 'sid-account.json');
+const SAFETY_LOG_PATH = path.join(__dirname, 'sid-log.json');
+const WATCHLIST_PATH  = path.join(__dirname, 'watchlist-sid.json');
+const EVENT_DATES_PATH= path.join(__dirname, 'event-dates.json');
+const PENDING_PATH    = path.join(__dirname, 'pending-approvals-sid.json');  // v2.3.0: Telegram Yes/No approval queue
 
 // v2.3.0: how many days a pending approval stays actionable before it's pruned
 // as stale. Approvals CAN legitimately arrive days later (Alan waits for price
