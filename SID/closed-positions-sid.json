@@ -498,5 +498,53 @@
     "realizedPnl": 53.24,
     "outcome": "WIN",
     "accountAfter": 10554.61
+  },
+  {
+    "id": "65e9885d-2f58-42c4-8dd6-b99aa47601f1",
+    "symbol": "IBM",
+    "side": "long",
+    "entry": 217.1300048828125,
+    "stopLoss": 217.14,
+    "shares": 4,
+    "shares_total": 4,
+    "shares_remaining": 2,
+    "orig_stop": 199,
+    "tp1_hit": true,
+    "totalUsd": 868.52,
+    "riskUsd": 72.52,
+    "signalDate": "2026-07-22",
+    "openDate": "2026-07-27",
+    "openTime": "16:38:30",
+    "mode": "paper",
+    "strategy": "SID v2.4.1",
+    "brokerStopOrderId": "7bbf8b90-d151-4da1-aab3-14902208cef8",
+    "clientOrderIdPrefix": "SID-IBM-20260722-long",
+    "manual_watch": false,
+    "manual_watch_reason": null,
+    "tp1_date": "2026-08-10",
+    "tp1_price": 237.51,
+    "tp1_shares": 2,
+    "tp1_pnl": 40.76,
+    "tp1_reason": "rsi50",
+    "tp1_rsi": 50.07,
+    "tp1_pnl_source": "alpaca_fill",
+    "closeDate": "2026-09-10",
+    "closeTime": "17:47:37",
+    "exit_strategy": "full_external_fill",
+    "exit_price": 238.39,
+    "exit_pnl": 42.52,
+    "exit_shares": 2,
+    "exit_fills": [
+      {
+        "orderId": "577e754f-fbea-46d4-9601-12ec6e4e347c",
+        "filledAt": "2026-09-10T13:30:45.668264Z",
+        "qty": 2,
+        "price": 238.39
+      }
+    ],
+    "total_pnl": 42.52,
+    "realizedPnl": 42.52,
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill"
   }
 ]
