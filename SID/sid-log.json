@@ -1,5 +1,267 @@
 [
   {
+    "timestamp": "2026-09-14T19:32:29.469Z",
+    "symbol": "HD",
+    "signal": "long",
+    "entry": 312.32000732421875,
+    "stopLoss": 304,
+    "shares": 3,
+    "totalUsd": 936.96,
+    "riskUsd": 24.96,
+    "rsiAtSignal": 28.3,
+    "rsiAtEntry": 36.69,
+    "signalDate": "2026-09-10",
+    "earningsDates": [],
+    "orderId": "d115f16b-475c-4d1b-b9a8-affe6c38b5be",
+    "reason": "RSI armed long (RSI 28.3) on 2026-09-10 → RSI(36.7) & MACD both up, 2d into 3d arm"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:28.388Z",
+    "symbol": "GS",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:27.774Z",
+    "symbol": "GOOG",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:27.346Z",
+    "symbol": "GME",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:26.771Z",
+    "symbol": "GLD",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:26.296Z",
+    "symbol": "GE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:25.701Z",
+    "symbol": "GDX",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:25.110Z",
+    "symbol": "FXI",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:24.622Z",
+    "symbol": "F",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:24.083Z",
+    "symbol": "EXPE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:23.646Z",
+    "symbol": "EWZ",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:23.030Z",
+    "symbol": "EWJ",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:22.589Z",
+    "symbol": "EWG",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:22.161Z",
+    "symbol": "EFA",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:21.678Z",
+    "symbol": "EEM",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:21.203Z",
+    "symbol": "DIS",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:20.723Z",
+    "symbol": "DIA",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:20.219Z",
+    "symbol": "DE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:19.681Z",
+    "symbol": "CVX",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:19.140Z",
+    "symbol": "CVNA",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:18.664Z",
+    "symbol": "CSCO",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:18.113Z",
+    "symbol": "CRM",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:17.651Z",
+    "symbol": "COST",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:16.996Z",
+    "symbol": "COIN",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:16.515Z",
+    "symbol": "CAT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:15.933Z",
+    "symbol": "BOIL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:15.486Z",
+    "symbol": "BLK",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:14.996Z",
+    "symbol": "BA",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:14.473Z",
+    "symbol": "B",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:13.970Z",
+    "symbol": "AXP",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:13.481Z",
+    "symbol": "AVGO",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:13.016Z",
+    "symbol": "ARM",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:12.612Z",
+    "symbol": "AMZN",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:12.161Z",
+    "symbol": "AMD",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:11.675Z",
+    "symbol": "AMC",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:11.234Z",
+    "symbol": "AMAT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:10.764Z",
+    "symbol": "AI",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:10.152Z",
+    "symbol": "ADBE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:09.622Z",
+    "symbol": "ABT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:08.999Z",
+    "symbol": "ABBV",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:08.418Z",
+    "symbol": "AAPL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-09-14T19:32:07.906Z",
+    "symbol": "AAL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
     "timestamp": "2026-09-11T21:13:11.605Z",
     "symbol": "XOM",
     "signal": null,
@@ -2758,258 +3020,6 @@
   {
     "timestamp": "2026-09-09T19:26:33.840Z",
     "symbol": "XLF",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:33.397Z",
-    "symbol": "XLE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:32.939Z",
-    "symbol": "XLC",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:32.494Z",
-    "symbol": "XHB",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:32.037Z",
-    "symbol": "WMT",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:31.588Z",
-    "symbol": "WFC",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:31.153Z",
-    "symbol": "V",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:30.727Z",
-    "symbol": "UVXY",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:30.340Z",
-    "symbol": "USO",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:29.927Z",
-    "symbol": "UNH",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:29.499Z",
-    "symbol": "UNG",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:29.098Z",
-    "symbol": "TZA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:28.622Z",
-    "symbol": "TSLA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:28.124Z",
-    "symbol": "TQQQ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:27.713Z",
-    "symbol": "TNA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:27.292Z",
-    "symbol": "TGT",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:26.787Z",
-    "symbol": "SQQQ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:26.234Z",
-    "symbol": "SPY",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:25.753Z",
-    "symbol": "SOXS",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:25.175Z",
-    "symbol": "SOXL",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:24.677Z",
-    "symbol": "SMCI",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:24.209Z",
-    "symbol": "SLV",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:23.654Z",
-    "symbol": "SCHW",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:23.106Z",
-    "symbol": "SBUX",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:22.626Z",
-    "symbol": "RTX",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:22.123Z",
-    "symbol": "ROKU",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:21.721Z",
-    "symbol": "RIVN",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:21.319Z",
-    "symbol": "RIOT",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:20.902Z",
-    "symbol": "QQQ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:20.293Z",
-    "symbol": "PYPL",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:19.867Z",
-    "symbol": "PLTR",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:19.404Z",
-    "symbol": "PG",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:18.888Z",
-    "symbol": "PFE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:18.424Z",
-    "symbol": "ORCL",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:17.851Z",
-    "symbol": "NVDA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:17.336Z",
-    "symbol": "NUGT",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:16.828Z",
-    "symbol": "NOW",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:16.361Z",
-    "symbol": "NKE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:15.916Z",
-    "symbol": "NIO",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:15.516Z",
-    "symbol": "MSTR",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:14.970Z",
-    "symbol": "MRK",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:14.489Z",
-    "symbol": "META",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-09-09T19:26:14.027Z",
-    "symbol": "MDLZ",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
