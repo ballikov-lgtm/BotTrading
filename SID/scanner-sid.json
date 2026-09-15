@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-09-15T20:25:31.696Z",
+  "scanDate": "2026-09-15T23:36:30.402Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
   "tickersWithError": 0,
-  "elapsedMs": 336391,
+  "elapsedMs": 325733,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -38,7 +38,7 @@
       "dailySma200": 8.23,
       "rsi50Target": 5.11,
       "note": "RSI oversold + MACD rising — ready to ARM on TV",
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "USO",
@@ -90,7 +90,7 @@
       "dailySma200": 183,
       "rsi50Target": 205.36,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "GE",
@@ -168,7 +168,7 @@
       "dailySma200": 193.82,
       "rsi50Target": 205.24,
       "note": "RSI oversold but MACD not yet rising",
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "XLU",
@@ -194,7 +194,7 @@
       "dailySma200": 44.61,
       "rsi50Target": 43.11,
       "note": "RSI oversold but MACD not yet rising",
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "META",
@@ -272,7 +272,7 @@
       "dailySma200": 201.37,
       "rsi50Target": 230.37,
       "note": null,
-      "transitionedFrom": "SIGNAL_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "XLE",
@@ -417,13 +417,13 @@
         "meanReversionActive": 20
       },
       "weeklyTrend": "up",
-      "rsi": 34,
+      "rsi": 33.9,
       "macdDirection": "falling",
       "weeklyAdx": 17,
       "choppinessIdx": 38.4,
       "daysToEarnings": null,
       "earningsBlackout": false,
-      "lastClose": 285.1499938964844,
+      "lastClose": 285.1400146484375,
       "dailySma50": 295.81,
       "dailySma200": 274.27,
       "rsi50Target": 294.09,
@@ -506,7 +506,7 @@
       "dailySma200": 229.88,
       "rsi50Target": 215.53,
       "note": null,
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "IYR",
@@ -688,7 +688,7 @@
       "dailySma200": 13.93,
       "rsi50Target": 13.71,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "AMD",
@@ -1676,7 +1676,7 @@
       "dailySma200": 954.96,
       "rsi50Target": 1026.28,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "WMT",
@@ -1769,13 +1769,13 @@
         "meanReversionActive": 20
       },
       "weeklyTrend": "up",
-      "rsi": 40.7,
+      "rsi": 40.6,
       "macdDirection": "falling",
       "weeklyAdx": 25.9,
       "choppinessIdx": 47.9,
       "daysToEarnings": null,
       "earningsBlackout": false,
-      "lastClose": 521.2999877929688,
+      "lastClose": 521.22998046875,
       "dailySma50": 528.95,
       "dailySma200": 500.44,
       "rsi50Target": 529.04,
@@ -2173,32 +2173,6 @@
       "transitionedFrom": null
     },
     {
-      "symbol": "KHC",
-      "status": "IDLE",
-      "direction": null,
-      "score": 64,
-      "scoreBreakdown": {
-        "weeklyTrendDirection": 20,
-        "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 8.3,
-        "historicalExtremes": 0,
-        "meanReversionActive": 16
-      },
-      "weeklyTrend": "down",
-      "rsi": 45,
-      "macdDirection": "falling",
-      "weeklyAdx": 17,
-      "choppinessIdx": 49.5,
-      "daysToEarnings": null,
-      "earningsBlackout": false,
-      "lastClose": 24.729999542236328,
-      "dailySma50": 25.46,
-      "dailySma200": 24.02,
-      "rsi50Target": 25.18,
-      "note": null,
-      "transitionedFrom": null
-    },
-    {
       "symbol": "TSLA",
       "status": "IDLE",
       "direction": null,
@@ -2221,6 +2195,32 @@
       "dailySma50": 352.54,
       "dailySma200": 398.32,
       "rsi50Target": 355.7,
+      "note": null,
+      "transitionedFrom": null
+    },
+    {
+      "symbol": "KHC",
+      "status": "IDLE",
+      "direction": null,
+      "score": 63,
+      "scoreBreakdown": {
+        "weeklyTrendDirection": 20,
+        "weeklyAdxHealthyBand": 20,
+        "dailyChoppinessLow": 7,
+        "historicalExtremes": 0,
+        "meanReversionActive": 16
+      },
+      "weeklyTrend": "down",
+      "rsi": 46,
+      "macdDirection": "rising",
+      "weeklyAdx": 17,
+      "choppinessIdx": 50.4,
+      "daysToEarnings": null,
+      "earningsBlackout": false,
+      "lastClose": 24.729999542236328,
+      "dailySma50": 25.45,
+      "dailySma200": 24.01,
+      "rsi50Target": 25.12,
       "note": null,
       "transitionedFrom": null
     },
@@ -2315,13 +2315,13 @@
         "meanReversionActive": 20
       },
       "weeklyTrend": "up",
-      "rsi": 53.4,
+      "rsi": 53.3,
       "macdDirection": "falling",
       "weeklyAdx": 17.2,
       "choppinessIdx": 56.5,
       "daysToEarnings": null,
       "earningsBlackout": false,
-      "lastClose": 96.94000244140625,
+      "lastClose": 96.91999816894531,
       "dailySma50": 94.7,
       "dailySma200": 89.48,
       "rsi50Target": 96.21,
@@ -2731,16 +2731,16 @@
         "meanReversionActive": 20
       },
       "weeklyTrend": "up",
-      "rsi": 44.5,
+      "rsi": 44.4,
       "macdDirection": "falling",
       "weeklyAdx": 12.4,
       "choppinessIdx": 55.2,
       "daysToEarnings": null,
       "earningsBlackout": false,
-      "lastClose": 757.4400024414062,
+      "lastClose": 757.3900146484375,
       "dailySma50": 759.06,
       "dailySma200": 715.11,
-      "rsi50Target": 763.29,
+      "rsi50Target": 763.28,
       "note": null,
       "transitionedFrom": null
     },
