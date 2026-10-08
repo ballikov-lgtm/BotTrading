@@ -630,5 +630,53 @@
     "realizedPnl": -19.3,
     "outcome": "LOSS",
     "accountAfter": 10512.11
+  },
+  {
+    "id": "6831959f-5bcf-494f-9c46-da712d5a4ab3",
+    "symbol": "HON",
+    "side": "long",
+    "entry": 204.22000122070312,
+    "stopLoss": 204.23,
+    "shares": 5,
+    "shares_total": 5,
+    "shares_remaining": 3,
+    "orig_stop": 196,
+    "tp1_hit": true,
+    "totalUsd": 1021.1,
+    "riskUsd": 41.1,
+    "signalDate": "2026-09-10",
+    "openDate": "2026-09-15",
+    "openTime": "19:48:15",
+    "mode": "paper",
+    "strategy": "SID v2.4.2",
+    "brokerStopOrderId": "2dc841a2-9be8-455b-b476-cffd6e8837dc",
+    "clientOrderIdPrefix": "SID-HON-20260910-long",
+    "manual_watch": false,
+    "manual_watch_reason": null,
+    "tp1_date": "2026-10-01",
+    "tp1_price": 214.73,
+    "tp1_shares": 2,
+    "tp1_pnl": 21.02,
+    "tp1_reason": "rsi50",
+    "tp1_rsi": 53.86,
+    "tp1_pnl_source": "alpaca_fill",
+    "closeDate": "2026-10-08",
+    "closeTime": "20:02:09",
+    "exit_strategy": "full_external_fill",
+    "exit_price": 204.19,
+    "exit_pnl": -0.09,
+    "exit_shares": 3,
+    "exit_fills": [
+      {
+        "orderId": "2dc841a2-9be8-455b-b476-cffd6e8837dc",
+        "filledAt": "2026-10-08T15:14:58.899273Z",
+        "qty": 3,
+        "price": 204.19
+      }
+    ],
+    "total_pnl": -0.09,
+    "realizedPnl": -0.09,
+    "is_full_close": true,
+    "pnl_source": "alpaca_fill"
   }
 ]

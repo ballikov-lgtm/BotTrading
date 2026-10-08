@@ -1,5 +1,23 @@
 [
   {
+    "timestamp": "2026-10-08T20:02:10.141Z",
+    "kind": "external_close_recorded",
+    "symbol": "HON",
+    "sharesClosed": 3,
+    "exitPrice": 204.19,
+    "pnl": -0.09,
+    "reason": "full_external_fill",
+    "isFullClose": true,
+    "fillsUsed": [
+      {
+        "orderId": "2dc841a2-9be8-455b-b476-cffd6e8837dc",
+        "filledAt": "2026-10-08T15:14:58.899273Z",
+        "qty": 3,
+        "price": 204.19
+      }
+    ]
+  },
+  {
     "timestamp": "2026-10-07T23:17:08.522Z",
     "symbol": "XOM",
     "signal": null,
@@ -2994,12 +3012,6 @@
   {
     "timestamp": "2026-10-06T21:11:19.088Z",
     "symbol": "LRCX",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-10-06T21:11:18.655Z",
-    "symbol": "LMT",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
