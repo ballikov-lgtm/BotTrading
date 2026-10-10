@@ -6019,6 +6019,10 @@
     {
       "t": "2026-10-09 20:16 UTC",
       "equity": 997.12
+    },
+    {
+      "t": "2026-10-10 00:12 UTC",
+      "equity": 997.12
     }
   ],
   "watchlist": [
@@ -6033,7 +6037,7 @@
     "SEIUSDT",
     "TRXUSDT"
   ],
-  "last_run": "2026-10-09 20:16 UTC",
+  "last_run": "2026-10-10 00:12 UTC",
   "events_last_run": [],
   "stats": {
     "closed_trades": 2,
@@ -6045,81 +6049,81 @@
   },
   "scan": {
     "ETHUSDT": {
-      "rsi": 25.8,
-      "price": 2474.94,
-      "gap_pct": 0.4,
+      "rsi": 33.1,
+      "price": 2487.72,
+      "gap_pct": 2.1,
       "rsi_floor": 35,
       "gate_open": false,
-      "cross_ok": true,
+      "cross_ok": false,
       "gap_ok": false,
       "slope4h_up": true,
       "dslope_up": true,
       "status": "GATED"
     },
     "SOLUSDT": {
-      "rsi": 23.3,
-      "price": 109.62,
-      "gap_pct": 4.8,
-      "rsi_floor": 35,
-      "gate_open": true,
-      "cross_ok": true,
-      "gap_ok": true,
-      "slope4h_up": true,
-      "dslope_up": true,
-      "status": "ARMED"
-    },
-    "XRPUSDT": {
-      "rsi": 31.4,
-      "price": 1.3805,
-      "gap_pct": 0.4,
+      "rsi": 30.0,
+      "price": 109.16,
+      "gap_pct": 1.9,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": true,
+      "gap_ok": false,
+      "slope4h_up": true,
+      "dslope_up": true,
+      "status": "GATED"
+    },
+    "XRPUSDT": {
+      "rsi": 40.1,
+      "price": 1.3959,
+      "gap_pct": 1.8,
+      "rsi_floor": 35,
+      "gate_open": false,
+      "cross_ok": false,
       "gap_ok": false,
       "slope4h_up": false,
       "dslope_up": true,
       "status": "GATED"
     },
     "SUIUSDT": {
-      "rsi": 29.1,
-      "price": 1.0407,
-      "gap_pct": 18.6,
+      "rsi": 39.9,
+      "price": 1.0697,
+      "gap_pct": 13.5,
       "rsi_floor": 35,
       "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": true,
-      "status": "ARMED"
+      "status": "WATCHING"
     },
     "VIRTUALUSDT": {
-      "rsi": 30.4,
-      "price": 0.7069,
-      "gap_pct": 9.0,
+      "rsi": 41.8,
+      "price": 0.7281,
+      "gap_pct": 3.4,
       "rsi_floor": 35,
       "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": true,
-      "status": "ARMED"
+      "status": "WATCHING"
     },
     "HYPEUSDT": {
-      "rsi": 30.5,
-      "price": 84.228,
-      "gap_pct": 2.4,
+      "rsi": 36.5,
+      "price": 84.232,
+      "gap_pct": 0.4,
       "rsi_floor": 35,
       "gate_open": false,
-      "cross_ok": true,
+      "cross_ok": false,
       "gap_ok": false,
-      "slope4h_up": true,
+      "slope4h_up": false,
       "dslope_up": true,
       "status": "GATED"
     },
     "APTUSDT": {
-      "rsi": 39.8,
-      "price": 0.7376,
-      "gap_pct": 8.8,
+      "rsi": 55.4,
+      "price": 0.8151,
+      "gap_pct": 7.0,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": true,
@@ -6129,38 +6133,38 @@
       "status": "GATED"
     },
     "FETUSDT": {
-      "rsi": 34.5,
-      "price": 0.2159,
-      "gap_pct": 16.8,
+      "rsi": 40.6,
+      "price": 0.2169,
+      "gap_pct": 11.1,
       "rsi_floor": 35,
       "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": true,
-      "status": "ARMED"
+      "status": "WATCHING"
     },
     "SEIUSDT": {
-      "rsi": 34.1,
-      "price": 0.06614,
-      "gap_pct": 19.2,
+      "rsi": 40.2,
+      "price": 0.06634,
+      "gap_pct": 14.4,
       "rsi_floor": 35,
       "gate_open": true,
       "cross_ok": true,
       "gap_ok": true,
       "slope4h_up": true,
       "dslope_up": true,
-      "status": "ARMED"
+      "status": "WATCHING"
     },
     "TRXUSDT": {
-      "rsi": 39.0,
-      "price": 0.33267,
-      "gap_pct": 0.7,
+      "rsi": 38.0,
+      "price": 0.33196,
+      "gap_pct": 1.1,
       "rsi_floor": 35,
       "gate_open": false,
       "cross_ok": false,
       "gap_ok": false,
-      "slope4h_up": true,
+      "slope4h_up": false,
       "dslope_up": true,
       "status": "GATED"
     }
