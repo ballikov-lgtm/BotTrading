@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-10-12T21:30:53.480Z",
+  "scanDate": "2026-10-12T23:46:00.940Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
   "tickersWithError": 0,
-  "elapsedMs": 297799,
+  "elapsedMs": 313809,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -64,7 +64,7 @@
       "dailySma200": 7.42,
       "rsi50Target": 4.27,
       "note": "RSI oversold but MACD not yet rising",
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "GME",
@@ -90,7 +90,7 @@
       "dailySma200": 22.36,
       "rsi50Target": 23.5,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "PLTR",
@@ -116,7 +116,7 @@
       "dailySma200": 152.41,
       "rsi50Target": 186.93,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "V",
@@ -142,7 +142,7 @@
       "dailySma200": 338.33,
       "rsi50Target": 370.93,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "ABBV",
@@ -152,7 +152,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 11.7,
+        "dailyChoppinessLow": 11.6,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -168,7 +168,7 @@
       "dailySma200": 232.91,
       "rsi50Target": 265.19,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "XLE",
@@ -194,7 +194,7 @@
       "dailySma200": 57.16,
       "rsi50Target": 63.41,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "XOM",
@@ -220,7 +220,7 @@
       "dailySma200": 150.59,
       "rsi50Target": 163.8,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "AI",
@@ -246,7 +246,7 @@
       "dailySma200": 10.17,
       "rsi50Target": 10.87,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "F",
@@ -272,7 +272,7 @@
       "dailySma200": 13.46,
       "rsi50Target": 12.79,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "GS",
@@ -298,7 +298,7 @@
       "dailySma200": 959.85,
       "rsi50Target": 937.13,
       "note": null,
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "RIOT",
@@ -376,7 +376,7 @@
       "dailySma200": 963.99,
       "rsi50Target": 927.33,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "RIVN",
@@ -385,8 +385,8 @@
       "score": 53,
       "scoreBreakdown": {
         "weeklyTrendDirection": 13.1,
-        "weeklyAdxHealthyBand": 11.5,
-        "dailyChoppinessLow": 8.4,
+        "weeklyAdxHealthyBand": 11.6,
+        "dailyChoppinessLow": 8.5,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -394,7 +394,7 @@
       "rsi": 30.2,
       "macdDirection": "falling",
       "weeklyAdx": 12.9,
-      "choppinessIdx": 49.4,
+      "choppinessIdx": 49.3,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 13.539999961853027,
@@ -402,7 +402,7 @@
       "dailySma200": 15.98,
       "rsi50Target": 14.95,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "PG",
@@ -412,7 +412,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 9.9,
         "weeklyAdxHealthyBand": 5.6,
-        "dailyChoppinessLow": 10,
+        "dailyChoppinessLow": 10.1,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -428,7 +428,7 @@
       "dailySma200": 147.79,
       "rsi50Target": 147.42,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "DE",
@@ -1234,7 +1234,7 @@
       "dailySma200": 194.99,
       "rsi50Target": 191.27,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "CVX",
@@ -1390,7 +1390,7 @@
       "dailySma200": 43.22,
       "rsi50Target": 42.08,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "AMAT",
@@ -1468,7 +1468,7 @@
       "dailySma200": 23.88,
       "rsi50Target": 23.42,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "LRCX",
@@ -1962,7 +1962,7 @@
       "dailySma200": 100.15,
       "rsi50Target": 97.58,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "EWJ",
@@ -2066,7 +2066,7 @@
       "dailySma200": 60.8,
       "rsi50Target": 61.69,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "PFE",
@@ -2196,7 +2196,7 @@
       "dailySma200": 42.35,
       "rsi50Target": 41.93,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "EXPE",
@@ -2248,7 +2248,7 @@
       "dailySma200": 277.19,
       "rsi50Target": 283.84,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "MSTR",
@@ -2300,7 +2300,7 @@
       "dailySma200": 5.01,
       "rsi50Target": 3.66,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "UVXY",
@@ -2344,7 +2344,7 @@
       "rsi": 44,
       "macdDirection": "rising",
       "weeklyAdx": 21.2,
-      "choppinessIdx": 63.1,
+      "choppinessIdx": 63,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 169.14999389648438,
@@ -2508,7 +2508,7 @@
       "dailySma200": 98.96,
       "rsi50Target": 96.44,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "XHB",
