@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-10-14T20:55:24.164Z",
+  "scanDate": "2026-10-14T23:59:02.059Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
   "tickersWithError": 0,
-  "elapsedMs": 323824,
+  "elapsedMs": 296014,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -376,7 +376,7 @@
       "dailySma200": 147.89,
       "rsi50Target": 148.44,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "SLV",
@@ -480,7 +480,7 @@
       "dailySma200": 83.91,
       "rsi50Target": 83.17,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "CAT",
@@ -584,7 +584,7 @@
       "dailySma200": 233.4,
       "rsi50Target": 267.11,
       "note": null,
-      "transitionedFrom": "OVERBOUGHT_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "PFE",
@@ -688,7 +688,7 @@
       "dailySma200": 959.61,
       "rsi50Target": 929.96,
       "note": null,
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "XHB",
@@ -932,7 +932,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 16.8,
-        "dailyChoppinessLow": 12.2,
+        "dailyChoppinessLow": 12.3,
         "historicalExtremes": 25,
         "meanReversionActive": 20
       },
@@ -940,7 +940,7 @@
       "rsi": 44.7,
       "macdDirection": "falling",
       "weeklyAdx": 14.2,
-      "choppinessIdx": 46.9,
+      "choppinessIdx": 46.8,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 728.9500122070312,
@@ -2144,7 +2144,7 @@
       "dailySma200": 13.44,
       "rsi50Target": 12.7,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "EWJ",
@@ -2248,7 +2248,7 @@
       "dailySma200": 98.23,
       "rsi50Target": 100.19,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "WFC",
