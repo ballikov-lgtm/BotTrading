@@ -29,7 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.6.0';
+const STRATEGY_VERSION = '2.6.1';
 // v2.4.1 (2026-07-18) = ACCOUNTING RECONCILE. NOT a signal-logic change: the headline
 // LIVE net-P&L now reads the REAL Alpaca paper-account equity from
 // alpaca-account-sid.json (reconciled to the broker's fills) instead of summing the
@@ -1541,7 +1541,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.6.0 QUEUE-FOR-OPEN EXITS 2026-10-24 · AN EXIT THAT RIPENS AFTER THE CLOSE IS NOW HANDED TO THE BROKER FOR THE NEXT OPEN · BOOKS TIE TO THE BROKER TO THE CENT · NO REAL MONEY AT RISK ⚠
+  ⚠ PAPER TRADING · V2.6.1 CLOSE-WINDOW ENTRIES 2026-10-24 · A NEW TRADE IS NOW JUDGED ~3 MINUTES BEFORE THE BELL, BECAUSE THE RULE HAS ALWAYS BEEN ENTER-AT-THE-CLOSE · AN EXIT THAT RIPENS AFTER THE CLOSE IS STILL HANDED TO THE BROKER FOR THE NEXT OPEN · NO REAL MONEY AT RISK ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1549,7 +1549,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.6.0 QUEUE-FOR-OPEN EXITS · NO EXIT CAN SLIP PAST THE CLOSE · HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN) · DUAL MODE PDT / PDT-SAFE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
+      <div class="brand-sub">V2.6.1 CLOSE-WINDOW ENTRIES · ENTRY = THE CLOSING BAR, NOT A MID-SESSION GUESS · NO EXIT CAN SLIP PAST THE CLOSE · HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN) · DUAL MODE PDT / PDT-SAFE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1670,7 +1670,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.6.0 · LIVE HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN, FLAGGED IF STALE) · REALISED P&L RECONCILED TO ALPACA FILLS · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.6.1 · LIVE HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN, FLAGGED IF STALE) · REALISED P&L RECONCILED TO ALPACA FILLS · BACKTEST TAKES EVERY SIGNAL WITH NO CAPS (LIVE ADDS A 5-CONCURRENT CAP + GATES BULLISH-ASSET SHORTS) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">

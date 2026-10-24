@@ -191,7 +191,20 @@ const IBM_BE_STOP = {
 // ═══════════════════════════════════════════════════════════════════════════
 section('V. Version + canon');
 
-check('V1  bot reports v2.6.0', BOT_VERSION, 'v2.6.0');
+// v2.6.1 made this assertion version-AGNOSTIC, following the convention this
+// release itself established (see SID/CLAUDE.md, v2.6.0 "OTHER SMALL FIXES"): the
+// exact version PIN lives in the NEWEST suite only. This suite tests v2.6.0
+// BEHAVIOUR, which must survive every later release; pinning it would force an
+// edit to every old suite on every bump, and an edited assertion is a weakened
+// assertion. The exact pin for the current release is in
+// tests/v2.6.1-close-window.test.mjs (V1/V2).
+function semverAtLeast(v, min) {
+  const n = String(v || '').replace(/^v/, '').split('.').map(x => parseInt(x, 10) || 0);
+  const m = String(min).split('.').map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) { if ((n[i] || 0) !== (m[i] || 0)) return (n[i] || 0) > (m[i] || 0); }
+  return true;
+}
+ok('V1  bot reports v2.6.0 or later (behaviour suite, not a version pin)', semverAtLeast(BOT_VERSION, '2.6.0'));
 check('V2  queue-for-open defaults ON', CONFIG.queueExitsForOpen, true);
 check('V3  weekend exit queue defaults ON', CONFIG.weekendExitQueue, true);
 check('V4  exits-only defaults OFF (a normal run still scans for entries)', CONFIG.exitsOnly, false);
@@ -794,7 +807,14 @@ section('L. Railway cron runner — shape, safety, no credentials');
   // Strip comments first — the doc block DISCUSSES setInterval as the documented
   // fallback, which must not be mistaken for using one.
   const rsCode = rs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  ok('L1  ONE-SHOT: no setInterval / setTimeout scheduler in the CODE',
+  // LABEL CLARIFIED in v2.6.1 (the predicate below is byte-identical). What this
+  // forbids is a RESIDENT SCHEDULER: a repeating setInterval, or a global
+  // setTimeout driving the cycle. v2.6.1 added ONE bounded awaited delay inside a
+  // single cycle (the close-window wait), imported as
+  // `{ setTimeout as sleepMs } from 'node:timers/promises'`, which is NOT the
+  // global timer and does not match this regex. That wait is bounded and asserted
+  // separately in tests/v2.6.1-close-window.test.mjs groups P and R.
+  ok('L1  ONE-SHOT: no resident setInterval/setTimeout scheduler in the CODE',
     !/setInterval\s*\(/.test(rsCode) && !/setTimeout\s*\(/.test(rsCode));
   ok('L1b ...and runCycle is invoked exactly once, behind a main-guard',
     (rsCode.match(/^\s*runCycle\(\)/gm) || []).length === 1 &&

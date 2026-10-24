@@ -14,7 +14,7 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 
 | Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
 |----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
-| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.6.0) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
+| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.6.0 deployed; **v2.6.1** in review) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
 | **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 | **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |
@@ -250,6 +250,47 @@ it on the real data, and prove it reproduces the exact bad number that was on di
 asserting the new code's number. A test that only checks the new value cannot tell you the bug
 was ever real, nor catch a "fix" that was really a no-op.
 
+### A counter that feeds a gate must count ONLY the thing the gate is about
+
+Earned on SID v2.6.1 (2026-10-24), but it is a general shape. SID's "how many trades today?"
+counter filtered its trade journal on the DATE alone — and that journal logs exits as well as
+entries. It fed the max-entries-per-day gate, so **a single position closing consumed the whole
+day's entry allowance** and the bot stopped looking for new trades. It did this for months.
+
+- **The signature is a gate that fires while the thing it guards has not happened.** The live log
+  said `Daily entry limit reached (1) — no new entries today` on a day the bot had opened nothing.
+  Any message of that shape is worth two minutes of reading the counter.
+- **Prefer a POSITIVE discriminator over a blacklist.** SID now requires the Side column to be
+  EXACTLY `long` or `short`, rather than excluding the known exit suffixes — a blacklist silently
+  re-breaks the moment someone adds an exit kind.
+- **Enumerate every WRITER before you trust a reader.** The fix was only safe because every
+  `appendTrade` call site in the repo was listed and checked, not just the ones in the obvious file.
+- **An unverified cap is a silent strategy change.** SID's 1-entry-per-day default was never in the
+  validated backtest (which has no caps at all) and nobody had written down that it diverged. If a
+  live limit is not in the backtest, say so in the memory file and say WHY it is there.
+
+### Verify a brief's numbers against the live code before building on them
+
+Recurring: v2.5.0 found the brief had quoted a signal price as a fill; v2.6.1 found the brief's
+per-day cap recommendation would have breached the concurrent-position cap (3 open + a 5/day budget
+= 8 concurrent) because the entry loop broke on the raw per-day number. **Re-derive the claim from
+the source, then implement.** It cost minutes and caught a real risk-control hole both times.
+
+### Line endings are NOT uniform in this repo — anchor-based patch scripts must detect them
+
+`SID/bot-sid.js` is LF; `SID/tests/v2.6.0-queue-for-open.test.mjs` is CRLF (`core.autocrlf=true`
+plus files created at different times). A Python/Node patch script with a multi-line anchor will
+silently fail its `count(old) == 1` assertion on the CRLF file. Read with `newline=''`, detect
+(`'
+' if s.count('
+') > s.count('
+')/2 else '
+'`), join anchors with that, and write back
+with `newline=''` so you don't rewrite the whole file's endings. Also: a `<<'EOF'` heredoc in this
+Git-Bash environment **eats backslashes** — `'\n'` arrives as `'
+'`. Write patch scripts to a
+file and run them, rather than piping them through a heredoc.
+
 ### Dashboard commit-message glossary
 Different workflows write different commit messages — don't confuse them when grepping git log:
 
@@ -365,7 +406,7 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 
 | Workflow | Cadence | Trigger | Strategy | What it does |
 |----------|---------|---------|----------|--------------|
-| `sid.yml` | 14:35 / 16:35 / 18:35 UTC weekdays | schedule + manual | SID | Runs SID bot. **Phase 1 (v2.6.0): still enabled**, running alongside the Railway cron service — see `SID/RAILWAY-DEPLOY.md` |
+| `sid.yml` | 14:35 / 16:35 / 18:35 UTC weekdays | schedule + manual | SID | Runs SID bot. **Phase 1 (v2.6.0): still enabled**, running alongside the Railway cron service — see `SID/RAILWAY-DEPLOY.md`. **v2.6.1 asymmetry:** an Actions run scans for entries whenever it lands (mid-session, unfinished bar) — the close-window discipline lives in `SID/railway-sid-runner.js`, not in `bot-sid.js`. One more reason to get to Phase 2. |
 | `sid-dashboard.yml` | 3× daily | schedule + manual | SID | Scans + rebuilds `docs/sid/index.html` |
 | `research.yml` | 2× daily | schedule + manual | Ironclad | Runs research, rebuilds `docs/index.html` |
 | `ironclad.yml` | Manual only | workflow_dispatch | Ironclad | Backup bot run (Railway is primary; Cloudflare blocks GH IPs from BitGet) |
@@ -375,7 +416,7 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 
 ## Live runtimes
 
-- **SID** → **GitHub Actions runner AND (v2.6.0) a Railway CRON service** (`SID/railway-sid-runner.js`, one-shot per cycle, `*/15 13-23 * * 1-5` UTC, gated on Alpaca `/v2/clock`). Both run in Phase 1 because GHA crons were landing ~3h late. Alpaca paper. Deploy + cutover plan: `SID/RAILWAY-DEPLOY.md`.
+- **SID** → **GitHub Actions runner AND (v2.6.0) a Railway CRON service** (`SID/railway-sid-runner.js`, one-shot per cycle, `*/15 13-23 * * 1-5` UTC, gated on Alpaca `/v2/clock`). Both run in Phase 1 because GHA crons were landing ~3h late. Alpaca paper. Deploy + cutover plan: `SID/RAILWAY-DEPLOY.md`. **v2.6.1:** the Railway runner now holds the ENTRY SCAN until **T-3 minutes before the close** (window derived from `/v2/clock`'s `next_close`, so DST and half-day sessions are the broker's problem) — because the strategy is defined as `entry = close`. Every other cycle is exits-only. Knobs `SID_CLOSE_WINDOW_MIN` / `SID_ENTRY_SUBMIT_OFFSET_MIN`; the cron expression is unchanged. See `SID/RAILWAY-DEPLOY.md` § 5a.
 - **Ironclad** → **Railway** (continuous 15-min loop). `railway-runner.js` is the driver. State pushed to `logs` branch.
 - **VWAP Scalper** → GitHub Actions runner. Schedule per `trade.yml`.
 

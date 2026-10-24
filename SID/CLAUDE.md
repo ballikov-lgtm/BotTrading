@@ -12,9 +12,9 @@ There are TWO `SID/` folders on disk and they are NOT the same:
 | Path | What it is | git branch | Use? |
 |---|---|---|---|
 | `Trading Setup/SID/` (parent) | **Stale snapshot** — older v1.0 code | `claude/silly-robinson-abcf6c` | ❌ **DO NOT EDIT.** Anything here is out of date. |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — working tree **v2.6.0** (uncommitted); origin/main is **v2.5.0** (commit `d05a770a0`) | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
+| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — origin/main is **v2.6.0** (commit `cd7b99b6d`, 2026-10-24); the working tree carries the UNCOMMITTED **v2.6.1** on top | `main` | ✅ **All bot work goes here.** This is what GitHub Actions and the Railway service deploy. |
 
-**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (**origin/main is v2.5.0**, commit `d05a770a0`, verified via `git show origin/main:SID/bot-sid.js`; the working tree carries the UNCOMMITTED v2.6.0 on top; historical note: **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
+**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. **CORRECTED 2026-10-24 (v2.6.1 session):** this file previously said origin/main was v2.5.0 with v2.6.0 uncommitted — v2.6.0 HAS SINCE SHIPPED (**origin/main = v2.6.0, commit `cd7b99b6d`**, and the Railway service is live and pushing `SID railway run ...` commits). The working tree now carries the UNCOMMITTED **v2.6.1** on top. *When this file and the live code disagree, the live code wins — fix the file.* (Historical note: historical note: **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
 
 **Rule of thumb before editing anything:**
 1. Run `git status` to confirm which branch you're on.
@@ -126,13 +126,21 @@ weekday crons: **14:35 / 16:35 / 18:35 UTC** (since the 2026-09-01 cron-redundan
 GHA crons are best-effort and were landing hours late, sometimes past the US close). The
 workflow uses `working-directory: SID` so all `./` file paths resolve correctly.
 
-**2. Railway CRON service** (v2.6.0) — `SID/railway-sid-runner.js`, recommended schedule
+**2. Railway CRON service** (v2.6.0, timing reworked in v2.6.1) — `SID/railway-sid-runner.js`, schedule
 `*/15 13-23 * * 1-5` (UTC). This is a **one-shot cron job, NOT an always-on loop**: each run
 pulls state from `main` via the GitHub Contents API, runs `bot-sid.js` once, pushes changed
 state back, and exits, so it is billed per execution rather than resident 24/7. Added because
 GHA crons were landing ~3h late (14:35 → ~18:15, 18:35 → ~21:10 UTC) while Railway
 documents its cron as varying only "by a few minutes". Whether a cycle does the full scan or
 the cheap exits-only path is decided by **Alpaca's `/v2/clock`**, never a hardcoded calendar.
+
+**v2.6.1 — ENTRIES HAPPEN ONCE A DAY, AT THE CLOSE.** A Railway cycle that starts inside the
+**close window** (default the final 20 minutes, derived from `/v2/clock`'s `next_close`) WAITS to
+**T-3 minutes**, re-reads the clock, and only then runs the entry scan — because the strategy is
+defined as `entry = close`, so a mid-session scan judges an unfinished bar. EVERY OTHER CYCLE IS
+EXITS-ONLY. Knobs: `SID_CLOSE_WINDOW_MIN` (20) / `SID_ENTRY_SUBMIT_OFFSET_MIN` (3) /
+`SID_MAX_ENTRY_WAIT_MIN` (30). The cron expression needs no change. **Note the Phase-1 asymmetry:**
+this discipline lives in the RUNNER, so a GitHub Actions run still scans whenever it lands.
 Deploy + verification + rollback: **`SID/RAILWAY-DEPLOY.md`**.
 
 **This is SID's OWN Railway service**, separate from Ironclad's. SID owns
@@ -2095,10 +2103,11 @@ and reports `BOT_VERSION = v2.5.0` with every new + pre-existing export resolvin
 
 ---
 
-### QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (v2.6.0, 2026-10-24) - WORKING TREE, NOT COMMITTED
+### QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (v2.6.0, 2026-10-24) - ✅ SHIPPED, commit `cd7b99b6d`
 
-**Status: WORKING TREE ONLY - nothing committed, pushed, or executed against Alpaca (per
-brief). Every broker interaction in this session was a read-only doc fetch; NO order was
+**Status: SHIPPED 2026-10-24 as commit `cd7b99b6d`; the Railway cron service is DEPLOYED and
+pushing `SID railway run ...` state commits. (It was working-tree-only when first written up.)
+Nothing was executed against Alpaca during its build — Every broker interaction in this session was a read-only doc fetch; NO order was
 submitted, cancelled or modified.** SID-owned files only (plus root `CLAUDE.md`, which is the
 shared index). **NO canon rule change** - RSI 30/70, RSI(3), MACD alignment, the weekly gates,
 the 45/55 no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings
@@ -2418,6 +2427,288 @@ signal-level and no signal rule moved).
   `SID/__pycache__/`, a dozen untracked `backtest-v2.1-validation-report-*.{json,csv}`, and
   `SID/scripts/*.py` one-offs. Not touched; worth a housekeeping sweep.
 
+---
+
+### CLOSE-WINDOW ENTRY EXECUTION + TWO ENTRY-SUPPRESSION FIXES (v2.6.1, 2026-10-24) - WORKING TREE, NOT COMMITTED
+
+**Status: WORKING TREE ONLY - nothing committed or pushed (per brief). NO order was submitted,
+cancelled or modified; every broker call was a read-only GET (`/v2/clock`, `/v2/calendar`).**
+SID-owned files only, plus the root `CLAUDE.md` index. **NO canon rule change** - RSI 30/70,
+RSI(3), MACD alignment (`macdRising` = MACD today > MACD yesterday), the weekly gates, the 45/55
+no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, the
+AUTO/HUMAN tiers, the 50% TP1 portion and `entry = close` are byte-for-byte unchanged. Asserted by
+test group V (17 checks on the live source + CONFIG).
+
+#### THE MEASURED MISS (three separate defects, all of which COST ENTRIES)
+
+**1. The run never landed in-hours.** Over the 25 trading days to 2026-10-23, **SEVEN (28%) had
+ZERO sid.yml runs inside market hours** - every run arrived after the 20:00 UTC close, where
+`alpaca-executor` refuses every order. Verified independently from `gh run list --workflow=sid.yml`:
+the zero-in-hours days are 09-28, 10-05, 10-07, 10-08, 10-12, 10-13, 10-19. **MCD is the named
+case:** replaying the bot's OWN `detectEntrySignal` over MCD's real 5y bars returns
+**LONG on the 2026-10-05 bar** (entry 233.04, stop 229, signalDate 2026-09-30) **and again on the
+2026-10-08 bar** (entry 236.90, stop 230, signalDate 2026-10-07) - and on BOTH days every run landed
+after the bell (05 Oct 21:34 / 22:53 / 00:17; 08 Oct 20:01 / 21:27 / 23:31 UTC).
+
+**2. Even an in-hours run was judging an UNFINISHED bar.** `detectEntrySignal`'s trigger sets
+`const ep = closes[i]` -> `entry: ep`, i.e. **the strategy is defined as entering at the signal
+bar's CLOSE**. A mid-session scan therefore reads the entry price AND the RSI AND the MACD direction
+off a day that has not finished. **Measured, from the live books:** three real entries taken 12-28
+minutes before the bell booked a 'close' that was **0.48% (HD), 0.49% (HON), 0.03% (IYR)** away from
+that day's OFFICIAL close (HD 312.35 vs 310.87; HON 204.44 vs 203.44; IYR 98.93 vs 98.90). On HD,
+whose stop sat ~2.7% below entry, 0.48% is **~18% of the risk unit**.
+
+**3. An EXIT consumed the day's ENTRY budget** - see FIX A below. This is the one that actually
+blocked MCD on 8 Oct, and it had nothing to do with timing.
+
+#### PART 1 - THE CLOSE WINDOW (in the RUNNER's timing, never in the strategy)
+
+`SID/railway-sid-runner.js` only. Three named, env-overridable constants:
+
+| Constant | Env | Default | What it is |
+|---|---|---|---|
+| `CLOSE_WINDOW_MIN` | `SID_CLOSE_WINDOW_MIN` | **20** | How close to the bell a cycle must START to be THE entry cycle. **0 = never scan entries** (documented switch). |
+| `ENTRY_SUBMIT_OFFSET_MIN` | `SID_ENTRY_SUBMIT_OFFSET_MIN` | **3** | Minutes before the close at which the scan actually runs. |
+| `MAX_ENTRY_WAIT_MIN` | `SID_MAX_ENTRY_WAIT_MIN` | **30** | Absolute ceiling on one wait. Belt-and-braces. |
+
+`intEnv` preserves a legitimate **0** in both knobs (`parseInt(x) || def` would clobber it) - same
+helper shape as `rearmCooldownLong`.
+
+**Two new pure exported functions, both suite-driven:**
+- **`etFields(ts)`** -> `{minutes, isoDate, offset}` or `null`. **Same discipline as
+  `alpaca-executor.js#etMinutesOfDay`: the offset MUST be `-04:00` or `-05:00`.** Confirmed against
+  the live clock - Alpaca stamps `timestamp` with nanoseconds AND an ET offset
+  (`2026-10-24T16:02:45.164880518-04:00`) and `next_close` with neither fractional seconds nor UTC
+  (`2026-10-26T16:00:00-04:00`). If Alpaca ever switches to `Z`, this returns null, the window
+  becomes `clock_unreadable`, and we DON'T scan - rather than silently reading UTC digits as ET.
+  NOT shared with the executor's method (that one is bound to a live `this.clock` and only reads
+  `timestamp`); test Q7 pins the two together on the same input in both offsets so they can't drift.
+- **`planEntryWindow(clock, opts)`** -> `{marketOpen, entryScan, waitMs, phase, ...}`. Phases:
+  `closed` | `clock_unreadable` | `window_disabled` | `past_close` | `pre_window` | `wait_then_scan`
+  | `scan_now`. **Derived entirely from `/v2/clock`'s `next_close` for the CURRENT session** - and it
+  REFUSES if `next_close`'s ET date != `timestamp`'s ET date (defensive: `is_open` true with
+  tomorrow's close is impossible for US equities, so don't compute a window from the wrong day).
+
+**`resolveEntryWindow({readClock, sleep, log, opts})`** is the cycle's timing phase, with its
+dependencies INJECTED so the suite executes the shipped control flow (group R) instead of a
+re-implementation. Safety properties, all structural rather than hoped-for:
+- the wait is clamped THREE ways: the window, `MAX_ENTRY_WAIT_MIN`, and **`minutesToClose - 1`** - so
+  it **always wakes at least a minute before the bell even if the offset is 0**;
+- the clock is **RE-READ on waking**; market closed / halted / early close moved / clock unreadable /
+  clock unavailable -> `Entry scan ABANDONED`, never fired into a shut market (tests R6-R10);
+- it sleeps **AT MOST ONCE**; a backwards-moving broker clock scans immediately (R11).
+
+**CYCLE ORDER CHANGED, deliberately: clock+wait FIRST, state pull SECOND.** v2.6.0 pulled state
+then read the clock. A cycle that pulls and then sleeps 17 minutes runs the bot against state up to
+17 minutes stale, which a concurrent GHA run could have moved. Asserted by R16.
+
+**The sleep is `import { setTimeout as sleepMs } from 'node:timers/promises'`** - not the global
+timer, and one awaited call, so the v2.6.0 L1 one-shot assertion still holds BY PREDICATE. I
+**clarified L1's LABEL** (predicate byte-identical) rather than leave it claiming something the
+bounded wait makes untrue; the wait's bounds are asserted positively in the v2.6.1 suite.
+
+#### WHAT HAPPENS TO THE CRON TICK DURING THE WAIT (the question to have an answer for)
+
+**Railway SKIPS it** - "if a previous execution is still running when the next scheduled execution
+is due, Railway will skip the new cron job." On `*/15` with a 20m window the wait spans at most ONE
+tick. That is harmless, and is the overlap guard working:
+- the skipped tick would have been an EXIT cycle, and the waiting cycle does exit management itself
+  when it wakes - still in-hours, just later;
+- SID's exits are DAILY-BAR triggers (RSI 50, SMA50/200 touch), so reading them at T-3 is **more**
+  faithful than at T-18;
+- intraday protection never depended on the bot running: the stop is a resting GTC order at the
+  broker throughout the wait;
+- anything still ripe after the bell is queued for the next open by the first post-close tick (v2.6.0).
+It also means the window can never produce TWO entry scans in one session.
+
+#### CRON EXPRESSION: **NO CHANGE NEEDED** (proven, not asserted)
+
+`*/15 13-23 * * 1-5` lands exactly one in-window tick in every regime. Test group S enumerates all
+44 ticks and runs `planEntryWindow` on each:
+
+| Session | Close ET | Close UTC | Window UTC | Tick |
+|---|---|---|---|---|
+| EDT normal | 16:00 | 20:00 | 19:40-20:00 | **19:45** |
+| EST normal | 16:00 | 21:00 | 20:40-21:00 | **20:45** |
+| EDT early close | 13:00 | 17:00 | 16:40-17:00 | 16:45 |
+| EST early close (**2026-11-27**, confirmed `close: 13:00` in `/v2/calendar`) | 13:00 | 18:00 | 17:40-18:00 | **17:45** |
+
+**The structural reason:** a half-open window of >= 15 minutes always contains a quarter-hour mark,
+whatever the close time. **THE RULE TO RESPECT: `SID_CLOSE_WINDOW_MIN` must be >= the cron
+interval.** At exactly 15 there is zero margin and Railway's "vary by a few minutes" could push the
+tick past the submit point; 20 gives 5 minutes of slack. **Documented upgrade: 35** makes the window
+span TWO ticks - the first claims the slot and Railway skips the second, so you still get exactly one
+scan at T-3 but a skipped/dead first tick is covered.
+
+**Cost:** ~12 min of wait per trading day ~= 250 container-minutes/month at 60-80 MB ~= **under 1p
+a month** on Railway's published $10/GB-month memory rate, and a sleeping process uses ~no vCPU.
+(The v2.6.0 caveat stands: "cron bills no idle time" is inferred from doc intent - check the bill.)
+
+#### PART 2 - FIX A: AN EXIT WAS EATING THE DAY'S ENTRY BUDGET (a real live bug)
+
+`countTodayTrades()` filtered `trades-sid.csv` on `l.startsWith(today)` - **every row dated today,
+EXITS INCLUDED** - and fed the `maxPerDay` gate, whose default was **1**. So one close consumed the
+whole day's entry allowance and `run()` returned before the scan.
+
+**PROVEN LIVE on 2026-10-08, GHA run `37836390871`:** the run booked HON's stop-out at **20:02:09**
+and at **20:02:10** printed `Daily entry limit reached (1) - no new entries today` and returned -
+blocked by the row it had itself just written one second earlier. **All three** of that day's runs
+printed it (20:02, 21:27, 23:31), so MCD's LONG was never evaluated. **17 trading days in the
+committed CSV carry an exit row with NO entry row** (06-01, 06-11, 06-24, 06-25, 07-01, 07-02,
+07-15, 07-22, 07-23, 08-10, 09-01, 09-02, 09-04, 09-08, 09-10, 10-01, 10-08) - every subsequent run
+on each was blocked identically.
+
+**FIX: `countTodayEntries()` counts ENTRY rows only, via a POSITIVE test on the `Side` column**
+(exactly `long` or `short`), deliberately NOT a blacklist of exit suffixes - so a future exit kind
+cannot silently re-break the gate. **Verified by enumerating EVERY `appendTrade` call site in the
+repo** (do this again if you ever touch the CSV schema):
+
+| Call site | Side written | Kind |
+|---|---|---|
+| `bot-sid.js` scan entry | `signal.signal` -> `long`/`short` | **ENTRY** |
+| `approve-trade.js` | `side` -> `long`/`short` | **ENTRY** |
+| `recordExternalClose` | `${side}-extclose` | exit |
+| `bookQueuedExitFill` (TP1) | `${side}-tp1` | exit |
+| `bookQueuedExitFill` (full) | `${side}-tp2` / `${side}-exit` | exit |
+| `checkPositions` Branch A | `${side}-tp1` | exit |
+| `checkPositions` Branch B | `${side}-tp2` | exit |
+| `manual-close.js` | `${side}-manualclose` | exit |
+
+and against the committed CSV's distinct values (`long`, `short`, `long-tp1`, `short-tp1`,
+`long-tp2`, `short-tp2`, `long-extclose`, `short-extclose`). The old name is gone from the file, so
+no caller is left on the broken counter (test T11).
+
+#### PART 3 - FIX B: THE ONLY POSITION LIMIT IS 5 CONCURRENT. THERE IS DELIBERATELY NO DAILY CAP.
+
+**WRITE THIS DOWN SO A FUTURE SESSION DOESN'T "FIX" IT BACK.** Alan's rule, verbatim:
+**"max 5 concurrent trades at any one time. This rule does not affect how many trades can be opened
+the same day."**
+
+- `CONFIG.maxPerDay` now defaults to **0 = UNLIMITED** (unset / 0 / negative). It is an OPTIONAL
+  manual throttle; `SID_MAX_PER_DAY` still overrides, because `sid.yml:62` and `RAILWAY-DEPLOY.md`
+  pass it through. An unset value can never block an entry.
+- `CONFIG.maxOpenPositions` stays **5**, untouched, and is now the SINGLE gate. New pure exported
+  `entryBudgetFor({openCount, maxOpenPositions, maxPerDay, entriesToday})` returns the budget =
+  `min(dayAllowance, freeSlots)`, and the entry loop breaks on THAT, never on the raw `maxPerDay`.
+- **WHY THE CLAMP IS NOT OPTIONAL:** the pre-v2.6.1 loop broke on `CONFIG.maxPerDay` directly. That
+  was only safe because the default was **1** (Step 1 guarantees room for one). Any larger value -
+  including the 5 an intermediate brief asked for - would have let a single run with 3 positions open
+  reach **8 concurrent** and blow straight through the cap. Invariant U11 brute-forces
+  `budget + openCount <= maxOpenPositions` over every combination.
+- Because free slots are recomputed every run, **a day on which positions CLOSE allows further
+  entries that same day** (test U5).
+
+**LIVE DELIBERATELY DIVERGES FROM THE BACKTEST, AND THIS IS THE DOCUMENTATION OF WHY.** The
+validated **280 trades / 73.9% WR / PF 3.19 / +$31,426** run (`backtest-sid-bot-parity.py`, tier1,
+5y, $200 fixed risk) has **NO per-day cap and NO concurrent cap** - it takes every signal. Both live
+limits are **RISK OVERLAYS**:
+- **5 concurrent is Alan's deliberate choice**, and the reason is exposure, not expectancy: it bounds
+  the account to **five simultaneous stop-losses if a global event moves everything at once**. KEEP IT.
+- **The old 1/day default was an undocumented EXTRA divergence** on top of that, never part of the
+  tested strategy. Removing it moves live CLOSER to the validated behaviour, not further away.
+
+#### OTHER FIX IN THIS RELEASE
+
+- **A dry-push cycle used to log `pushed=N` for files it never sent.** `pushState` now counts them as
+  `skipped` with a separate `dry` tally, and the cycle summary reads
+  `pushed=0 skipped=N (dry push: M would have been written)`. Cosmetic, but a runner that reports
+  work it didn't do is exactly how a bad deploy looks healthy.
+
+#### TESTED - `tests/v2.6.1-close-window.test.mjs`, 167 checks, 167 PASS
+
+Plus **`tests/v2.5.0-pnl-booking.test.mjs` 101/101** and **`tests/v2.6.0-queue-for-open.test.mjs`
+217/217** still green. **485 checks total.** Sandboxed (`SID/_v261_sandbox/`, removed on exit,
+asserted by Z1), **NO network, NO broker calls, NO real waiting.**
+
+Groups: **V** version + canon (17) | **W** the MCD regression witness (16) | **Q** `etFields` + DST +
+the executor-agreement pin (8) | **P** `planEntryWindow` across both regimes, edges, caps, overrides,
+the real early close (23) | **R** the SHIPPED `resolveEntryWindow` driven with an injected clock and
+a fake sleep, incl. all five abort paths (17) | **S** the cron-expression proof (6) | **T** FIX A incl.
+the witness (11) | **U** FIX B incl. the runtime env probe (17) | **X** exits provably untouched (11) |
+**L** runner shape/safety/docs (20) | **D** the ship-check asserted (14) | **M** segregation (4).
+
+**THE FIXTURE IS CHECKED IN** - `tests/fixtures/mcd-daily-to-2026-10-08.csv` (1244 real MCD daily
+bars, 2021-10-25 -> 2026-10-08, `date,high,low,close`) + a provenance README. **5 years is
+deliberate:** the live scan fetches `'5y'` because the v2.3 weekly SMA50/200 arm gate needs >= 200
+weekly buckets; a 2y fixture would silently DISABLE that gate and make the replay looser than the
+live bot.
+
+**REGRESSION WITNESSES (the point of the suite):**
+- **W7-W10:** the three REAL 8-Oct run times are fed in as the clock; `planEntryWindow` returns
+  `closed / entryScan:false / waitMs:0` for all three, and the PRE-v2.6.1 gate (`clock.open === true`)
+  is false on all three too - so the old runner performed **no in-session entry scan that day**. Then
+  W11-W13 show the in-window tick waiting 12m to 15:57 ET and the SAME bars still yielding the LONG.
+- **T1/T2:** the pre-fix counter is re-implemented verbatim and run on the real 8-Oct CSV state -
+  it returns **1**, i.e. exactly the number that blocked the run - before T3 proves the new counter
+  returns **0**. T6 shows the old counter saying **10** on a 10-row day the new one scores **2**.
+
+**Runtime proof (`node --check` is not enough):** real ESM `import()` of `bot-sid.js` ->
+`BOT_VERSION = v2.6.1` with every new + pre-existing export resolving; `node
+railway-sid-runner.js --version` -> `SID Railway cron runner v2.6.1`, exit 0; importing the runner is
+side-effect free. `SID_MAX_PER_DAY` plumbing probed in CHILD PROCESSES (unset -> 0, `3` -> 3, `0` ->
+0) because ESM caches the module and an in-process re-import cannot re-read env.
+
+**WHAT I COULD NOT PROVE - be honest about this:**
+- **Nothing is deployed and no cycle has actually waited.** The whole timing path is proven against
+  mocked clocks and a fake sleep; `resolveEntryWindow` has never run on Railway.
+- **`run()` and `checkPositions` are still not executed end-to-end** (they need network candle data
+  and a live executor). FIX A/B wiring inside `run()` is asserted by regex on the live source (U12-U14),
+  exactly as v2.6.0's group K did. `entryBudgetFor` and `countTodayEntries` ARE driven for real.
+- **MCD WOULD STILL NOT HAVE BEEN ENTERED on 5 or 8 Oct, and v2.6.1 does not change that.** Both days
+  sat inside the **14-day PPI blackout** (next PPI 2026-10-15, i.e. 10 and 7 days away). `isWithinPPIWindow`
+  reads `new Date()` so it cannot be driven historically - tests W14-W16 re-implement its arithmetic
+  against the committed `event-dates.json` and are LABELLED as a re-implementation. Worth knowing:
+  **46.2% of 2026 weekdays to date are PPI-blocked** (98 of 212), because PPI is monthly and the
+  window is pre-only 14 days. So the MCD miss had THREE independent causes and this release fixes
+  two of them. **The `entry = close` argument and the 28%-of-days-unreachable finding stand on their
+  own and are what justify the change.**
+- Whether Yahoo's `interval=1d` bar updates intraday was NOT re-verified this session (it was a
+  weekend). It is inferred - strongly - from the live books: three entries recorded 12-28 minutes
+  before the bell carry prices that differ from the official close, which can only happen if the
+  last bar is live. If that ever changed, the close window would be judging the PREVIOUS day's bar,
+  which would be a silent and serious regression. **First-canary check: compare the entry price a
+  close-window cycle records against that day's official close.**
+- The Phase-1 asymmetry is real: **the close-window discipline lives in the RUNNER, so a GitHub
+  Actions run still scans mid-session on an unfinished bar.** Deliberate (Actions is the fallback),
+  documented in `RAILWAY-DEPLOY.md`, and one more reason to get to Phase 2.
+
+#### SHIP-CHECK DONE (v2.6.1, RELEASE)
+
+`BOT_VERSION` v2.6.1 + detailed history one-liner; new exports (`countTodayEntries`,
+`entryBudgetFor`) and new runner exports (`etFields`, `planEntryWindow`, `resolveEntryWindow`,
+`CLOSE_WINDOW_MIN`, `ENTRY_SUBMIT_OFFSET_MIN`, `MAX_ENTRY_WAIT_MIN`); `sid-dashboard.js`
+`STRATEGY_VERSION='2.6.1'` + beta-banner / brand-sub / perf-note markers; `strategy-updates.json`
+new **RELEASE** entry at top (count auto 30 -> **31**, derived from array length in both the tab
+badge and the panel title); `SID-README.md` current-version line (with v2.6.0 folded into a
+`<details>` block so the header stays readable) + a v2.6.1 history row above v2.6.0 + the
+"Max open trades" row + 3 Files-table rows; `RAILWAY-DEPLOY.md` -> v2.6.1 with a new
+**§ 5a The close window** section, the three new variables, the cron-expression verdict, the
+skipped-tick explanation, the cost note, 4 new rollback rows and 2 new Phase-2 go/no-go criteria;
+root `CLAUDE.md` index row -> v2.6.1; this append (plus the two STALE-STATUS corrections above).
+`docs/sid/index.html` is BUILD OUTPUT - regenerated to VERIFY (v2.6.1 markers x8 + the `(31)` badge
++ the new entry) then **RESTORED to HEAD**, because `sid-dashboard.yml` rebuilds it from cloud state.
+No Pine change (the visualiser is signal-level and no signal rule moved).
+
+#### QUEUED / NOT DONE
+
+- **NOTHING COMMITTED OR PUSHED** - returned for Alan's review (per brief). If approved, push via the
+  standard protocol (fetch -> pull --rebase --autostash -> push; never without approval).
+- **⚠ ALAN'S ACTION, REQUIRED FOR FIX B TO TAKE EFFECT IN THE CLOUD: if the `SID_MAX_PER_DAY`
+  GitHub secret (or Railway variable) is SET - e.g. to `1` - DELETE it.** An explicitly set value
+  still wins over the new unlimited default, so the old throttle would survive the release. I cannot
+  read secret values to check.
+- **Alan's other action:** set `SID_CLOSE_WINDOW_MIN` / `SID_ENTRY_SUBMIT_OFFSET_MIN` only if he wants
+  something other than 20 / 3. The cron expression needs NO change.
+- **Branch B's latent double-count is STILL not fixed** (carried from v2.6.0): `checkPositions`
+  Branch B computes `totalPnl = pos.tp1_pnl + tp2Pnl` with no `tp1LegAlreadyInClosedRecords` guard.
+  Needs approval + its own witness. Candidate v2.6.2.
+- **The stop path still does not append to `trades-sid.csv`** (carried from v2.5.0). Note this now
+  interacts with FIX A: a missing exit row can only make the entry counter LOWER, so it cannot block
+  an entry - but it does mean the CSV is not a complete journal. Candidate v2.6.2.
+- `sid-account.json` `reconciledAt` still says 2026-07-17 (belongs to `reconcile-account.js --write`).
+- Untracked cruft still in the worktree: `SID/strategy-updates.json.tmp.37284.*`, `SID/__pycache__/`,
+  a dozen untracked `backtest-v2.1-validation-report-*.{json,csv}`, `SID/scripts/*.py` one-offs,
+  `docs/sid-scanner-preview.html`. Not touched; worth a housekeeping sweep.
 ---
 
 ## See also

@@ -32,7 +32,7 @@ const CONFIG = {
   riskPct:          parseFloat(process.env.SID_RISK_PCT)         || 0.01,   // V2 default 1% per instructor S3_Ep4
   maxPositionPct:   parseFloat(process.env.SID_MAX_POS_PCT)      || 0.10,   // 10% of account max per trade
   maxOpenPositions: parseInt(process.env.SID_MAX_POSITIONS)      || 5,      // Never hold more than 5 at once (v2.2.6: raised 3→5; 5 × 10% cap = ~50% max deployed)
-  maxPerDay:        parseInt(process.env.SID_MAX_PER_DAY)        || 1,      // Max new entries per run
+  maxPerDay:        Math.max(0, parseInt(process.env.SID_MAX_PER_DAY, 10) || 0),  // v2.6.1: NO DAILY CAP BY DEFAULT. 0 (or unset, or a negative) means UNLIMITED; set SID_MAX_PER_DAY to an integer for an optional manual cap. Alan's rule, verbatim: "max 5 concurrent trades at any one time. This rule does not affect how many trades can be opened the same day." So the ONE position limit is maxOpenPositions (5) - it bounds exposure to 5 simultaneous stop-losses if a global event moves everything at once - and it is a RISK OVERLAY, not a strategy rule: the validated 280-trade / 73.9% WR / PF 3.19 backtest has NO per-day and NO concurrent cap and takes every signal. The old default of 1/day was an undocumented EXTRA divergence on top of the concurrent cap, and (with the pre-v2.6.1 counter that also counted exits) the thing that actually blocked 2026-10-08. If five positions close during a day, further entries that day are allowed again, up to the concurrent cap.
   earningsWindow:   parseInt(process.env.SID_EARNINGS_WINDOW)    || 14,     // Skip if earnings within N days
   rsiNoGoLong:      parseFloat(process.env.SID_RSI_NOGO_LONG)    || 45,     // V2: reject long entry if RSI >= this
   rsiNoGoShort:     parseFloat(process.env.SID_RSI_NOGO_SHORT)   || 55,     // V2: reject short entry if RSI <= this
@@ -133,7 +133,8 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.6.0'; // V2.6.0 QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (execution plumbing + scheduling ONLY, NOT a signal-logic change). THE LIVE FAILURE: on 2026-09-09 IBM's TP2 (SMA50 touch) ripened in the last ~35 minutes of the session; the next bot run landed 21:06 UTC, an hour after the close, correctly swept the resting stop, then hit `Market closed - refusing to submit close for IBM` (alpaca-executor.js :520), re-protected the runner and gave up until the next run. Alan then did it by hand: cancel the stop, queue a market sell, filled at the next open (2 @ $238.39). With GHA crons landing ~3h late (14:35 -> ~18:15, 18:35 -> ~21:10 UTC) an exit that ripens late in the session can slip for DAYS - and ON-TIME crons would ALSO have missed this one, because the touch came after the last in-hours run. Hence both halves. (1) QUEUE-FOR-OPEN EXITS: when an exit triggers (TP1 partial, TP2, the daily-poll stop, or the v2.0 RSI-50 fallback) and the market is CLOSED, the bot now sweeps every resting order on the symbol (cancelAllOpenOrders + waitForNoOpenOrders - the shares cannot be freed otherwise) and submits the exit as a MARKET order the BROKER executes at the next open, recording a `pending_exit` block (order id, reason, shares, queued timestamp, trigger data) that is the single-fire guard: checkPositions SKIPS a position while one is pending, so a second order can never be queued and a queued TP1 cannot re-fire (tp1_hit only flips when the fill is BOOKED). Every later run reconciles `pending_exit` BEFORE syncPositions (load-bearing ordering - otherwise an overnight fill would be booked twice, once as an 'external' close): filled -> booked through the real-fill path at the price WEIGHTED from the per-fill activity rows (the v2.5.0 6dp-rounding pitfall), pending_exit cleared, and for a TP1 partial the break-even stop restored on the remainder; still open/accepted -> left strictly alone; cancelled/rejected/expired -> cleared, IMMEDIATELY re-protected with a stop, loud alarm. A rejected submission falls back to exactly the pre-v2.6.0 behaviour (re-protect, alert, retry) so a position is never both unprotected and unqueued. VERIFIED AGAINST THE ALPACA DOCS (2026-10-24): tif 'opg' is REJECTED between 09:28 and 19:00 ET and queued to the following day's opening auction after 19:00 - and 21:06 UTC is 17:06 ET, squarely in that dead zone - so queuedExitTif() picks 'opg' where Alpaca accepts it and a plain queued 'day' market order (documented: submitted after 16:00 ET it is 'queued up for release the next trading day') in between, alternating on retry; ET is read from the BROKER clock's own -04:00/-05:00 timestamp, never a hardcoded timezone, so DST is the broker's problem. DOCUMENTED TRADE-OFF: between the sweep and the open the position has NO resting stop, because a stop holds the shares and would block the queued exit; the exposure is the overnight gap on a position we are exiting anyway, and a market-on-open fill is equivalent-or-better than a stop triggering at that same open. ENTRIES ARE NEVER QUEUED - the two entry refusals (:202/:278) are untouched, because a stale entry signal must be re-evaluated against a fresh bar. (2) RAILWAY CRON RUNNER (SID/railway-sid-runner.js): one-shot (pull state from main via the GitHub Contents API -> run the bot once -> push changed state back SHA-aware with a re-pull-and-retry on conflict -> exit), driven by a Railway Cron Schedule rather than an always-on loop, gated on Alpaca's /v2/clock so the cheap out-of-hours cycle (SID_EXITS_ONLY) still reconciles and queues exits without a 112-ticker Yahoo scan. Runs ALONGSIDE the existing GHA crons in Phase 1 - they are NOT disabled in this release. CONCURRENCY IS MADE SAFE AT THE BROKER, not just in local state: every queued exit carries a DETERMINISTIC client_order_id (SID-<SYM>-<tag>-<YYYYMMDD>[-a<attempt>]), so a concurrent second submission is rejected by Alpaca as a duplicate instead of double-selling. (3) The weekend guard no longer returns BEFORE checkPositions - positions are managed at the weekend (a Friday-evening exit is queued for Monday's open; Friday 19:30 ET is Saturday UTC) while the ENTRY SCAN stays blocked, which is all that guard ever protected against. NO canon rule change: RSI 30/70, RSI(3), MACD alignment, the weekly gates, the 45/55 no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, the AUTO/HUMAN tiers and the 50% TP1 portion are byte-for-byte unchanged. Reverts: SID_QUEUE_EXITS_FOR_OPEN=false / SID_WEEKEND_EXIT_QUEUE=false. (paper trading, 2026-10-24)
+const BOT_VERSION = 'v2.6.1'; // V2.6.1 CLOSE-WINDOW ENTRY EXECUTION (scheduling + risk-overlay ONLY - not one strategy rule moved). THE MEASURED MISS: replaying this file's own detectEntrySignal over MCD's real bars returns LONG on the 2026-10-05 bar AND again on the 2026-10-08 bar, and on BOTH days every sid.yml run landed after the 20:00 UTC close (05 Oct 21:34 / 22:53 / 00:17; 08 Oct 20:01 / 21:27 / 23:31) where alpaca-executor refuses every order - so no entry was possible regardless of signal. Across the 25 trading days to 2026-10-23, SEVEN (28%) had ZERO runs inside market hours. THE DEEPER POINT: an entry here is DEFINED as `entry = close` (detectEntrySignal's trigger branch), so every mid-session run judges an UNFINISHED daily bar - measured on three real SID entries the booked 'close' was 0.48% / 0.49% / 0.03% off the official close, and on a trade with a ~2.7% stop distance half a percent is ~18% of the risk unit. FIX (in the RUNNER's timing, never in the strategy): the Railway cycle derives a CLOSE WINDOW from Alpaca /v2/clock's next_close for the CURRENT session (never a hardcoded hour, so the November DST switch and the half-day sessions are the broker's problem, and the -04:00/-05:00 offset is ASSERTED exactly as etMinutesOfDay does it - a future 'Z' makes the window unreadable rather than silently reading UTC digits as ET). A cycle that starts inside the window (SID_CLOSE_WINDOW_MIN, default 20m) WAITS to T-minus SID_ENTRY_SUBMIT_OFFSET_MIN (default 3m), RE-READS the clock, and only then runs the bot with the entry scan enabled, so the bar evaluated is effectively the closing bar; every other cycle runs SID_EXITS_ONLY=true (position management, no 112-ticker scan). The wait is bounded three ways (window, SID_MAX_ENTRY_WAIT_MIN, and minutesToClose-1 so it can never sleep past the bell), sleeps at most ONCE, and ABANDONS entries if the market closed/halted/went unreadable while it slept - never fires into a shut market. EXITS ARE UNTOUCHED (they ripen intraday and v2.6.0's queue-for-open already covers out-of-hours), and ENTRIES ARE STILL NEVER QUEUED for the next open. The cron tick that would fire during the wait is SKIPPED by Railway's overlap rule - harmless, because the waiting cycle does exit management itself when it wakes, still in-hours, and the resting broker stop protects throughout. TWO ENTRY-SUPPRESSION FIXES SHIP WITH IT (same theme - entries being silently lost). FIX A, a proven live bug: countTodayTrades() counted EVERY trades-sid.csv row dated today, exits included, and it feeds the maxPerDay gate - so with the then-default maxPerDay=1 a single close consumed the whole day's entry allowance and run() returned before the scan. On 2026-10-08 (GHA run 37836390871) the bot booked HON's stop-out at 20:02:09 and one second later printed `Daily entry limit reached (1)` and quit, blocked by the row it had just written itself; all three of that day's runs were blocked and MCD's LONG was never evaluated. 17 trading days in the committed CSV carry an exit row with no entry row. Now countTodayEntries() counts ENTRY rows only, using a POSITIVE test on the Side column (exactly 'long' or 'short') rather than a blacklist of exit suffixes, so a future exit kind cannot silently re-break it - verified against every appendTrade call site (entries write a bare side; exits write -extclose / -tp1 / -tp2 / -exit / -manualclose). FIX B, Alan's explicit decision, verbatim: "max 5 concurrent trades at any one time. This rule does not affect how many trades can be opened the same day." So THE ONLY POSITION LIMIT IS 5 CONCURRENT: CONFIG.maxPerDay now defaults to 0 = UNLIMITED (an unset or 0 SID_MAX_PER_DAY can never block an entry; set it to an integer for an optional manual throttle, which sid.yml and RAILWAY-DEPLOY.md still pass through), and the entry loop's budget is the FREE SLOTS (maxOpenPositions - openNow), so the concurrent cap is un-exceedable by construction rather than by luck - the pre-v2.6.1 loop drove off the raw maxPerDay, which was only safe because its default was 1. Because free slots are recomputed every run, a day on which positions CLOSE allows further entries that same day. Both live limits are RISK OVERLAYS, not strategy rules: the validated 280-trade / 73.9% WR / PF 3.19 backtest has NO per-day and NO concurrent cap and takes every signal, so the old 1/day default was an undocumented EXTRA divergence on top of the concurrent cap, and removing it moves live CLOSER to the validated behaviour. maxOpenPositions stays 5 deliberately - it bounds exposure to 5 simultaneous stop-losses if a global event moves everything at once. ACTION FOR DEPLOY: if the SID_MAX_PER_DAY GitHub secret / Railway variable is set to 1, DELETE it, or the old cap still applies in the cloud regardless of this default. Also fixed: a dry-push cycle used to log `pushed=N` for files it never sent; it now reports them as skipped. (paper trading, 2026-10-24)
+// V2.6.0 QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (execution plumbing + scheduling ONLY, NOT a signal-logic change). THE LIVE FAILURE: on 2026-09-09 IBM's TP2 (SMA50 touch) ripened in the last ~35 minutes of the session; the next bot run landed 21:06 UTC, an hour after the close, correctly swept the resting stop, then hit `Market closed - refusing to submit close for IBM` (alpaca-executor.js :520), re-protected the runner and gave up until the next run. Alan then did it by hand: cancel the stop, queue a market sell, filled at the next open (2 @ $238.39). With GHA crons landing ~3h late (14:35 -> ~18:15, 18:35 -> ~21:10 UTC) an exit that ripens late in the session can slip for DAYS - and ON-TIME crons would ALSO have missed this one, because the touch came after the last in-hours run. Hence both halves. (1) QUEUE-FOR-OPEN EXITS: when an exit triggers (TP1 partial, TP2, the daily-poll stop, or the v2.0 RSI-50 fallback) and the market is CLOSED, the bot now sweeps every resting order on the symbol (cancelAllOpenOrders + waitForNoOpenOrders - the shares cannot be freed otherwise) and submits the exit as a MARKET order the BROKER executes at the next open, recording a `pending_exit` block (order id, reason, shares, queued timestamp, trigger data) that is the single-fire guard: checkPositions SKIPS a position while one is pending, so a second order can never be queued and a queued TP1 cannot re-fire (tp1_hit only flips when the fill is BOOKED). Every later run reconciles `pending_exit` BEFORE syncPositions (load-bearing ordering - otherwise an overnight fill would be booked twice, once as an 'external' close): filled -> booked through the real-fill path at the price WEIGHTED from the per-fill activity rows (the v2.5.0 6dp-rounding pitfall), pending_exit cleared, and for a TP1 partial the break-even stop restored on the remainder; still open/accepted -> left strictly alone; cancelled/rejected/expired -> cleared, IMMEDIATELY re-protected with a stop, loud alarm. A rejected submission falls back to exactly the pre-v2.6.0 behaviour (re-protect, alert, retry) so a position is never both unprotected and unqueued. VERIFIED AGAINST THE ALPACA DOCS (2026-10-24): tif 'opg' is REJECTED between 09:28 and 19:00 ET and queued to the following day's opening auction after 19:00 - and 21:06 UTC is 17:06 ET, squarely in that dead zone - so queuedExitTif() picks 'opg' where Alpaca accepts it and a plain queued 'day' market order (documented: submitted after 16:00 ET it is 'queued up for release the next trading day') in between, alternating on retry; ET is read from the BROKER clock's own -04:00/-05:00 timestamp, never a hardcoded timezone, so DST is the broker's problem. DOCUMENTED TRADE-OFF: between the sweep and the open the position has NO resting stop, because a stop holds the shares and would block the queued exit; the exposure is the overnight gap on a position we are exiting anyway, and a market-on-open fill is equivalent-or-better than a stop triggering at that same open. ENTRIES ARE NEVER QUEUED - the two entry refusals (:202/:278) are untouched, because a stale entry signal must be re-evaluated against a fresh bar. (2) RAILWAY CRON RUNNER (SID/railway-sid-runner.js): one-shot (pull state from main via the GitHub Contents API -> run the bot once -> push changed state back SHA-aware with a re-pull-and-retry on conflict -> exit), driven by a Railway Cron Schedule rather than an always-on loop, gated on Alpaca's /v2/clock so the cheap out-of-hours cycle (SID_EXITS_ONLY) still reconciles and queues exits without a 112-ticker Yahoo scan. Runs ALONGSIDE the existing GHA crons in Phase 1 - they are NOT disabled in this release. CONCURRENCY IS MADE SAFE AT THE BROKER, not just in local state: every queued exit carries a DETERMINISTIC client_order_id (SID-<SYM>-<tag>-<YYYYMMDD>[-a<attempt>]), so a concurrent second submission is rejected by Alpaca as a duplicate instead of double-selling. (3) The weekend guard no longer returns BEFORE checkPositions - positions are managed at the weekend (a Friday-evening exit is queued for Monday's open; Friday 19:30 ET is Saturday UTC) while the ENTRY SCAN stays blocked, which is all that guard ever protected against. NO canon rule change: RSI 30/70, RSI(3), MACD alignment, the weekly gates, the 45/55 no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, the AUTO/HUMAN tiers and the 50% TP1 portion are byte-for-byte unchanged. Reverts: SID_QUEUE_EXITS_FOR_OPEN=false / SID_WEEKEND_EXIT_QUEUE=false. (paper trading, 2026-10-24)
 // V2.5.0 P&L BOOKING FIXES (accounting + execution plumbing, NOT a signal-logic change): the dashboard was reporting the WRONG profit because three independent booking bugs corrupted the stored records. Verified against the real Alpaca paper account on 2026-10-18 (read-only GETs): broker equity +$543.43, our ledger +$512.02. (1) EXTERNAL FULL CLOSE DROPPED A BOT-BOOKED TP1 LEG — recordExternalClose set total_pnl to the closed leg ALONE, while deriveLedger only counts an open position's tp1_pnl WHILE IT IS OPEN; so the instant a runner closed externally, a TP1 half banked by Branch A fell out of the books (IBM lost +$40.76 -> booked +$42.52 vs truth +$82.88; HON lost +$20.58 -> booked -$0.09 vs truth +$19.83). The bot's own TP2 path never had this bug (it already summed tp1_pnl + tp2Pnl). FIX: a full close now carries the TP1 leg into total_pnl, guarded by the new shared tp1LegAlreadyInClosedRecords() so the PYPL pattern — where the TP1 leg was itself written as a separate closed PARTIAL record (is_full_close:false, same id) — can never be counted twice. (2) THE SAME PREDICATE FIXES THE MIRROR DOUBLE-COUNT queued in v2.4.3: deriveLedger was adding a still-open position's tp1_pnl ON TOP of the closed partial record written for that same leg by the broker-OCO path. Both directions land together, each with its own regression witness. (3) STOP EXITS BOOKED THE STOP LEVEL, NOT THE REAL FILL — the daily-poll stop path submits a MARKET close but never overwrote exitPrice with filledAvgPrice, leaving pnl_source:'estimate' (HD booked 3sh @ $304.00 = -$24.96; the real fill was $303.346667 = -$27.01). v2.4.1 had fixed this for TP1/TP2 only; the stop path and the v2.0 RSI-50 fallback path now mirror the identical pollOrderFill/override shape, so NO close path leaves 'estimate' when a real fill exists. (4) ENTRY PRICE WAS THE SIGNAL CLOSE, NOT THE ENTRY FILL — run() stored signal.entry (the bar the rules fired on) for a MARKET order, so every share of entry error multiplied across the whole position and through BOTH exit legs (HON 204.22 vs real 204.44; IBM 217.13 vs 217.23; HD 312.32 vs 312.35; RIOT 19.65 vs 19.665526). approve-trade.js already polled the fill correctly — the main path now mirrors it, storing filledAvgPrice plus entry_source/signal_entry provenance. Share math, the stop level and riskUsd are deliberately NOT recomputed (the order is already submitted and the broker stop already rests at signal.stopLoss). NO canon rule change (RSI 30/70, RSI(3), MACD alignment, weekly gates, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, AUTO/HUMAN tiers and entry/arm/scan are byte-for-byte unchanged) — this is accounting and execution plumbing only. Ships with the v2.4.3 work (external-close fill-consumption guard, reconcile skipping open positions, the per-run Alpaca snapshot write + sid.yml staging, dashboard stale-snapshot flag) re-badged into this release, and a one-off idempotent record correction (SID/scripts/fix-pnl-booking-2026-10-18.js) that ties the books to the broker: corrected records sum +$543.94, less $0.51 of real TAF/CAT/REG fee activities = +$543.43 = Alpaca equity EXACTLY. (paper trading, 2026-10-18)
 // V2.4.3 ACCOUNTING/DISPLAY FIXES (NOT a signal-logic change): (1) DOUBLE-COUNT FIX — recordExternalClose re-scanned ALL of Alpaca's filled exit orders on every external close, so a SECOND external close on the same symbol walked back and re-used fills the FIRST close had already booked. PROVEN on the PYPL short (17sh, entry $60.675): leg 1 banked 9sh @ $52.40 = +$74.47 (correct); leg 2's real fills were 6 @ $56.66 + 2 @ $56.71 (avg $56.6725 → true +$32.02) but the bot booked $57.58 at "exit $53.4775", which decodes EXACTLY as (2 x 56.71 + 6 x 52.40) / 8 — two shares at the correct new price then SIX back-filled at leg 1's already-consumed $52.40. FIX: a consumed-fill ledger (consumedExitFillQty) subtracts, per broker order id, every quantity already stamped into a prior closed record's exit_fills (plus the bot's own TP1 partial-close order, now stamped as tp1_close_order_id) before pricing the new close — mirroring reconcile-account.js's allocateFillsFIFO lot-consumption model rather than inventing a second one. When the surviving fills cover FEWER shares than the close, the record is stamped pnl_source:'estimate' + exit_fill_shortfall instead of silently extrapolating a full-coverage 'alpaca_fill'. (2) STALE-SNAPSHOT FIX — alpaca-account-sid.json (the dashboard's LIVE net-P&L headline) had only ONE writer: reconcile-account.js under an explicit --write. The bot never wrote it, so the dashboard rendered a FROZEN 2026-07-17 equity for 7 weeks. The bot now writes the snapshot every run from its existing preflight account read (equity/startingEquity/netPnl/source/mode/asOf), mode-segregated (paper → alpaca-account-sid.json, live → alpaca-account-<mode>-sid.json) so a paper run can never overwrite a live snapshot; sid.yml now stages the file so the refresh actually reaches the dashboard; and sid-dashboard.js flags a snapshot older than SNAPSHOT_STALE_DAYS (2) as STALE instead of presenting it as current. NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan and the v2.2.5/2.2.6/v2.4.2 cancel-first + sweep close mechanics are all byte-for-byte unchanged). (paper trading, 2026-09-05)
 // V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbing, NOT a signal-logic change): a v2.2 SHORT's intraday TP1 had no working exit — maintainV2_2BrokerOrders left the full-size entry stop holding ALL shares (it cancelled the wrong id after a blind 800ms sleep, and findOpenOrder's endsWith('-stop')/('-tp1') MISSED the timestamped re-placed orders — the twin of the v2.2.6 closePosition bug), so the runner stop + TP1 OCO failed `insufficient qty available: 0` and, because Branch A skips the daily-poll TP1 for v2.2 shorts, the short could never bank TP1 (live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open). FIX: (1) findOpenOrder matches `<suffix>(-\\d+)?$` so timestamped re-places are found; (2) maintain cancels the resting stop by the TRACKED pos.brokerStopOrderId (robust to any client_order_id) + the suffix-found stop + (pre-TP1 short) any resting TP1 OCO, WAITS for release via waitForNoOpenOrders (not a sleep), then places the runner-only stop; (3) the TP1 half is placed as the OCO buy-limit at the RSI-50 target with shares now free — where price has already passed the target (PYPL) it is marketable → fills → banks TP1. (4) Before ANY close/reset the bot sweeps ALL open orders on that ONE symbol (new executor.cancelAllOpenOrders) — incl. a MANUAL break-even stop placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag) that the tracked-id/suffix cancels can't see and that would otherwise hold the shares + hang waitForNoOpenOrders. Symbol-scoped (never other symbols). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan all byte-for-byte unchanged; the v2.2.5/2.2.6 cancel-first CLOSE mechanics untouched — only a broader symbol-scoped sweep added ahead of them). Ships with the sid.yml cron-redundancy change. (paper trading, 2026-09-01)
@@ -676,11 +677,70 @@ function appendTrade(row) {
   fs.appendFileSync(TRADES_PATH, row + '\n');
 }
 
-function countTodayTrades() {
+// v2.6.1 FIX A - count only ENTRY rows. `trades-sid.csv` is a journal of
+// EVERYTHING the bot books, exits included, and this counter feeds the
+// optional `SID_MAX_PER_DAY` throttle. With the old `startsWith(today)` it counted exits
+// too, so (with the then-default maxPerDay=1) ONE close consumed the whole
+// day's entry allowance and `run()` returned before the scan.
+//
+// PROVEN LIVE, 2026-10-08 (GitHub Actions run 37836390871): the run booked
+// HON's stop-out at 20:02:09 and then at 20:02:10 printed
+//   `Daily entry limit reached (1) - no new entries today`
+// and returned - blocked by the row it had itself just written one second
+// earlier. All three of that day's runs were blocked, so MCD's LONG signal on
+// that bar was never even evaluated. 17 separate trading days in the
+// committed CSV carry an exit row with no entry row, i.e. every subsequent
+// run on each of those days was blocked the same way.
+//
+// THE DISCRIMINATOR IS THE `Side` COLUMN, and the test is deliberately
+// POSITIVE (Side is EXACTLY 'long' or 'short') rather than a blacklist of exit
+// suffixes, so a future exit kind cannot silently re-break the gate. Verified
+// against EVERY appendTrade call site in the repo:
+//   ENTRY -> bare side:     bot-sid.js (`signal.signal`), approve-trade.js (`side`)
+//   EXIT  -> suffixed side: `-extclose`, `-tp1`, `-tp2`, `-exit`, `-manualclose`
+// and against the committed CSV's distinct values: long, short, long-tp1,
+// short-tp1, long-tp2, short-tp2, long-extclose, short-extclose.
+function countTodayEntries() {
   if (!fs.existsSync(TRADES_PATH)) return 0;
   const today = todayString();
   const lines = fs.readFileSync(TRADES_PATH, 'utf8').trim().split('\n');
-  return lines.slice(1).filter(l => l.startsWith(today)).length;
+  return lines.slice(1).filter(l => {
+    const f = l.split(',');
+    if (f[0] !== today) return false;
+    const side = (f[4] || '').trim();
+    return side === 'long' || side === 'short';
+  }).length;
+}
+
+// v2.6.1 - how many NEW entries may one run open?
+//
+// THE ONLY POSITION LIMIT IS maxOpenPositions (5 CONCURRENT). Alan's rule,
+// verbatim: "max 5 concurrent trades at any one time. This rule does not affect
+// how many trades can be opened the same day." So the budget is the FREE SLOTS,
+// and the entry loop stops when they run out - which makes the concurrent cap
+// un-exceedable by construction. Before v2.6.1 the loop broke on the raw
+// maxPerDay, which was only safe because its default was 1 (Step 1 guarantees
+// room for one); ANY larger value would have let a single run breach the cap.
+//
+// `maxPerDay` is an OPTIONAL manual throttle, OFF by default (0/unset/negative =
+// unlimited). It can never block an entry unless explicitly configured.
+//
+// Both limits are RISK OVERLAYS, not strategy rules: the validated 280-trade /
+// 73.9% WR / PF 3.19 backtest has NO per-day and NO concurrent cap and takes
+// every signal. maxOpenPositions=5 is kept deliberately - it bounds exposure to
+// 5 simultaneous stop-losses if a global event moves everything at once.
+//
+// Pure and exported so the regression suite drives THIS function, not a copy.
+//
+// @returns {{budget:number, freeSlots:number, perDayCap:number|null,
+//            dayAllowance:number, reason:'ok'|'daily_cap'|'no_free_slots'}}
+function entryBudgetFor({ openCount = 0, maxOpenPositions = 0, maxPerDay = 0, entriesToday = 0 } = {}) {
+  const freeSlots    = Math.max(0, maxOpenPositions - openCount);
+  const perDayCap    = maxPerDay > 0 ? maxPerDay : null;          // null = unlimited
+  const dayAllowance = perDayCap === null ? Infinity : Math.max(0, perDayCap - entriesToday);
+  const budget       = Math.max(0, Math.min(dayAllowance, freeSlots));
+  const reason       = budget > 0 ? 'ok' : (dayAllowance <= 0 ? 'daily_cap' : 'no_free_slots');
+  return { budget, freeSlots, perDayCap, dayAllowance, reason };
 }
 
 // ── Compounding Account State ─────────────────────────────────────────────────
@@ -3884,12 +3944,45 @@ async function run() {
     return;
   }
 
-  // Step 2: Check daily new-entry limit
-  if (countTodayTrades() >= CONFIG.maxPerDay) {
-    console.log(`\n⚠️  Daily entry limit reached (${CONFIG.maxPerDay}) — no new entries today`);
+  // Step 2: how many NEW ENTRIES may this run open?
+  //
+  // v2.6.1 - THE ONLY POSITION LIMIT IS 5 CONCURRENT OPEN POSITIONS.
+  // Alan's rule, verbatim: "max 5 concurrent trades at any one time. This rule
+  // does not affect how many trades can be opened the same day." So the budget
+  // is simply the FREE SLOTS, and the entry loop stops when they are used up -
+  // the concurrent cap is un-exceedable by construction, not by luck. (Before
+  // v2.6.1 the raw maxPerDay drove the loop; that was safe only because its
+  // default was 1, which Step 1 guarantees there is room for. Any larger value
+  // would have let one run breach maxOpenPositions.)
+  //
+  // THERE IS DELIBERATELY NO DAILY CAP. CONFIG.maxPerDay is 0 (= unlimited)
+  // unless SID_MAX_PER_DAY is explicitly set, in which case it applies as an
+  // optional manual throttle on top. An unset value can never block an entry,
+  // and because free slots are recomputed every run, a day on which positions
+  // CLOSE allows further entries that same day.
+  //
+  // The counter it throttles against is countTodayEntries() - ENTRY rows only.
+  // See FIX A: the old counter counted exits, so one close consumed the whole
+  // 1/day allowance (proven live on 2026-10-08).
+  const perDayCapSet = CONFIG.maxPerDay > 0;
+  const entriesToday = perDayCapSet ? countTodayEntries() : 0;   // only read when it can matter
+  const eb = entryBudgetFor({
+    openCount:        openPositions.length,
+    maxOpenPositions: CONFIG.maxOpenPositions,
+    maxPerDay:        CONFIG.maxPerDay,
+    entriesToday,
+  });
+  const entryBudget = eb.budget;
+  if (entryBudget <= 0) {
+    if (eb.reason === 'daily_cap') {
+      console.log(`\n⚠️  Optional daily entry cap reached (${entriesToday}/${eb.perDayCap} entries booked today, SID_MAX_PER_DAY) — no new entries today`);
+    } else {
+      console.log(`\n⚠️  No free position slots (${openPositions.length}/${CONFIG.maxOpenPositions} open) — no new entries this run`);
+    }
     console.log(`\n══ SID run complete ══`);
     return;
   }
+  console.log(`\n📋 Entry budget this run: ${entryBudget} — ${eb.freeSlots} free slot(s) of ${CONFIG.maxOpenPositions} concurrent${eb.perDayCap === null ? ', no daily cap' : `, optional daily cap ${entriesToday}/${eb.perDayCap}`}`);
 
   // Step 2.5: VIX gate (v1.7) — skip new entries on high-fear days
   // The gate blocks new ARMing only. Open positions keep running (with their
@@ -3922,7 +4015,7 @@ async function run() {
   console.log('\n── Scanning watchlist ──');
 
   for (const symbol of WATCHLIST) {
-    if (newEntriesThisRun >= CONFIG.maxPerDay) break;
+    if (newEntriesThisRun >= entryBudget) break;   // v2.6.1 - the CLAMPED budget, never the raw maxPerDay
     if (openSymbols.has(symbol)) {
       console.log(`  ${symbol.padEnd(6)} → Already open — skipping`);
       continue;
@@ -4380,4 +4473,7 @@ export {
   prunePendingApprovals,
   pendingApprovalId,
   todayString,
+  // v2.6.1 - exported so the suite can drive the real entry counter.
+  countTodayEntries,
+  entryBudgetFor,
 };
