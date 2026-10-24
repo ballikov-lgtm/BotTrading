@@ -91,6 +91,12 @@ jobs:
           git add SID/open-positions-sid.json                    || true
           git add SID/closed-positions-sid.json                  || true
           git add SID/sid-account.json                           || true
+          # v2.4.3 — the REAL Alpaca equity snapshot the dashboard headline reads.
+          # bot-sid.js now refreshes it every run; without this stage line the
+          # refresh never leaves the runner and the dashboard keeps rendering a
+          # frozen number (it sat on the 2026-07-17 equity for SEVEN WEEKS).
+          # Glob covers the mode-segregated live file (alpaca-account-live-sid.json).
+          git add 'SID/alpaca-account*-sid.json'                  || true
           git diff --staged --quiet || git commit -m "SID run $(date -u '+%Y-%m-%d %H:%M UTC')"
           git pull --rebase --autostash origin main
           git push

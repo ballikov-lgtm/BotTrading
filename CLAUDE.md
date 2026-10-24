@@ -14,7 +14,7 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 
 | Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
 |----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
-| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.2.6) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
+| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.5.0) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
 | **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 | **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |
@@ -198,6 +198,57 @@ Without both, the action fails with `No file in /home/runner/work/... matched to
 GHA `schedule:` crons are **best-effort, not guaranteed on time** — under GitHub load they can start hours late. This is a real trade-execution hazard, not cosmetic. Confirmed on SID 2026-08: a single daily cron at `'35 14 * * 1-5'` (14:35 UTC, mid-session) actually started **23:51 UTC (Aug 27), 23:37 (Aug 28), 20:15 (Aug 31)** — every one AFTER the 20:00 UTC US market close. On a closed-market run the Alpaca executor refuses every order (`Market closed — refusing to submit ...`), so exits (TP1/TP2) and entries are silently skipped — a ripe SID TP1 never banked because no run landed in-hours.
 
 **Rule:** for any bot whose orders must land inside a market window, schedule **multiple staggered crons across the window** (SID now runs 14:35 / 16:35 / 18:35 UTC) so a multi-hour delay on one still leaves ≥1 run in-hours — but ONLY if the bot is **idempotent across same-day runs** (single-fire exit guards that persist in committed state, open-symbol + per-calendar-day entry caps, de-duped notification/approval queues). Verify idempotency BEFORE adding crons; if a path re-fires (e.g. an alert sent every run), guard it first. See `SID/CLAUDE.md` § "CRON REDUNDANCY" for the full idempotency audit + the notification de-dupe guard. (Distinct from the "use GHA cron not local schedulers" rule below — that's about WHERE trades fire; this is about the cron being LATE.)
+
+### Broker-reconciliation rules (any strategy that books P&L from fills)
+
+Earned on SID v2.5.0 (2026-10-18), but these bite any bot that reconciles its own books
+against a broker. Full write-up in [`SID/CLAUDE.md`](SID/CLAUDE.md) § v2.5.0.
+
+- **Audit the WHOLE record set, never just the rows someone flagged.** A brief listing 5 bad
+  trades turned out to understate it: auditing all 16 against real fills found 2 more drifted
+  records *and* corrected one of the brief's own "true" figures (an entry price quoted from the
+  signal, not the fill). Join every record to its broker fill and diff the lot.
+- **Never derive a reconciliation target by subtracting from broker equity** — that's circular
+  and it hides the error you're hunting. Compute P&L independently from the fill rows (per
+  symbol: sell proceeds − buy cost; exact whenever the symbol is flat), compute fees
+  independently from the fee rows, and only THEN check the two against equity. SID ties to the
+  cent that way: records +$543.94 − $0.51 fees = +$543.43 = equity.
+- **Regulatory fees are real and they are NOT the whole residual.** Alpaca posts them as
+  separate `FEE` activities with sub-types TAF / CAT / REG. Sum the actual rows; don't hand-wave
+  a residual as "fees" (SID's real fee total was $0.51 against a $1.66 assumed residual — the
+  other $1.15 was four unnoticed data bugs).
+- **An order's `filled_avg_price` is ROUNDED (6dp on Alpaca).** For any order whose individual
+  fills are NOT all at the same price, compute the weighted average from the per-fill activity
+  rows instead — the rounding alone shifted one SID leg by a cent and broke the tie-out. Use
+  the fill-level rows (`/v2/account/activities/FILL`), which also expose per-execution ids that
+  the orders endpoint can miss.
+- **A correction script must assert its pre-state and refuse to run twice.** Dry-run by
+  default; abort (non-zero, write nothing) on ANY field mismatch including "already corrected";
+  store the previous values in-record so it's reversible; cross-check each recomputed figure
+  against an independently derived target and abort on disagreement. That last guard is what
+  caught the rounding bug above instead of silently shipping it.
+- **Never invent a broker order id.** If an id looks unrecoverable, check the FILL activities
+  endpoint before stamping `null` — SID had recorded `orderId:null` for a fill whose id was
+  retrievable all along.
+- **Two independent code paths agreeing is the standard of proof.** SID's correction script and
+  `reconcile-account.js` (separate FIFO allocator) agreed on all 16 records at $0.00 delta.
+- **Don't hand-edit a file the dashboard presents as "real broker equity."** A visibly
+  flagged-stale number beats an unverified hand-written one. Let the bot's own writer refresh it.
+
+### Don't delete the test harness (it is not scratch work)
+
+SID's v2.4.1 and v2.4.3 harnesses (17/18 and 70/70) both ran in throwaway sandboxes that were
+deleted when the session ended, so a later brief asking to "keep the existing 70/70 suite green"
+could not be honoured — **the suite no longer existed** and had to be rebuilt from scratch.
+Check the suite in (SID's now lives at `SID/tests/`). The sandbox pattern is still right for
+anything that writes state: copy the module tree into a throwaway dir INSIDE the worktree (so
+the root `node_modules` resolves), import the module from there so `__dirname`-anchored state
+paths hit throwaway files, and delete the dir on exit — but the *test file itself* belongs in git.
+
+**And prefer regression WITNESSES to bare assertions:** re-implement the pre-fix algorithm, run
+it on the real data, and prove it reproduces the exact bad number that was on disk before
+asserting the new code's number. A test that only checks the new value cannot tell you the bug
+was ever real, nor catch a "fix" that was really a no-op.
 
 ### Dashboard commit-message glossary
 Different workflows write different commit messages — don't confuse them when grepping git log:

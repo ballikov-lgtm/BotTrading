@@ -12,9 +12,9 @@ There are TWO `SID/` folders on disk and they are NOT the same:
 | Path | What it is | git branch | Use? |
 |---|---|---|---|
 | `Trading Setup/SID/` (parent) | **Stale snapshot** — older v1.0 code | `claude/silly-robinson-abcf6c` | ❌ **DO NOT EDIT.** Anything here is out of date. |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — current v2.2.5 deployment | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
+| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — working tree **v2.5.0**; origin/main is **v2.4.2** | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
 
-**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (currently **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
+**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (**origin/main is v2.4.2**, verified via `git show origin/main:SID/bot-sid.js`; the working tree carries the UNCOMMITTED v2.4.3 + v2.5.0 on top; historical note: **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
 
 **Rule of thumb before editing anything:**
 1. Run `git status` to confirm which branch you're on.
@@ -1714,6 +1714,367 @@ approves: push via the standard protocol (fetch → pull --rebase --autostash �
 approval), then manually dispatch `sid.yml` DURING US market hours and confirm PYPL banks TP1 via
 the `closed-positions`/`open-positions` diff of that run's commit (NOT sid-log — it only journals
 the entry scan). Optional follow-up: the at-entry short OCO (see the DELIBERATELY-did-NOT note).
+
+### ACCOUNTING / DISPLAY FIXES (v2.4.3, 2026-09-05) - WORKING TREE, NOT COMMITTED
+
+Three accounting/display bugs + one data correction. **Status: WORKING TREE ONLY - nothing
+committed, pushed or executed against Alpaca (per brief). SID-owned files only.**
+**NO canon rule change** - RSI 30/70, RSI(3), MACD alignment, weekly gates, earnings blackout,
+AUTO-tier universe, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math and entry/arm/scan
+are byte-for-byte unchanged. Verified by diff: the ONLY removed lines in `bot-sid.js` are
+`if (qtyCounted >= sharesClosed) break;`, `const take = Math.min(q, ...)` and one relocated
+`const closed = loadClosedPositions();`. Zero `cancelAllOpenOrders` / `waitForNoOpenOrders` /
+`cancelOrderById` / `closePartial` / `closePosition` / `placeStop` / `pollOrderFill` /
+`submitTp1Oco` / `findOpenOrder` lines touched -> the v2.2.5 / v2.2.6 / v2.4.2 cancel-first + sweep
+mechanics and the `__dirname` anchoring are untouched.
+
+**FIX 1 - `recordExternalClose` DOUBLE-COUNTED already-booked fills.** It queried Alpaca for every
+FILLED exit order on the symbol since the position opened and consumed them most-recent-first up to
+`sharesClosed`, with NO memory of what a PREVIOUS close had already booked. So a second external
+close on the same symbol walked back into leg 1's fills.
+- **PROVEN on the live paper PYPL short** (17 sh, entry $60.675, closed manually in two legs):
+  leg 1 = 9 sh @ $52.40 -> **+$74.47 (correct)**. Leg 2's real fills were 6 @ $56.66 + 2 @ $56.71
+  (avg $56.6725 -> **true +$32.02**) but the bot booked **+$57.58** at "exit $53.4775" - which
+  decodes EXACTLY as `(2 x 56.71 + 6 x 52.40) / 8`: two shares at the correct new price, then SIX
+  back-filled at $52.40, the price leg 1 had already consumed (order `b312909a`, a 9-share fill leg
+  1 used in full). Over-stated by **$25.56**.
+- **FIX:** new `consumedExitFillQty(symbol, {closedRecords, positions})` -> `Map<orderId, qtyBooked>`
+  built from (a) every prior closed record's `exit_fills` stamp for that symbol and (b) the bot's own
+  TP1 partial-close order (now stamped as `tp1_close_order_id` - Branch A hoists `closeOrderId` into
+  `tp1CloseOrderId` and stamps it on the position; accounting bookkeeping ONLY, the close block is
+  unchanged). The fill loop subtracts that from each order's `filled_qty` and can only draw the
+  REMAINDER. **Deliberately mirrors `allocateFillsFIFO`'s per-lot `draw()`/`qtyLeft` model** rather
+  than inventing a second scheme (per the brief).
+- **HONESTY GUARD:** when the surviving unconsumed fills cover FEWER shares than the close, the
+  record is stamped `pnl_source:'estimate'` + `exit_fill_qty` / `exit_fill_shortfall` (+
+  `exit_fills_skipped`) rather than extrapolating a price across unseen shares as `alpaca_fill`.
+  On the live PYPL data (where Alpaca never returned the 6-share leg) this books $31.72 flagged as
+  an estimate instead of $57.58 presented as a real fill.
+- `closed` is now loaded ONCE at the top of `recordExternalClose` (it feeds both the consumed-fill
+  ledger and the append) - the duplicate `loadClosedPositions()` was removed.
+
+**FIX 2 - the dashboard's LIVE net-P&L headline was a FROZEN snapshot for 7 WEEKS.**
+`alpaca-account-sid.json` had exactly ONE writer: `reconcile-account.js` under an explicit
+`--write`. `bot-sid.js` never wrote it; `sid-dashboard.js` only reads it. So the headline rendered
+`asOf 2026-07-17`, equity $100,182.18 as "current" while the real paper account had moved to
+~$100,554.04. **This was the user's actual complaint.**
+- `run()` now calls `writeAlpacaSnapshot({equity: preflight.equity, mode: CONFIG.tradingMode})`
+  right after `preflight.ok` - the preflight ALREADY fetched the account, so **zero extra API
+  calls**. Writes `{equity, startingEquity, netPnl, source:'alpaca', mode, asOf, writer:'bot-sid',
+  botVersion}`. Best-effort (try/catch, returns null) - a display write can never abort a run.
+- **MODE-SEGREGATED PATHS** (`alpacaSnapshotPathForMode`): paper -> `alpaca-account-sid.json` (the
+  existing dashboard file), any other mode -> `alpaca-account-<mode>-sid.json`. A paper run can
+  therefore NEVER overwrite a live snapshot or vice-versa.
+- `alpacaStartingEquityFor(mode, equity, existing)`: existing `startingEquity` ->
+  `SID_ALPACA_STARTING_EQUITY` env -> paper 100000 / other = current equity (so the FIRST live run
+  baselines netPnl at 0 rather than reporting a bogus six-figure gain).
+- **`.github/workflows/sid.yml` now stages it** - `git add 'SID/alpaca-account*-sid.json'` (glob
+  verified against `git ls-files`; also covers the live file). It previously did NOT, so even a
+  written refresh would never have reached the dashboard. **This was the second half of the bug.**
+- **`sid-dashboard.js` staleness guard:** `SNAPSHOT_STALE_DAYS = 2`. A snapshot older than that (or
+  with an unparsable `asOf`) renders `[warn] STALE SNAPSHOT - <mode label> as of <date> (Nd old) -
+  not current` in amber instead of the confident "$X on $Y base" caption. The number is still shown
+  - hiding it would be its own kind of lie. Label is now mode-aware ("Live account (real cash)" vs
+  "Paper account (simulated)"). Verified in the generated HTML: `STALE SNAPSHOT</span> - Paper
+  account (simulated) as of 2026-07-17 (49d old) - not current`.
+
+**FIX 3 - `reconcile-account.js` reconstructed OPEN positions as CLOSED (dangerous).** A dry-run on
+2026-09-05 would have written PHANTOM closed records for **IBM (2 sh runner)** and **ABT (4 sh
+runner)** - both still OPEN - because their banked TP1 partial fills look like a complete buy+sell
+round trip in the leftover lots. **The tool was validated 2026-07-17 when there were ZERO open
+positions - that is exactly why this was never caught.** Two independent layers, either of which
+alone prevents the phantom:
+- **(braces) `allocateFillsFIFO(positions, allFills, opts)`** now takes `opts.openPositions`. Open
+  positions are allocated alongside the closed records in the same chronological FIFO order, so
+  their fills are CONSUMED and never reach `leftovers`. An open position draws its FULL entry leg
+  but only the exits it has ACTUALLY taken (`shares_total - shares_remaining`, minus any
+  `exit_shares` already captured by a closed partial record sharing its id) - it must never draw an
+  exit it hasn't taken. Open positions are always `matched:false, open:true` (never re-priced).
+- **(belt) `reconstructOrphans(leftovers, mode, {openSymbols, skippedOut})`** hard-skips any symbol
+  with an open position and reports the skip so `main()` logs it loudly.
+- **ALSO FIXED (the duplicate-PYPL over-count the brief flagged):** when SEVERAL closed records
+  share one position `id` (a partial external close then the final close), each record now draws
+  only ITS OWN leg (`exit_shares`) instead of the whole `shares_total` round trip. Previously the
+  09-02 record was re-priced to the FULL-trade $106.41 while the 09-04 record kept its $57.58
+  estimate = **$163.99 booked for a trade whose true total is $106.49**. Now: 74.47 + 32.02.
+  **SINGLE-record positions are untouched** - verified against the real file: 9 of 11 records keep
+  `entryNeed = exitNeed = shares_total`; ONLY the two PYPL records switch to per-leg.
+- `reconcile-account.js` gained an `import.meta.url` main-guard + `export {allocateFillsFIFO,
+  reconstructOrphans, fillSideKind, fillQty, fillPrice, fillMs}` so it can be unit-tested without
+  running `main()`. Direct-run behaviour (`node reconcile-account.js`, sid-reconcile.yml) unchanged.
+
+**FIX 4 - the stored PYPL record corrected (one-off, documented).**
+`SID/scripts/fix-pypl-leg2-2026-09-05.js` - dry-run by default, `--write` to persist, IDEMPOTENT
+(a re-run detects the `correction.tag`). It ASSERTS the full pre-correction state (leg 1 = +$74.47
+on 9 sh, leg 2 = +$57.58 at $53.4775 on 8 sh, short side, and that leg 2 actually re-used a leg-1
+fill) and ABORTS without changes if anything doesn't match. Applied: `exit_price 53.4775 ->
+56.6725`, `exit_pnl / total_pnl / realizedPnl 57.58 -> 32.02`, `exit_fills` -> the real 6 @ $56.66 +
+2 @ $56.71, plus a `correction` block recording the old values and the reason.
+**The 2026-09-02 leg-1 record is untouched - nothing double-counts.** PYPL trade total = **$106.49**
+(74.47 + 32.02). The matching `trades-sid.csv` row was patched (57.58 -> 32.02, risk% recomputed).
+The 6 @ $56.66 leg's broker order id was never captured by the buggy run, so it is stamped
+`orderId:null, source:'manual_correction'` - an id is never invented.
+`SID/scripts/rederive-ledger.js` (new, dry-run default) then re-derived the ledger using the BOT's
+OWN `deriveLedger()` (never a hand-rolled copy): `realizedPnl 517.53 -> 491.97`,
+`accountUsd 10517.53 -> 10491.97`, `tradeCount 11` (unchanged). Records sum 460.61 -> 435.05.
+
+**! SNAPSHOT NOT HAND-EDITED, ON PURPOSE.** `alpaca-account-sid.json` still reads the stale
+2026-07-17 $100,182.18. There are no Alpaca keys locally, so writing the brief's $100,554.04 by hand
+would put an unverified number into the file the dashboard presents as "real Alpaca equity" -
+strictly worse than a number that is now VISIBLY FLAGGED STALE. The first post-deploy `sid.yml` run
+overwrites it with the live value. Do not hand-edit it.
+
+**Tested (local, no network - 70/70 pass).** The harness ran in a throwaway `SID/_v243_sandbox/`
+COPY of the module tree (inside the worktree so the root `node_modules` resolves) so no real state
+file was ever touched; the sandbox was deleted afterwards.
+- `node --check` on all 5 touched/new JS files: PASS. **Real ESM runtime `import()`** of both
+  `bot-sid.js` and `reconcile-account.js` (a bare syntax check previously masked a crash-on-run
+  bug): PASS, `BOT_VERSION = v2.4.3`, all new + all v2.4.2 exports resolve, `reconcile-account.js`
+  imports WITHOUT executing `main()`. `sid.yml` YAML valid; all touched JSON parses.
+- **Part 1:** exact two-leg PYPL replay through the REAL `recordExternalClose` with a TIME-AWARE
+  mock client (a naive mock that returns future fills makes leg 1 look wrong for reasons Alpaca
+  could never produce - harness bug, cost one iteration). Leg 1 = $52.40 / +$74.47 consuming only
+  `b312909a`; leg 2 uses ONLY `REAL-6` + `e903f7c2` -> $56.6725 / **+$32.02**; total $106.49 = the
+  real-fill sum. **Regression witness:** the pre-v2.4.3 algorithm re-run on the same data reproduces
+  the live bad $53.4775 -> $57.58 exactly.
+- **Part 1b/1c/1d:** the shortfall path flags `estimate` + `exit_fill_shortfall:6` and books $31.72
+  (vs $57.58 before); a normal SINGLE external close (GLD -$61.16 @ $366.39) is unchanged; the bot's
+  own TP1 order is excluded so an IBM-style runner prices at the runner fill, not the banked TP1;
+  `consumedExitFillQty` is symbol-scoped.
+- **Part 2:** snapshot written with fresh `asOf` (<60 s) and current equity; paper/live paths
+  distinct and a live write leaves the paper file byte-identical; `startingEquity` carried forward;
+  a fresh live snapshot baselines off current equity; NaN equity is a no-op. Dashboard: the live
+  July snapshot flags STALE (49d), now/1d do not, 3d/unparsable do. The `sid.yml` stage line is
+  asserted by regex.
+- **Part 3:** with IBM+ABT open, `reconstructOrphans` returns ONLY MCD (genuine orphan, -$78.14,
+  long 8 sh rebuilt from real fills); open positions leave no leftovers; open runners' UNSOLD shares
+  are not drawn as exits (IBM exitQty 2, ABT exitQty 4). **Regression witness:** without the fix
+  IBM+ABT ARE reconstructed. The belt was tested independently on unfixed leftovers -> still blocked
+  + skip reported. Gotcha: `reconstructOrphans` CONSUMES the leftover lots, so a second call needs a
+  fresh `allocateFillsFIFO` (cost one iteration).
+- **Part 3b/3c:** the two PYPL records reconcile to 74.47 + 32.02 = $106.49 (not $163.99); GOOG
+  allocates IDENTICALLY with and without the new `opts` argument; over the REAL closed file 9/11
+  records keep `shares_total` legs and only the 2 duplicate-id PYPL records change.
+- Dashboard regenerated locally to VERIFY (v2.4.3 markers, `(28)` count badge, the STALE caption,
+  the new Updates entry) then **RESTORED to HEAD** - `docs/sid/index.html` is build output and
+  `sid-dashboard.yml` rebuilds it from cloud state.
+
+**Ship-check (v2.4.3, FIX):** `BOT_VERSION` v2.4.3 + one-liner + detailed history block;
+`sid-dashboard.js` `STRATEGY_VERSION='2.4.3'` + beta-banner / brand-sub / perf-note markers;
+`strategy-updates.json` new FIX entry at top (count auto 27 -> 28); `SID-README.md` current-version
+line + a v2.4.3 history row above v2.4.2. No Pine change (the visualiser is signal-level).
+`.sid-update-manifest.txt` needs no change (bot-sid.js / sid-dashboard.js / README / updates JSON
+are already listed).
+
+**! QUEUED - SEPARATE LATENT DOUBLE-COUNT, ASSESSED BUT NOT FIXED (outside this brief's scope).**
+`deriveLedger` sums closed records of the mode PLUS `tp1_pnl` of still-open `tp1_hit` positions.
+When a v2.2 TP1 fills via the resting broker OCO, `syncPositions` reports a PARTIAL close ->
+`recordExternalClose` writes a CLOSED record for that leg, and then the v2.2 TP1-detection block in
+`run()` ALSO sets `livePos.tp1_hit/tp1_pnl` for the SAME shares -> the leg is counted twice on every
+subsequent run. It has not bitten yet purely by luck: on PYPL the detection block's `-tp1` fill
+lookup fell back to `livePos.entry`, so `tp1_pnl` was **0**. IBM/ABT banked TP1 via Branch A (no
+closed record) so they are clean today, and the numbers above are correct. **Suggested one-line
+guard for v2.4.4 (needs approval + its own tests):** in `deriveLedger`, skip a still-open position's
+`tp1_pnl` when a closed record already exists with the same `id` and `is_full_close === false`.
+Zero effect on today's figures; prevents the next occurrence.
+
+**Also noticed (not changed):** `sid.yml` does not stage `SID/pending-approvals-sid.json`, so the
+Telegram approval queue's de-dupe state does not persist across cloud runs. Flagged only.
+
+**Queued / not done:** nothing committed or pushed (per brief - return for review). If Alan
+approves: push via the standard protocol (fetch -> pull --rebase --autostash -> push; never without
+approval). The first `sid.yml` run after deploy should log `[Alpaca] Account snapshot refreshed:
+equity $... netPnl ...` AND the resulting commit should include `SID/alpaca-account-sid.json` - that
+pair is the proof FIX 2 landed. Optional follow-up: wire the dashboard to read a LIVE snapshot file
+when SID goes live (today it only reads the paper one; the caption is already mode-aware).
+
+---
+
+### P&L BOOKING FIXES (v2.5.0, 2026-10-18) - WORKING TREE, NOT COMMITTED
+
+The dashboard was reporting the WRONG realised profit. Three independent booking bugs had
+corrupted the stored records; this release fixes the CODE so it can't recur and repairs the
+records already on disk. **Status: WORKING TREE ONLY - nothing committed or pushed (per brief).
+No Alpaca order was ever submitted, cancelled or modified - every broker call was a read-only GET.**
+**NO canon rule change** - RSI 30/70, RSI(3), MACD alignment, weekly gates, the RSI-50 TP1
+trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout and the AUTO/HUMAN tiers are
+byte-for-byte unchanged. Accounting + execution plumbing ONLY.
+
+**THE STARTING DISCREPANCY (all verified 2026-10-18):** Alpaca paper equity **$100,543.43**
+(net **+$543.43**), 0 positions, 0 open orders. Ledger `sid-account.json` realizedPnl
+**+$512.02** / 16 records. Dashboard headline **+$182.18** (the frozen 2026-07-17 snapshot).
+
+**BUG 1 - external full close DROPPED a bot-booked TP1 leg.** `recordExternalClose` set
+`total_pnl` to the closed leg ALONE, while `deriveLedger` adds an open position's `tp1_pnl`
+ONLY WHILE IT IS OPEN. So the instant a runner closed externally, a TP1 half banked by
+Branch A silently left the books:
+- IBM: TP1 2sh @ 237.51 = +$40.56 LOST -> booked +$42.52, truth **+$82.88**
+- HON: TP1 2sh @ 214.73 = +$20.58 LOST -> booked **-$0.09** (a "loss"), truth **+$19.83** (a WIN)
+The bot's OWN TP2 path never had this bug - it already did `tp1_pnl + tp2Pnl`.
+**FIX:** a full close now carries the TP1 leg into `total_pnl` (`exit_pnl` still holds only
+that leg), gated by the new shared `tp1LegAlreadyInClosedRecords()`.
+
+**BUG 1b - the MIRROR double-count, queued in v2.4.3, closed by the SAME predicate.**
+`deriveLedger` was adding a still-open position's `tp1_pnl` ON TOP of the closed PARTIAL
+record the broker-OCO path writes for that same leg. Both directions now share ONE predicate,
+each with its own regression witness. The v2.4.1 behaviour (an in-flight Branch-A TP1 DOES
+compound into sizing) is preserved - test B4 guards it.
+
+**`tp1LegAlreadyInClosedRecords(pos, closedRecords)` - the design, because the naive version
+is wrong.** "Position has `tp1_pnl`" does NOT imply "the leg is unbooked". A TP1 half reaches
+the books by two different routes: (a) THE BOT banked it (Branch A - no closed record; the leg
+lives on the position and Branch A stamps `tp1_close_order_id`), or (b) THE BROKER banked it
+(resting OCO -> `recordExternalClose` writes a closed `is_full_close:false` record AND the v2.2
+detection block in `run()` stamps `tp1_pnl` on the live position for the SAME shares). Only
+`is_full_close === false` records count as a separate leg (a full-close record IS the trade
+total). If the bot holds the TP1 order id and the partial record was priced from OTHER orders,
+the leg is NOT in that record, so keep looking. **Ambiguity defaults to TRUE (already booked)**
+- for an accounting fix, never inflate.
+
+**BUG 2 - stop exits booked the stop LEVEL, not the real fill.** The daily-poll stop path
+submits a MARKET close, which fills at whatever the market gives - but it never overwrote
+`exitPrice` with `filledAvgPrice` and left `pnl_source:'estimate'`. HD booked 3sh @ $304.00 =
+-$24.96; the real fill was **$303.346667** = **-$27.01**. v2.4.1 had fixed exactly this for
+TP1/TP2 and the stop path was simply missed. **FIX:** the stop path AND the v2.0 RSI-50
+fallback path now capture `closePosition()`'s `closeOrderId`, `pollOrderFill` it, overwrite the
+price and recompute via `realisedPnlFor` - the identical shape as Branch A/B. **Invariant now
+true: no close path leaves `pnl_source:'estimate'` when a real fill exists** (test C10 asserts
+it on comment-stripped source).
+
+**BUG 3 - the ENTRY price was the signal close, not the entry fill.** `run()` stored
+`signal.entry` (the bar the rules fired on) for a MARKET order. Because entry feeds BOTH exit
+legs, every cent multiplied across the whole trade. **`approve-trade.js` had been doing it
+correctly all along** (`pollOrderFill` -> `fill.filledAvgPrice`, L216) - the main path just
+never caught up. **FIX:** mirror it, storing `filledAvgPrice` plus `entry_source` /
+`signal_entry` / `entry_fill_qty` provenance.
+**DELIBERATELY NOT recomputed: share count, `stopLoss`, `riskUsd`.** The order is already
+submitted and the broker GTC stop already rests at `signal.stopLoss` - rewriting either would
+desync the record from the live broker order, and sizing/stop are strategy outputs. A filled
+qty that differs from the ordered qty is LOGGED (`entry_partial_fill`), never silently
+rewritten - `syncPositions` reconciles real qty next run.
+
+**! THE BRIEF'S NUMBERS WERE SLIGHTLY OFF, AND THE REASON MATTERS.** The brief listed IBM's
+entry as 217.13 and predicted a corrected total of $545.09 with a ~-$1.66 fee residual. The
+real IBM entry FILL is **217.23** - 217.13 is the signal price, i.e. bug 3 had hit IBM too.
+**Auditing ALL 16 records against real fills (not just the 5 flagged) found two more drifted
+records nobody had spotted: ABT -$0.08 and RIOT -$0.59**, both pure bug-3 entry error.
+Reconciliation (the brief's 545.09 minus the four unflagged entry errors 0.40 IBM + 0.08 PYPL
++ 0.08 ABT + 0.59 RIOT = 1.15) -> **543.94**. So the true residual is **-$0.51 of real fees,
+not -$1.66**; the brief had attributed all of it to fees.
+**LESSON: audit the WHOLE record set against the broker, never just the rows someone flagged.**
+
+**RECONCILES EXACTLY, AND NOT BY SUBTRACTION FROM EQUITY (which would be circular):**
+- Cash-flow P&L from `/v2/account/activities/FILL`, summed per symbol as (sell proceeds - buy
+  cost) over all 12 symbols (every symbol is FLAT, so this is exact): **+$543.94**
+- Fee activities from `/v2/account/activities/FEE`: **47 rows = -$0.51** (TAF -0.14, CAT -0.27,
+  REG -0.10). A `JNLC` +100,000 row confirms the $100K base.
+- **543.94 - 0.51 = 543.43 = Alpaca equity, to the cent. Residual $0.00.**
+- **INDEPENDENT SECOND OPINION:** `reconcile-account.js --dry-run` with a live read-only
+  connection (`SID_TRADING_MODE=paper`) allocates the broker's fills through COMPLETELY
+  SEPARATE code (its own FIFO allocator) and agreed on **all 16 records at +$0.00 delta**, with
+  entry prices matching mine exactly (RIOT ~19.67, IBM 217.23, HD 312.35, HON 204.44, ABT
+  115.35, PYPL 60.67). It reported "gap -$0.51 [OK] reconciled to the dollar".
+
+**RECORD CORRECTION - `scripts/fix-pnl-booking-2026-10-18.js`** (dry-run default, `--write` to
+apply). Corrects 8 records: RIOT 146.19->145.60, ABT 53.24->53.16, IBM 42.52->**82.88**,
+HD -24.96->**-27.01**, IYR provenance only (P&L was already right), HON -0.09->**+19.83**,
+PYPL leg1 74.47->74.43, PYPL leg2 57.58->**31.98**.
+- ASSERTS the exact pre-state of every field it touches and ABORTS (exit 1, writes nothing) on
+  any mismatch, including a record that already carries the corrected value. A second `--write`
+  refuses on the `correction.tag`. Stores `correction.previous` in-record so it is reversible.
+- PAPER-ONLY guard: a non-paper record is refused outright. Makes NO network calls.
+- Every leg is recomputed by the BOT'S OWN `realisedPnlFor()` from real fills, then
+  cross-checked against the independently computed per-symbol cash-flow target; a mismatch
+  aborts. **This guard EARNED ITS KEEP** - see the rounding pitfall below.
+- **SUPERSEDES `scripts/fix-pypl-leg2-2026-09-05.js`, which was never applied to cloud state.**
+  Its target was +32.02 because it used the STORED entry 60.675; the real entry fill is 60.67,
+  making the correct figure **+31.98** (and the PYPL short total **+$106.41**, not 106.49 -
+  which is exactly the figure the v2.4.3 notes recorded the reconcile tool computing). Don't
+  run both.
+- The 6 @ $56.66 PYPL fill DOES have a broker order id (`452d8277-82a8-4010-9daf-dfbb5c73a2d7`)
+  in `/v2/account/activities/FILL`, so it is stamped properly - v2.4.3 had recorded
+  `orderId:null` believing it was unrecoverable. An id is still never invented.
+
+**PITFALL (new, cost one iteration): Alpaca's order-level `filled_avg_price` is ROUNDED TO 6dp,
+and for a multi-price order that rounding alone can move a leg by a cent.** RIOT's entry shows
+as `19.665526` but is really 747.29/38 = 19.66552631578...; using the displayed value made the
+legs sum to **145.61** against the broker's **145.60** and the cross-check correctly refused to
+write. HD's exit shows `303.346667` but is really 910.04/3. **FIX: for any order whose
+individual fills are NOT all the same price, compute the weighted average from the per-fill
+rows (`/v2/account/activities/FILL`), not the order's `filled_avg_price`.** Single-price orders
+are already exact. Had the cross-check not been there, this would have silently shipped a
+1-cent-per-trade error.
+
+**PITFALL: the stop path does not append to `trades-sid.csv` at all.** HD and IYR both closed
+via the Branch A stop and have NO journal row (the closed-positions JSON has them; the CSV
+doesn't). Pre-existing, NOT introduced here, and the dashboard reads the JSON (`realizedPnl ??
+pnl`) not the CSV, so no displayed number is affected. **Flagged, not fixed - out of this
+brief's scope.** Worth a v2.5.1.
+
+**TESTS - `tests/v2.5.0-pnl-booking.test.mjs`, 100 checks, 100 PASS.** Sandboxed, NO network,
+NO broker calls.
+- **This suite is CHECKED IN, deliberately.** The v2.4.1/v2.4.3 harnesses ran in throwaway
+  sandboxes that were DELETED afterwards, so the brief's "keep the existing 70/70 suite green"
+  was impossible to honour - **the suite no longer existed**. Don't do that again: a test you
+  delete is a test you have to re-earn. This one persists.
+- Mechanism: copies the module tree into `SID/_v250_sandbox/` (inside the worktree so the root
+  `node_modules` resolves), writes fresh isolated state, imports `bot-sid.js` FROM the sandbox
+  so the `__dirname`-anchored state paths point at throwaway files, and removes the sandbox on
+  exit (test H1 asserts it). No real state file is ever touched. `TELEGRAM_ALERTS_ENABLED=false`
+  keeps it silent.
+- **REGRESSION WITNESSES (the point of the suite):** the pre-fix algorithm is re-implemented and
+  re-run on the real live data, and must reproduce the EXACT bad number that was on disk -
+  IBM **+42.52** (A1), HON **-0.09** (A2), HD **-24.96** (C1), the ledger double-count
+  **148.86** (B1), HON TP1 **21.02** off the signal entry (D1) - BEFORE the fixed code is
+  asserted to produce 82.88 / 19.83 / -27.01 / 74.43 / 20.58. A test that only asserts the new
+  number can't tell you the bug was ever real.
+- Groups: A external-close TP1 carry (incl. the PYPL no-double-count guard, partial-close
+  must-not-carry, and provenance downgrade when the TP1 leg was an estimate), B the ledger
+  mirror + the predicate's 6 edge cases + paper/live segregation, C the stop path (arithmetic
+  witness + wiring assertions on live source), D the entry fill (incl. that stopLoss/shares/
+  riskUsd are NOT recomputed), E the 16 real corrected records tie to the broker, F the v2.4.3
+  carried work has not regressed, G the instructor canon constants are untouched.
+- **HONEST LIMITATION:** groups C and D prove the NUMBER arithmetically and the WIRING by
+  regex on the live source, not by executing `checkPositions`/`run()` end-to-end - both need
+  network candle data and a live executor. The `recordExternalClose` tests (group A) DO drive
+  the real exported function with a time-aware mock client.
+- **Mock gotcha (inherited from v2.4.3, re-confirmed):** the mock Alpaca client MUST be
+  time-aware (serve only fills that existed before the close time). A naive mock returning
+  future fills makes leg 1 look wrong for reasons the real broker could never produce.
+
+**Ship-check (v2.5.0, FIX):** `BOT_VERSION` v2.5.0 + detailed history one-liner; new export
+`tp1LegAlreadyInClosedRecords`; `sid-dashboard.js` `STRATEGY_VERSION='2.5.0'` + beta-banner /
+brand-sub / perf-note markers; `strategy-updates.json` new FIX entry at top (count auto 28 ->
+**29** - the badge is derived from `strategyUpdates.length` in BOTH the tab button and the
+panel title, so adding the entry increments both automatically; no manual count to edit);
+`SID-README.md` current-version line + a v2.5.0 history row above v2.4.3; root `CLAUDE.md`
+index row -> v2.5.0; this append. `docs/sid/index.html` is BUILD OUTPUT - regenerated to verify
+then RESTORED to HEAD, because `sid-dashboard.yml` rebuilds it from cloud state. No Pine change
+(the visualiser is signal-level and no signal rule moved).
+
+**Runtime proof:** `node --check` is not enough - a real ESM `import()` of `bot-sid.js` was run
+and reports `BOT_VERSION = v2.5.0` with every new + pre-existing export resolving.
+
+**Queued / not done:**
+- NOTHING COMMITTED OR PUSHED - returned for Alan's review (per brief). If approved, push via
+  the standard protocol (fetch -> pull --rebase --autostash -> push; never without approval).
+- `alpaca-account-sid.json` is STILL the stale 2026-07-17 $100,182.18 snapshot and was
+  deliberately NOT hand-edited (same call as v2.4.3): writing a number by hand into the file the
+  dashboard presents as "real Alpaca equity" is worse than one that is VISIBLY FLAGGED STALE.
+  **The first `sid.yml` run after deploy overwrites it** with live equity (that's the v2.4.3
+  FIX-2 snapshot writer) and the resulting commit should include the file - that pair is the
+  proof it landed. Until then the dashboard headline stays flagged STALE.
+- `sid-account.json` `reconciledAt` still says 2026-07-17 - left alone, as it belongs to
+  `reconcile-account.js --write`, which was NOT run in write mode.
+- **Methodology note (always cite it):** `sid-account.json` is the **1%-compounding-from-$10K**
+  ledger (`accountUsd` $10,543.94 on `startingUsd` 10000) while the broker account is
+  **$100,543.43 on a $100,000 base**. The DOLLAR realised P&L ties (543.94 vs 543.43 less fees);
+  the BASE differs by 10x. `accountUsd` is a sizing construct, NOT broker equity - don't quote
+  it as account value.
+- The stop path's missing `trades-sid.csv` row (above) is a candidate v2.5.1.
+- Untracked cruft noticed in the worktree: `SID/strategy-updates.json.tmp.37284.348d7f4b10c6`
+  (leftover from an interrupted write), `SID/__pycache__/`, and a dozen untracked
+  `backtest-v2.1-validation-report-*.{json,csv}`. Not touched; worth a housekeeping sweep.
 
 ---
 

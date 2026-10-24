@@ -112,10 +112,61 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.4.2'; // V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbing, NOT a signal-logic change): a v2.2 SHORT's intraday TP1 had no working exit — maintainV2_2BrokerOrders left the full-size entry stop holding ALL shares (it cancelled the wrong id after a blind 800ms sleep, and findOpenOrder's endsWith('-stop')/('-tp1') MISSED the timestamped re-placed orders — the twin of the v2.2.6 closePosition bug), so the runner stop + TP1 OCO failed `insufficient qty available: 0` and, because Branch A skips the daily-poll TP1 for v2.2 shorts, the short could never bank TP1 (live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open). FIX: (1) findOpenOrder matches `<suffix>(-\\d+)?$` so timestamped re-places are found; (2) maintain cancels the resting stop by the TRACKED pos.brokerStopOrderId (robust to any client_order_id) + the suffix-found stop + (pre-TP1 short) any resting TP1 OCO, WAITS for release via waitForNoOpenOrders (not a sleep), then places the runner-only stop; (3) the TP1 half is placed as the OCO buy-limit at the RSI-50 target with shares now free — where price has already passed the target (PYPL) it is marketable → fills → banks TP1. (4) Before ANY close/reset the bot sweeps ALL open orders on that ONE symbol (new executor.cancelAllOpenOrders) — incl. a MANUAL break-even stop placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag) that the tracked-id/suffix cancels can't see and that would otherwise hold the shares + hang waitForNoOpenOrders. Symbol-scoped (never other symbols). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan all byte-for-byte unchanged; the v2.2.5/2.2.6 cancel-first CLOSE mechanics untouched — only a broader symbol-scoped sweep added ahead of them). Ships with the sid.yml cron-redundancy change. (paper trading, 2026-09-01)
+const BOT_VERSION = 'v2.5.0'; // V2.5.0 P&L BOOKING FIXES (accounting + execution plumbing, NOT a signal-logic change): the dashboard was reporting the WRONG profit because three independent booking bugs corrupted the stored records. Verified against the real Alpaca paper account on 2026-10-18 (read-only GETs): broker equity +$543.43, our ledger +$512.02. (1) EXTERNAL FULL CLOSE DROPPED A BOT-BOOKED TP1 LEG — recordExternalClose set total_pnl to the closed leg ALONE, while deriveLedger only counts an open position's tp1_pnl WHILE IT IS OPEN; so the instant a runner closed externally, a TP1 half banked by Branch A fell out of the books (IBM lost +$40.76 -> booked +$42.52 vs truth +$82.88; HON lost +$20.58 -> booked -$0.09 vs truth +$19.83). The bot's own TP2 path never had this bug (it already summed tp1_pnl + tp2Pnl). FIX: a full close now carries the TP1 leg into total_pnl, guarded by the new shared tp1LegAlreadyInClosedRecords() so the PYPL pattern — where the TP1 leg was itself written as a separate closed PARTIAL record (is_full_close:false, same id) — can never be counted twice. (2) THE SAME PREDICATE FIXES THE MIRROR DOUBLE-COUNT queued in v2.4.3: deriveLedger was adding a still-open position's tp1_pnl ON TOP of the closed partial record written for that same leg by the broker-OCO path. Both directions land together, each with its own regression witness. (3) STOP EXITS BOOKED THE STOP LEVEL, NOT THE REAL FILL — the daily-poll stop path submits a MARKET close but never overwrote exitPrice with filledAvgPrice, leaving pnl_source:'estimate' (HD booked 3sh @ $304.00 = -$24.96; the real fill was $303.346667 = -$27.01). v2.4.1 had fixed this for TP1/TP2 only; the stop path and the v2.0 RSI-50 fallback path now mirror the identical pollOrderFill/override shape, so NO close path leaves 'estimate' when a real fill exists. (4) ENTRY PRICE WAS THE SIGNAL CLOSE, NOT THE ENTRY FILL — run() stored signal.entry (the bar the rules fired on) for a MARKET order, so every share of entry error multiplied across the whole position and through BOTH exit legs (HON 204.22 vs real 204.44; IBM 217.13 vs 217.23; HD 312.32 vs 312.35; RIOT 19.65 vs 19.665526). approve-trade.js already polled the fill correctly — the main path now mirrors it, storing filledAvgPrice plus entry_source/signal_entry provenance. Share math, the stop level and riskUsd are deliberately NOT recomputed (the order is already submitted and the broker stop already rests at signal.stopLoss). NO canon rule change (RSI 30/70, RSI(3), MACD alignment, weekly gates, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, AUTO/HUMAN tiers and entry/arm/scan are byte-for-byte unchanged) — this is accounting and execution plumbing only. Ships with the v2.4.3 work (external-close fill-consumption guard, reconcile skipping open positions, the per-run Alpaca snapshot write + sid.yml staging, dashboard stale-snapshot flag) re-badged into this release, and a one-off idempotent record correction (SID/scripts/fix-pnl-booking-2026-10-18.js) that ties the books to the broker: corrected records sum +$543.94, less $0.51 of real TAF/CAT/REG fee activities = +$543.43 = Alpaca equity EXACTLY. (paper trading, 2026-10-18)
+// V2.4.3 ACCOUNTING/DISPLAY FIXES (NOT a signal-logic change): (1) DOUBLE-COUNT FIX — recordExternalClose re-scanned ALL of Alpaca's filled exit orders on every external close, so a SECOND external close on the same symbol walked back and re-used fills the FIRST close had already booked. PROVEN on the PYPL short (17sh, entry $60.675): leg 1 banked 9sh @ $52.40 = +$74.47 (correct); leg 2's real fills were 6 @ $56.66 + 2 @ $56.71 (avg $56.6725 → true +$32.02) but the bot booked $57.58 at "exit $53.4775", which decodes EXACTLY as (2 x 56.71 + 6 x 52.40) / 8 — two shares at the correct new price then SIX back-filled at leg 1's already-consumed $52.40. FIX: a consumed-fill ledger (consumedExitFillQty) subtracts, per broker order id, every quantity already stamped into a prior closed record's exit_fills (plus the bot's own TP1 partial-close order, now stamped as tp1_close_order_id) before pricing the new close — mirroring reconcile-account.js's allocateFillsFIFO lot-consumption model rather than inventing a second one. When the surviving fills cover FEWER shares than the close, the record is stamped pnl_source:'estimate' + exit_fill_shortfall instead of silently extrapolating a full-coverage 'alpaca_fill'. (2) STALE-SNAPSHOT FIX — alpaca-account-sid.json (the dashboard's LIVE net-P&L headline) had only ONE writer: reconcile-account.js under an explicit --write. The bot never wrote it, so the dashboard rendered a FROZEN 2026-07-17 equity for 7 weeks. The bot now writes the snapshot every run from its existing preflight account read (equity/startingEquity/netPnl/source/mode/asOf), mode-segregated (paper → alpaca-account-sid.json, live → alpaca-account-<mode>-sid.json) so a paper run can never overwrite a live snapshot; sid.yml now stages the file so the refresh actually reaches the dashboard; and sid-dashboard.js flags a snapshot older than SNAPSHOT_STALE_DAYS (2) as STALE instead of presenting it as current. NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan and the v2.2.5/2.2.6/v2.4.2 cancel-first + sweep close mechanics are all byte-for-byte unchanged). (paper trading, 2026-09-05)
+// V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbing, NOT a signal-logic change): a v2.2 SHORT's intraday TP1 had no working exit — maintainV2_2BrokerOrders left the full-size entry stop holding ALL shares (it cancelled the wrong id after a blind 800ms sleep, and findOpenOrder's endsWith('-stop')/('-tp1') MISSED the timestamped re-placed orders — the twin of the v2.2.6 closePosition bug), so the runner stop + TP1 OCO failed `insufficient qty available: 0` and, because Branch A skips the daily-poll TP1 for v2.2 shorts, the short could never bank TP1 (live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open). FIX: (1) findOpenOrder matches `<suffix>(-\\d+)?$` so timestamped re-places are found; (2) maintain cancels the resting stop by the TRACKED pos.brokerStopOrderId (robust to any client_order_id) + the suffix-found stop + (pre-TP1 short) any resting TP1 OCO, WAITS for release via waitForNoOpenOrders (not a sleep), then places the runner-only stop; (3) the TP1 half is placed as the OCO buy-limit at the RSI-50 target with shares now free — where price has already passed the target (PYPL) it is marketable → fills → banks TP1. (4) Before ANY close/reset the bot sweeps ALL open orders on that ONE symbol (new executor.cancelAllOpenOrders) — incl. a MANUAL break-even stop placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag) that the tracked-id/suffix cancels can't see and that would otherwise hold the shares + hang waitForNoOpenOrders. Symbol-scoped (never other symbols). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan all byte-for-byte unchanged; the v2.2.5/2.2.6 cancel-first CLOSE mechanics untouched — only a broader symbol-scoped sweep added ahead of them). Ships with the sid.yml cron-redundancy change. (paper trading, 2026-09-01)
 // V2.4.1 ACCOUNTING RECONCILE (NOT a signal-logic change): (1) per-close real-fill booking — TP1 (Branch A), TP2 (Branch B), and recordExternalClose now book the CONFIRMED Alpaca filled_avg_price (from pollOrderFill / the closed-order fills) instead of the simulated bar/SMA trigger price; every closed record is stamped pnl_source ('alpaca_fill' when the real fill was read, 'estimate' on fallback) + mode. Falls back to the bar/SMA estimate only when the real fill is unavailable (never silently wrong). (2) The ledger (sid-account.json realizedPnl/tradeCount/accountUsd) is now RE-DERIVED from the on-disk records every close (realizedPnl = Σ closed records of the account's mode + Σ in-flight TP1 partials of that mode; tradeCount = distinct closed records of that mode; accountUsd = startingUsd + realizedPnl) instead of a running `+=` counter — so a deleted/edited record can NEVER leave a phantom loss again (the exact drift the account reconcile fixed retroactively: MCD phantom -$78.14 + inflated tradeCount). PAPER/LIVE SEGREGATED: the ledger sums ONLY the current mode's records; the other mode's records are ignored (a future live ledger starts fresh, mode:live, and never mixes with paper). NO canon rule change — the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout exits, share math, cancel-first stop logic, entry/arm/scan logic are all byte-for-byte unchanged; only the exit PRICE source + the ledger DERIVATION changed. Pairs with reconcile-account.js + alpaca-account-sid.json + the dashboard re-point at real Alpaca paper equity. (paper trading, 2026-07-18)
 // V2.4.0 PDT-SAFE EXECUTION MODE (new opt-in execution mode, NOT a signal-logic change): adds SID_PDT_SAFE (default FALSE = the standard "PDT version" with broker GTC stops + resting intraday short-TP1 limit). When SID_PDT_SAFE=true, the bot places NO broker order that can fire intraday same-day — it SKIPS maintainV2_2BrokerOrders entirely (no resting GTC stop, no resting intraday short-TP1 limit) AND does not place the entry-time broker stop, for BOTH the normal entry path (openEntryNoStop) AND the approved-entry path (approve-trade.js). PDT-safe positions carry pdt_safe:true + brokerStopOrderId:null → isV2_2Position()===false → they are managed SOLELY by the daily-poll in checkPositions (TP1 RSI-50, TP2 SMA50/SMA200/BE/timeout, and a stop breach → market close at the NEXT run's open). GUARANTEE: because checkPositions only scans bars strictly AFTER the entry date, runs AFTER the entry loop adds the position, and there are no broker orders, no exit can fire on the same calendar day as entry → PDT-immune (v2.0's original design, restored as opt-in for sub-$25K margin accounts, which SID's shorts require). Standard mode (pdtSafe=false) is byte-for-byte unchanged. Honest trade-offs: no intraday stop (a hard mid-day move isn't cut until the next run's open → gap/slippage, ~few-% profit reduction) and a missed run leaves a position unprotected longer. The fresh installer (SID-DEPLOY-PROMPT.md Step 8) now asks the follower's funding size and branches: $25K+ → PDT version (SID_PDT_SAFE=false); under $25K → PDT-safe (true). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, earnings blackout, AUTO-80 all untouched); headline backtest numbers unchanged. (paper trading, 2026-07-17)
 // Version history:
+//   v2.4.3 ACCOUNTING / DISPLAY FIXES (2026-09-05, paper trading):
+//        - FIX 1 — recordExternalClose DOUBLE-COUNTED already-booked fills.
+//          It queried Alpaca for every FILLED exit order on the symbol since the
+//          position opened and consumed them most-recent-first up to sharesClosed
+//          — with NO memory of which fills a PREVIOUS close had already booked. So
+//          a second external close on the same symbol walked back into leg 1's
+//          fills and priced part of leg 2 at leg 1's price.
+//          PROVEN (live paper, PYPL short 17sh @ $60.675, closed manually in two
+//          legs): leg 1 = 9sh @ $52.40 -> +$74.47 (CORRECT). Leg 2's real fills
+//          were 6 @ $56.66 + 2 @ $56.71 (avg $56.6725 -> TRUE +$32.02), but the
+//          bot booked +$57.58 at "exit $53.4775" — which decodes EXACTLY as
+//          (2 x 56.71 + 6 x 52.40) / 8: two shares at the correct new price, then
+//          six shares back-filled at $52.40, the price leg 1 had already consumed.
+//          FIX: new consumedExitFillQty() builds a Map<orderId, qtyAlreadyBooked>
+//          from (a) every prior closed record's `exit_fills` stamp for that symbol
+//          and (b) the bot's own TP1 partial-close order (now stamped on the
+//          position as `tp1_close_order_id`, since its fill is already booked as
+//          tp1_pnl). recordExternalClose subtracts that from each order's
+//          filled_qty and can only draw the REMAINDER — the same per-lot
+//          consumption model reconcile-account.js's allocateFillsFIFO already
+//          uses, deliberately mirrored rather than re-invented. Every close keeps
+//          stamping the exact { orderId, qty, price } it consumed into
+//          `exit_fills`, so the exclusion stays deterministic for future closes.
+//          HONESTY GUARD: if the surviving (unconsumed) fills cover FEWER shares
+//          than the close, the record is stamped pnl_source:'estimate' with
+//          `exit_fill_qty` / `exit_fill_shortfall` rather than presenting an
+//          extrapolated price as a full-coverage 'alpaca_fill'.
+//        - FIX 2 — the dashboard's LIVE net-P&L headline was a FROZEN snapshot.
+//          alpaca-account-sid.json had exactly ONE writer: reconcile-account.js,
+//          and only under an explicit `--write`. bot-sid.js never wrote it and
+//          sid-dashboard.js only reads it, so the dashboard rendered the
+//          2026-07-17 equity ($100,182.18) as "current" for SEVEN WEEKS.
+//          FIX: run() now writes the snapshot every run straight from the account
+//          read the Alpaca preflight ALREADY performs (no extra API call) —
+//          { equity, startingEquity, netPnl, source:'alpaca', mode, asOf, writer,
+//          botVersion }. MODE-SEGREGATED: paper writes alpaca-account-sid.json
+//          (the existing dashboard file), any other mode writes
+//          alpaca-account-<mode>-sid.json, so a paper run can NEVER overwrite a
+//          live snapshot (or vice-versa). Best-effort: a snapshot write failure
+//          logs and is swallowed — it must never abort a trading run.
+//          `.github/workflows/sid.yml` now stages the snapshot in its commit step
+//          (it previously did not, so even a written refresh never reached the
+//          dashboard), and sid-dashboard.js flags any snapshot older than
+//          SNAPSHOT_STALE_DAYS (2) as STALE instead of showing it as current.
+//        - NOT a signal-logic change. RSI 30/70, RSI(3), MACD alignment, weekly
+//          gates, the earnings blackout, the AUTO-tier universe, the RSI-50 TP1
+//          trigger, the TP2 SMA50/SMA200/BE/timeout exits, the share math and the
+//          v2.2.5 / v2.2.6 / v2.4.2 cancel-first + symbol-scoped-sweep close
+//          mechanics are all byte-for-byte unchanged.
 //   v2.4.2 SHORTS-TP1 OCO FIX (2026-09-01, paper trading):
 //        - ROOT CAUSE: a v2.2 SHORT's intraday TP1 relies SOLELY on the resting
 //          broker OCO — checkPositions Branch A `continue`s past the daily-poll TP1
@@ -646,6 +697,48 @@ function realisedPnlFor(side, entry, exit, shares) {
 // ONLY paper records; a future live ledger sums only live records.
 function recordMode(r) { return String(r?.mode || 'paper').toLowerCase(); }
 
+// ── v2.5.0: is a position's TP1 leg ALREADY booked in a closed record? ───────
+// A TP1 half can reach the books by two completely different routes:
+//
+//   (a) THE BOT banked it (checkPositions Branch A). No closed record is written
+//       — the leg lives only on the still-open position as `tp1_pnl`, and Branch A
+//       stamps the broker order that did it as `tp1_close_order_id`.
+//   (b) THE BROKER banked it (a v2.2 resting TP1 OCO filling intraday). syncPositions
+//       sees a PARTIAL close -> recordExternalClose writes a CLOSED record for that
+//       leg (`is_full_close:false`, same position `id`) AND the v2.2 TP1-detection
+//       block in run() ALSO stamps `tp1_pnl` on the live position for the SAME shares.
+//
+// So "position has tp1_pnl" does NOT imply "the leg is unbooked". Two bugs flow
+// from conflating them, and this ONE predicate guards both:
+//   * deriveLedger would add the open position's tp1_pnl ON TOP of the closed
+//     partial record -> the leg is counted twice on every run (route b).
+//   * recordExternalClose's full close must ADD the tp1_pnl leg to total_pnl for
+//     route (a) (else the leg silently vanishes when the position closes — the
+//     live IBM -$40.76 / HON -$21.02 bug) but must NOT for route (b).
+//
+// Returns TRUE when a closed PARTIAL record for this position already carries the
+// leg. Only `is_full_close === false` records qualify — a full-close record IS the
+// trade total, not a separate leg. When the bot banked TP1 itself (we hold the
+// order id) and the partial record was priced from OTHER broker orders, the leg is
+// NOT in that record, so we keep looking. Ambiguity defaults to TRUE (treat as
+// already booked) — for an accounting fix, never inflate.
+function tp1LegAlreadyInClosedRecords(pos, closedRecords = []) {
+  if (!pos?.tp1_hit || !pos?.id) return false;
+  const tp1OrderId = pos.tp1_close_order_id || null;
+  for (const r of (closedRecords || [])) {
+    if (!r || r.id !== pos.id) continue;
+    if (r.is_full_close !== false) continue;   // only a PARTIAL record is a separate leg
+    if (tp1OrderId) {
+      const fills = Array.isArray(r.exit_fills) ? r.exit_fills : [];
+      const usesTp1Order =
+        fills.some(f => f?.orderId === tp1OrderId) || r.tp1_close_order_id === tp1OrderId;
+      if (!usesTp1Order) continue;             // this partial priced OTHER shares
+    }
+    return true;
+  }
+  return false;
+}
+
 // Re-derive the ledger for the CURRENT trading mode straight from the on-disk
 // records — NEVER a running `+=` counter (that carried a phantom loss when a
 // record was later deleted but its delta wasn't reversed; see SID/CLAUDE.md
@@ -667,7 +760,16 @@ function deriveLedger(mode, sources = {}) {
   const closedSum = closed.reduce((s, r) => s + (r.total_pnl ?? r.realizedPnl ?? 0), 0);
   // In-flight TP1 partials: a still-open runner whose TP1 already banked. Its
   // total_pnl record doesn't exist yet, so add the booked tp1_pnl leg.
-  const openTp1Sum = open.reduce((s, r) => s + (r.tp1_hit ? (r.tp1_pnl || 0) : 0), 0);
+  // v2.5.0: ...UNLESS a closed PARTIAL record already carries that same leg (the
+  // broker-OCO TP1 path writes one via recordExternalClose AND the v2.2 detection
+  // block stamps tp1_pnl on the live position — counting both double-books the
+  // leg on every subsequent run). tp1LegAlreadyInClosedRecords is the single
+  // shared predicate; recordExternalClose uses the SAME one for the mirror case.
+  const openTp1Sum = open.reduce((s, r) => {
+    if (!r.tp1_hit) return s;
+    if (tp1LegAlreadyInClosedRecords(r, closedAll)) return s;
+    return s + (r.tp1_pnl || 0);
+  }, 0);
   const realizedPnl = parseFloat((closedSum + openTp1Sum).toFixed(2));
   return { realizedPnl, tradeCount: closed.length };
 }
@@ -691,6 +793,68 @@ function updateAccount(_deltaHintIgnored, sources = {}) {
   account.lastUpdated = todayString();
   fs.writeFileSync(ACCOUNT_PATH, JSON.stringify(account, null, 2));
   return account;
+}
+
+// ── v2.4.3: REAL Alpaca account snapshot (dashboard headline source) ─────────
+// alpaca-account-sid.json is what sid-dashboard.js renders as the LIVE net-P&L
+// headline ("Paper account (simulated) · $X on $Y base"). Until v2.4.3 its ONLY
+// writer was reconcile-account.js, and only under an explicit `--write` — the
+// bot never wrote it and the dashboard only reads it. Result: the dashboard
+// showed a FROZEN 2026-07-17 equity ($100,182.18) as "current" for SEVEN WEEKS
+// while the real paper account had moved on. The bot already reads the account
+// in its Alpaca preflight, so writing the snapshot costs ZERO extra API calls.
+//
+// PAPER/LIVE SEGREGATION: paper writes the existing alpaca-account-sid.json;
+// any other mode writes alpaca-account-<mode>-sid.json. A paper run can
+// therefore NEVER overwrite a live snapshot (or vice-versa) — the same hard
+// separation reconcile-account.js applies to the records themselves.
+function alpacaSnapshotPathForMode(mode) {
+  const m = String(mode || 'paper').toLowerCase();
+  return m === 'paper'
+    ? path.join(__dirname, 'alpaca-account-sid.json')
+    : path.join(__dirname, `alpaca-account-${m}-sid.json`);
+}
+
+// Baseline the net-P&L is measured against. Precedence:
+//   1. the existing snapshot's startingEquity (never drifts once established)
+//   2. SID_ALPACA_STARTING_EQUITY env override
+//   3. paper -> 100000 (Alpaca's paper base, which cannot be set lower)
+//      other -> the CURRENT equity, i.e. the first live run establishes the
+//               baseline so netPnl starts at 0 rather than a bogus six figures.
+function alpacaStartingEquityFor(mode, currentEquity, existing) {
+  const fromSnap = Number(existing?.startingEquity);
+  if (Number.isFinite(fromSnap) && fromSnap > 0) return fromSnap;
+  const fromEnv = parseFloat(process.env.SID_ALPACA_STARTING_EQUITY || '');
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+  if (String(mode || 'paper').toLowerCase() === 'paper') return 100000;
+  return Number.isFinite(currentEquity) ? currentEquity : 0;
+}
+
+// Write the snapshot. BEST-EFFORT: any failure is logged and swallowed — a
+// dashboard-display write must never abort or alter a trading run.
+function writeAlpacaSnapshot({ equity, mode }) {
+  try {
+    if (!Number.isFinite(equity)) return null;
+    const p = alpacaSnapshotPathForMode(mode);
+    let existing = null;
+    try { existing = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
+    const startingEquity = alpacaStartingEquityFor(mode, equity, existing);
+    const snapshot = {
+      equity:         parseFloat(equity.toFixed(2)),
+      startingEquity: parseFloat(Number(startingEquity).toFixed(2)),
+      netPnl:         parseFloat((equity - startingEquity).toFixed(2)),
+      source:         'alpaca',
+      mode:           String(mode || 'paper').toLowerCase(),
+      asOf:           new Date().toISOString(),
+      writer:         'bot-sid',
+      botVersion:     BOT_VERSION,
+    };
+    fs.writeFileSync(p, JSON.stringify(snapshot, null, 2));
+    return snapshot;
+  } catch (err) {
+    console.warn(`[snapshot] Could not write Alpaca account snapshot: ${err.message}`);
+    return null;
+  }
 }
 
 // ── Position Tracking ─────────────────────────────────────────────────────────
@@ -815,6 +979,54 @@ function buildEntryPositionRecord({
   };
 }
 
+// ── v2.4.3: consumed-fill ledger (external-close double-count guard) ─────────
+// recordExternalClose prices an external close by reading Alpaca's FILLED exit
+// orders for the symbol. Before v2.4.3 it re-scanned ALL of them every time with
+// no memory of which fills a PREVIOUS close had already booked, so a second
+// external close on the same symbol walked back into the first close's fills.
+//
+// PROVEN on the live paper PYPL short (17 sh, entry $60.675, closed manually in
+// two legs):
+//   leg 1 — 9 sh @ $52.40                       -> +$74.47  (CORRECT)
+//   leg 2 — real fills 6 @ $56.66 + 2 @ $56.71  -> TRUE +$32.02
+//           but the bot booked +$57.58 at "exit $53.4775", which decodes
+//           EXACTLY as (2 x 56.71 + 6 x 52.40) / 8: two shares at the correct
+//           new price, then SIX shares back-filled at $52.40 — leg 1's price.
+//
+// This builds Map<orderId, qtyAlreadyBooked> so the new close can only draw each
+// broker order's REMAINING quantity. It is deliberately the same per-lot
+// consumption model that reconcile-account.js's allocateFillsFIFO already uses
+// (draw() decrements lot.qtyLeft) rather than a second, divergent scheme.
+//
+// Sources of "already booked":
+//   1. Every prior CLOSED record for this symbol stamps the exact
+//      { orderId, qty, price } it consumed in `exit_fills` — that stamp is the
+//      deterministic exclusion key (and is why each close keeps writing it).
+//   2. The bot's OWN TP1 partial close (Branch A). Its fill is already booked as
+//      tp1_pnl, so re-using it to price the runner would double-count. v2.4.3
+//      stamps that order id on the position/record as `tp1_close_order_id`.
+// Positions/records for OTHER symbols are ignored (symbol-scoped).
+function consumedExitFillQty(symbol, { closedRecords = [], positions = [] } = {}) {
+  const sym = String(symbol || '').toUpperCase();
+  const consumed = new Map();
+  const add = (orderId, qty) => {
+    if (!orderId) return;                       // no id -> can't exclude deterministically
+    const q = Number(qty);
+    if (!Number.isFinite(q) || q <= 0) return;
+    consumed.set(orderId, (consumed.get(orderId) || 0) + q);
+  };
+  for (const r of (closedRecords || [])) {
+    if (!r || String(r.symbol || '').toUpperCase() !== sym) continue;
+    for (const f of (Array.isArray(r.exit_fills) ? r.exit_fills : [])) add(f?.orderId, f?.qty);
+    add(r.tp1_close_order_id, r.tp1_shares);
+  }
+  for (const p of (positions || [])) {
+    if (!p || String(p.symbol || '').toUpperCase() !== sym) continue;
+    add(p.tp1_close_order_id, p.tp1_shares);
+  }
+  return consumed;
+}
+
 // ── External close recorder (FIX tasks #25 + #26, 2026-06-05) ────────────────
 // When syncPositions detects that Alpaca closed shares we didn't fire ourselves
 // (stop fills, OCO fills, manual broker-side closes), this records the close
@@ -826,6 +1038,15 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
   // ── Find the actual exit price from Alpaca's order history ─────────
   let exitPrice = null;
   let fillsUsed = [];
+  let qtyPriced = 0;               // v2.4.3: shares actually priced from REAL, unconsumed fills
+  const fillsSkipped = [];         // v2.4.3: fills excluded because a prior close already booked them
+  // v2.4.3: closed records are needed BOTH for the consumed-fill ledger below and
+  // for the append further down — load once and reuse (single read, single truth).
+  const closed = loadClosedPositions();
+  const consumedFills = consumedExitFillQty(pos.symbol, {
+    closedRecords: closed,
+    positions:     [pos],
+  });
   try {
     const oppositeSide = pos.side === 'long' ? 'sell' : 'buy';
     const afterIso = pos.openDate ? `${pos.openDate}T00:00:00Z` : undefined;
@@ -849,10 +1070,20 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
       let costCounted = 0;
       const sortedFills = fills.sort((a, b) => new Date(b.filled_at || b.updated_at || b.created_at) - new Date(a.filled_at || a.updated_at || a.created_at));
       for (const f of sortedFills) {
-        if (qtyCounted >= sharesClosed) break;
+        if (qtyCounted >= sharesClosed - 1e-9) break;
         const q = parseFloat(f.filled_qty);
         const p = parseFloat(f.filled_avg_price);
-        const take = Math.min(q, sharesClosed - qtyCounted);
+        if (!Number.isFinite(q) || q <= 0 || !Number.isFinite(p) || p <= 0) continue;
+        // v2.4.3 DOUBLE-COUNT GUARD: an earlier close on this symbol may already
+        // have booked part (or all) of this broker order. Only the REMAINDER is
+        // available — never re-price shares that are already in the books.
+        const alreadyBooked = consumedFills.get(f.id) || 0;
+        const available     = q - alreadyBooked;
+        if (available <= 1e-9) {
+          fillsSkipped.push({ orderId: f.id, qty: q, alreadyBooked, reason: 'already booked by an earlier close' });
+          continue;
+        }
+        const take = Math.min(available, sharesClosed - qtyCounted);
         qtyCounted += take;
         costCounted += take * p;
         fillsUsed.push({
@@ -863,6 +1094,7 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
         });
       }
       if (qtyCounted > 0) exitPrice = costCounted / qtyCounted;
+      qtyPriced = qtyCounted;
     }
   } catch (err) {
     console.warn(`[recordExternalClose] Failed to query Alpaca orders for ${pos.symbol} exit price: ${err.message}`);
@@ -872,6 +1104,23 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
   // case here — this path exists precisely because Alpaca closed the position);
   // 'estimate' only on the stopLoss fallback when no fills were returned.
   let pnlSource = fillsUsed.length > 0 ? 'alpaca_fill' : 'estimate';
+
+  // v2.4.3 HONESTY GUARD: with the double-count guard in place, the unconsumed
+  // fills can legitimately cover FEWER shares than this close (e.g. Alpaca's
+  // order window didn't return one leg). The weighted average of what we DID
+  // find is still the best available price, but extrapolating it across shares
+  // we never saw a fill for is an ESTIMATE — label it as one rather than
+  // presenting it as a full-coverage real fill. Never silently wrong.
+  const fillShortfall = parseFloat((sharesClosed - qtyPriced).toFixed(4));
+  if (fillsUsed.length > 0 && fillShortfall > 1e-9) {
+    pnlSource = 'estimate';
+    console.warn(
+      `[recordExternalClose] ${pos.symbol}: real (unconsumed) fills cover only ` +
+      `${qtyPriced}/${sharesClosed} sh` +
+      (fillsSkipped.length ? ` (${fillsSkipped.length} order(s) skipped — already booked by an earlier close)` : '') +
+      ` — pricing the remainder at the found average $${(exitPrice ?? 0).toFixed(4)} and flagging pnl_source:"estimate".`
+    );
+  }
 
   // Fallback: use the bot's tracked stop level. For Alpaca-side stops set at
   // bot's stopLoss, this is usually within a few cents of actual fill.
@@ -887,8 +1136,43 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
   const pnl = pnlRounded;
   const exitPriceRounded = parseFloat(exitPrice.toFixed(4));
 
+  // ── v2.5.0 FIX: carry the bot-booked TP1 leg into total_pnl ─────────────────
+  // `exit_pnl` is THIS leg. `total_pnl` is THE TRADE — and the ledger sums
+  // total_pnl. Before v2.5.0 a full external close set total_pnl to the closed
+  // leg ALONE, while deriveLedger only counts an open position's tp1_pnl WHILE
+  // IT IS OPEN. So the instant the runner closed, a TP1 half banked by Branch A
+  // silently dropped out of the books:
+  //   IBM  TP1 2sh @ 237.51 = +$40.76 LOST -> trade booked +$42.52, truth +$82.88
+  //   HON  TP1 2sh @ 214.73 = +$20.58 LOST -> trade booked  -$0.09, truth +$19.83
+  // (The bot's OWN TP2 path never had this bug — it already does tp1_pnl + tp2Pnl.)
+  //
+  // MUST NOT double-count the PYPL pattern, where the TP1 leg was itself written
+  // as a separate closed PARTIAL record (`is_full_close:false`, same id) — that
+  // record already carries it. tp1LegAlreadyInClosedRecords is the shared guard
+  // (the same one deriveLedger uses for the mirror case).
+  const tp1LegPnl       = Number(pos.tp1_pnl) || 0;
+  const tp1AlreadyBooked = tp1LegAlreadyInClosedRecords(pos, closed);
+  const includeTp1Leg   = Boolean(isFullClose && pos.tp1_hit && tp1LegPnl !== 0 && !tp1AlreadyBooked);
+  const tradeTotalPnl   = includeTp1Leg
+    ? parseFloat((tp1LegPnl + pnlRounded).toFixed(2))
+    : pnlRounded;
+  if (includeTp1Leg) {
+    console.log(
+      `    [v2.5.0] ${pos.symbol}: carrying the bot-booked TP1 leg into the trade total — ` +
+      `TP1 ${tp1LegPnl >= 0 ? '+' : ''}$${tp1LegPnl.toFixed(2)} + this close ` +
+      `${pnlRounded >= 0 ? '+' : ''}$${pnlRounded.toFixed(2)} = ${tradeTotalPnl >= 0 ? '+' : ''}$${tradeTotalPnl.toFixed(2)}`
+    );
+  }
+  // Combined provenance: 'alpaca_fill' only when BOTH legs were real fills —
+  // identical rule to the TP2 branch's combinedSource.
+  if (includeTp1Leg) {
+    const tp1Src = pos.tp1_pnl_source || 'estimate';
+    if (!(tp1Src === 'alpaca_fill' && pnlSource === 'alpaca_fill')) pnlSource = 'estimate';
+  }
+
   // ── Append to closed-positions-sid.json ─────────────────────────────
-  const closed = loadClosedPositions();
+  // (`closed` was loaded at the top of this function — it also feeds the
+  //  v2.4.3 consumed-fill ledger, so it is deliberately read only once.)
   const closedRec = {
     ...pos,
     closeDate: todayString(),
@@ -897,9 +1181,20 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
     exit_price:    exitPriceRounded,
     exit_pnl:      pnlRounded,
     exit_shares:   sharesClosed,
+    // v2.4.3: `exit_fills` is the DETERMINISTIC exclusion key a later close on
+    // this symbol uses to avoid re-booking these same shares. Keep stamping it.
     exit_fills:    fillsUsed,
-    total_pnl:     pnlRounded,
-    realizedPnl:   pnlRounded,
+    exit_fill_qty:       parseFloat(qtyPriced.toFixed(4)),
+    exit_fill_shortfall: fillShortfall > 1e-9 ? fillShortfall : 0,
+    ...(fillsSkipped.length ? { exit_fills_skipped: fillsSkipped } : {}),
+    // v2.5.0: total_pnl is THE TRADE (this leg + any bot-booked TP1 leg not
+    // already carried by a closed partial record); exit_pnl stays THIS leg.
+    total_pnl:     tradeTotalPnl,
+    realizedPnl:   tradeTotalPnl,
+    ...(includeTp1Leg ? { tp1_pnl_included: true } : {}),
+    ...(isFullClose && pos.tp1_hit && tp1AlreadyBooked
+      ? { tp1_pnl_included: false, tp1_leg_in_prior_record: true }
+      : {}),
     is_full_close: isFullClose,
     pnl_source:    pnlSource,
     mode:          pos.mode || CONFIG.tradingMode,
@@ -937,7 +1232,9 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
   updateAccount(null, { open: openMinusClosed });
 
   // ── Telegram alert ──────────────────────────────────────────────────
-  const pnlEmoji = pnlRounded >= 0 ? '📈' : '📉';
+  // v2.5.0: headline the TRADE total, not just this leg — a HON-style close is a
+  // small negative on the runner leg but a WIN on the trade (+$19.83).
+  const pnlEmoji = tradeTotalPnl >= 0 ? '📈' : '📉';
   const sign = pnlRounded >= 0 ? '+' : '';
   try {
     await tg.sendMessage(
@@ -945,6 +1242,10 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
       `${pos.symbol} ${pos.side.toUpperCase()} ${sharesClosed}sh ${isFullClose ? '(FULL)' : '(PARTIAL)'}\n` +
       `Entry: $${entry.toFixed(2)}  Exit: $${exitPriceRounded.toFixed(2)}\n` +
       `Realized P&amp;L: <b>${sign}$${pnlRounded.toFixed(2)}</b>\n` +
+      (includeTp1Leg
+        ? `TP1 leg: ${tp1LegPnl >= 0 ? '+' : ''}$${tp1LegPnl.toFixed(2)}\n` +
+          `<b>Trade total: ${tradeTotalPnl >= 0 ? '+' : ''}$${tradeTotalPnl.toFixed(2)}</b>\n`
+        : '') +
       `Reason: ${reasonKind}\n\n` +
       `Trade journal + account auto-updated. Position freed for new entries.`
     );
@@ -958,9 +1259,16 @@ async function recordExternalClose({ pos, sharesClosed, alpacaClient, reasonKind
     sharesClosed,
     exitPrice:   exitPriceRounded,
     pnl:         pnlRounded,
+    totalPnl:    tradeTotalPnl,     // v2.5.0 — incl. any carried TP1 leg
+    tp1LegPnl,
+    includeTp1Leg,
+    tp1AlreadyBooked,
     reason:      reasonKind,
     isFullClose,
     fillsUsed,
+    pnlSource,
+    fillsSkipped,          // v2.4.3 — visibility into the double-count guard
+    fillShortfall,
   });
 }
 
@@ -1951,16 +2259,21 @@ async function checkPositions(executor = null) {
           : c.high >= pos.stopLoss;
 
         if (stopHit) {
-          const exitPrice   = pos.stopLoss;
-          const realizedPnl = parseFloat((
+          // Start at the SIMULATED stop level; overwritten below with the real
+          // Alpaca fill once the market close confirms (v2.5.0).
+          let exitPrice   = pos.stopLoss;
+          let realizedPnl = parseFloat((
             pos.side === 'long'
               ? (exitPrice - pos.entry) * pos.shares_total
               : (pos.entry - exitPrice) * pos.shares_total
           ).toFixed(2));
+          let stopPnlSource = 'estimate';
+          let stopCloseOrderId = null;
 
           if (executor) {
             try {
-              await executor.closePosition(pos, `V2.1 stop-out before TP1 — stop $${pos.stopLoss} breached ${c.date}`);
+              const closeRes = await executor.closePosition(pos, `V2.1 stop-out before TP1 — stop $${pos.stopLoss} breached ${c.date}`);
+              stopCloseOrderId = closeRes?.closeOrderId || null;
             } catch (err) {
               console.log(`\n    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
               writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
@@ -1968,15 +2281,36 @@ async function checkPositions(executor = null) {
               positionHandled = true;
               break;
             }
+
+            // ── v2.5.0 FIX: BOOK THE REAL STOP FILL, NOT THE STOP LEVEL ──────
+            // This path submits a MARKET sell/buy to exit — it does not fill at
+            // the stop level, it fills at whatever the market gives. v2.4.1 fixed
+            // exactly this for TP1 (Branch A) and TP2 (Branch B) via
+            // pollOrderFill + filledAvgPrice, but the stop path was missed and
+            // kept booking `pos.stopLoss` with pnl_source:'estimate'.
+            //   LIVE PROOF — HD: booked 3sh @ $304.00 = -$24.96, but the real
+            //   fill was $303.346667 = -$27.01 (a $2.05 error on one trade).
+            // Same poll/override shape as Branch A/B so there is one pattern.
+            const stopFill = stopCloseOrderId
+              ? await executor.pollOrderFill(stopCloseOrderId)
+              : { filled: false, filledAvgPrice: null };
+            if (Number.isFinite(stopFill.filledAvgPrice) && stopFill.filledAvgPrice > 0) {
+              exitPrice     = stopFill.filledAvgPrice;
+              realizedPnl   = realisedPnlFor(pos.side, pos.entry, exitPrice, pos.shares_total);
+              stopPnlSource = 'alpaca_fill';
+            } else {
+              console.log(`\n    ⚠ Stop-out fill price unavailable for ${pos.symbol} — booking stop-level estimate $${exitPrice.toFixed(2)}`);
+              stopPnlSource = 'estimate';
+            }
           }
 
           const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
           const icon = realizedPnl >= 0 ? '✅' : '❌';
 
           // Push the closed record FIRST, then re-derive the ledger from records
-          // (never a running counter — can't carry a phantom). This is a stop-out
-          // at the stop level (no pollOrderFill on this legacy path), so
-          // pnl_source is 'estimate' — flagged so it's visibly not a real fill.
+          // (never a running counter — can't carry a phantom). v2.5.0: pnl_source
+          // is 'alpaca_fill' when the real stop fill was read off Alpaca above,
+          // 'estimate' only on the dry-run / fill-unavailable fallback.
           const closedRec = {
             ...pos,
             // V2.1 fields
@@ -1991,7 +2325,7 @@ async function checkPositions(executor = null) {
             tp2_reason: 'stopped_before_tp1',
             total_pnl: realizedPnl,
             exit_strategy: 'v2.1-stop',
-            pnl_source: 'estimate',
+            pnl_source: stopPnlSource,
             mode: pos.mode || CONFIG.tradingMode,
             // v2.0-compat fields the dashboard reads
             exitLevel: 'sl',
@@ -2027,16 +2361,19 @@ async function checkPositions(executor = null) {
 
         // V2.0 fallback: full close at RSI 50 if dynamic TP disabled
         if (!CONFIG.useDynamicTp) {
-          const exitPrice   = c.close;
-          const realizedPnl = parseFloat((
+          let exitPrice   = c.close;
+          let realizedPnl = parseFloat((
             pos.side === 'long'
               ? (exitPrice - pos.entry) * pos.shares_total
               : (pos.entry - exitPrice) * pos.shares_total
           ).toFixed(2));
+          let v20PnlSource = 'estimate';
 
           if (executor) {
+            let v20CloseOrderId = null;
             try {
-              await executor.closePosition(pos, `V2.0 fallback exit — RSI 50 reached (${rsi.toFixed(1)})`);
+              const closeRes = await executor.closePosition(pos, `V2.0 fallback exit — RSI 50 reached (${rsi.toFixed(1)})`);
+              v20CloseOrderId = closeRes?.closeOrderId || null;
             } catch (err) {
               console.log(`\n    🚫 Alpaca close FAILED: ${err.message} — position stays open, will retry next run`);
               writeLog({ kind: 'close_fail', symbol: pos.symbol, error: err.message });
@@ -2044,19 +2381,31 @@ async function checkPositions(executor = null) {
               positionHandled = true;
               break;
             }
+            // v2.5.0: book the REAL fill here too — this path also submits a
+            // market close, so c.close is only ever an estimate.
+            const v20Fill = v20CloseOrderId
+              ? await executor.pollOrderFill(v20CloseOrderId)
+              : { filled: false, filledAvgPrice: null };
+            if (Number.isFinite(v20Fill.filledAvgPrice) && v20Fill.filledAvgPrice > 0) {
+              exitPrice    = v20Fill.filledAvgPrice;
+              realizedPnl  = realisedPnlFor(pos.side, pos.entry, exitPrice, pos.shares_total);
+              v20PnlSource = 'alpaca_fill';
+            } else {
+              console.log(`\n    ⚠ V2.0 fallback fill price unavailable for ${pos.symbol} — booking bar-close estimate $${exitPrice.toFixed(2)}`);
+            }
           }
 
           const outcome = realizedPnl >= 0 ? 'WIN' : 'LOSS';
           const icon = realizedPnl >= 0 ? '✅' : '❌';
-          // Record first, then re-derive the ledger from records. No pollOrderFill
-          // on this v2.0 fallback path (closePosition returns no fill), so
-          // pnl_source is 'estimate'.
+          // Record first, then re-derive the ledger from records. v2.5.0: the real
+          // market-close fill is booked when available ('alpaca_fill'); the
+          // bar-close estimate is used (and flagged) only as a fallback.
           const closedRec = {
             ...pos,
             exitLevel: 'rsi50', exitPrice, exitRsi: rsi,
             closeDate: c.date, realizedPnl, outcome,
             exit_strategy: 'v2.0-rsi50-full',
-            pnl_source: 'estimate',
+            pnl_source: v20PnlSource,
             mode: pos.mode || CONFIG.tradingMode,
           };
           closedPositions.push(closedRec);
@@ -2112,6 +2461,10 @@ async function checkPositions(executor = null) {
         //       unprotected — re-place a protective stop on the FULL remaining
         //       qty and raise a LOUD alarm.
         let tp1Confirmed = true;   // true when there is no executor (dry_run) OR the fill confirmed
+        // v2.4.3: the broker order id that banks the TP1 half, hoisted so it can
+        // be stamped on the position below (accounting bookkeeping — the close
+        // mechanics inside this block are unchanged).
+        let tp1CloseOrderId = null;
         if (executor) {
           // (1) Release the shares held by the resting broker stop(s).
           try {
@@ -2190,6 +2543,7 @@ async function checkPositions(executor = null) {
           // reconcile fixed retroactively; now we book it right at close time so
           // the record never needs re-pricing. Falls back to the c.close estimate
           // only if the fill price is somehow unavailable, flagged pnl_source.
+          tp1CloseOrderId = closeOrderId;   // v2.4.3 — stamped on the position below
           if (Number.isFinite(fill.filledAvgPrice) && fill.filledAvgPrice > 0) {
             exitPrice    = fill.filledAvgPrice;
             tp1Pnl       = realisedPnlFor(pos.side, pos.entry, exitPrice, tp1Shares);
@@ -2226,6 +2580,11 @@ async function checkPositions(executor = null) {
         pos.tp1_reason       = 'rsi50';
         pos.tp1_rsi          = rsi;
         pos.tp1_pnl_source   = tp1PnlSource;   // 'alpaca_fill' | 'estimate'
+        // v2.4.3: remember WHICH broker order banked the TP1 half. Its fill is
+        // already booked as tp1_pnl, so recordExternalClose must never re-use it
+        // to price the runner's exit (consumedExitFillQty subtracts it).
+        // Accounting bookkeeping only — does not touch the close mechanics.
+        if (tp1CloseOrderId) pos.tp1_close_order_id = tp1CloseOrderId;
         pos.shares_remaining = runnerShares;
         // BE stop — locks ≥ 1¢/share profit (computed above as bePrice).
         pos.stopLoss  = bePrice;
@@ -2587,6 +2946,20 @@ async function run() {
       console.error('   Aborting run to avoid placing orders in an unknown state.');
       writeLog({ kind: 'preflight_fail', reason: preflight.reason, detail: preflight.detail });
       return;
+    }
+
+    // ── v2.4.3: refresh the REAL Alpaca account snapshot EVERY run ──────────
+    // The preflight above already fetched the account, so this is free. Before
+    // v2.4.3 the only writer was `reconcile-account.js --write`, so the
+    // dashboard headline sat frozen on the 2026-07-17 equity for 7 weeks.
+    // Mode-segregated (paper vs live get different files) and best-effort — a
+    // write failure can never abort the run or change any trading decision.
+    const acctSnapshot = writeAlpacaSnapshot({
+      equity: preflight.equity,
+      mode:   CONFIG.tradingMode,
+    });
+    if (acctSnapshot) {
+      console.log(`[Alpaca] Account snapshot refreshed: equity $${acctSnapshot.equity.toFixed(2)}  netPnl ${acctSnapshot.netPnl >= 0 ? '+' : '-'}$${Math.abs(acctSnapshot.netPnl).toFixed(2)} on $${acctSnapshot.startingEquity.toFixed(2)} base (${acctSnapshot.mode})`);
     }
 
     // V2.2: size off the internal ledger, NOT Alpaca equity. The internal
@@ -2996,6 +3369,20 @@ async function run() {
     let modeLabel           = 'dry_run';
     let stopOrderId         = null;     // V2.2: broker GTC stop placed alongside entry
     let clientOrderIdPrefix = null;     // V2.2: needed to find/refresh resting TP1 limit
+    // ── v2.5.0: the ENTRY price actually paid ──────────────────────────────────
+    // `signal.entry` is the SIGNAL bar's close — the price the rules fired on.
+    // The order is a MARKET order, so it fills at whatever the book gives, which
+    // is never exactly the signal close. Storing the signal price made EVERY
+    // share of entry error multiply across the whole position and through both
+    // exit legs:
+    //   HON  signal 204.22 vs real fill 204.44  -> 5 sh, TP1+runner mis-booked
+    //   IBM  signal 217.13 vs real fill 217.23  -> 4 sh, $0.40 off
+    //   HD   signal 312.32 vs real fill 312.35  |  RIOT 19.65 vs 19.665526
+    // approve-trade.js already did this correctly (pollOrderFill ->
+    // fill.filledAvgPrice); the main entry path simply never caught up. Mirror it.
+    let entryPrice      = signal.entry;
+    let entrySource     = 'signal_estimate';
+    let entryFillQty    = null;
 
     if (executor) {
       try {
@@ -3012,6 +3399,35 @@ async function run() {
         exchange            = `Alpaca/${CONFIG.tradingMode}`;
         modeLabel           = CONFIG.tradingMode;
         console.log(`    Order ID : ${orderId}${CONFIG.pdtSafe ? ' (PDT-SAFE — no broker stop; daily-poll manages exits)' : ` (stop ${stopOrderId})`}`);
+
+        // v2.5.0 — confirm the entry fill and book the REAL average price.
+        // Accounting ONLY: shares were already submitted from `sizing` and the
+        // broker stop is already resting at `signal.stopLoss`, so neither the
+        // share math nor the stop level is recomputed here (that would desync
+        // the record from the live broker order). Best-effort: a poll failure
+        // must never lose a position we have genuinely opened.
+        try {
+          const entryFill = await executor.pollOrderFill(orderId, { attempts: 30, delayMs: 2000 });
+          if (Number.isFinite(entryFill.filledAvgPrice) && entryFill.filledAvgPrice > 0) {
+            entryPrice   = entryFill.filledAvgPrice;
+            entrySource  = 'alpaca_fill';
+            entryFillQty = Number(entryFill.filledQty) || null;
+            console.log(`    Entry fill: $${entryPrice.toFixed(4)} (signal was $${signal.entry.toFixed(4)}${
+              Math.abs(entryPrice - signal.entry) > 1e-9
+                ? ` — slippage ${(entryPrice - signal.entry >= 0 ? '+' : '')}$${(entryPrice - signal.entry).toFixed(4)}/sh`
+                : ''})`);
+            if (entryFillQty !== null && Math.abs(entryFillQty - sizing.shares) > 1e-9) {
+              // Don't silently rewrite share math — flag it. syncPositions
+              // reconciles the real broker quantity on the next run.
+              console.log(`    ⚠ Entry filled ${entryFillQty} sh but ${sizing.shares} were ordered — flagged; next run's Alpaca sync reconciles qty`);
+              writeLog({ kind: 'entry_partial_fill', symbol, ordered: sizing.shares, filled: entryFillQty, orderId });
+            }
+          } else {
+            console.log(`    ⚠ Entry fill price unavailable for ${symbol} — storing the signal estimate $${signal.entry.toFixed(4)} (flagged entry_source:"signal_estimate")`);
+          }
+        } catch (fillErr) {
+          console.log(`    ⚠ Entry fill poll failed for ${symbol}: ${fillErr.message} — storing the signal estimate, flagged`);
+        }
       } catch (err) {
         console.log(`    🚫 Alpaca entry FAILED: ${err.message}`);
         writeLog({
@@ -3034,7 +3450,7 @@ async function run() {
       symbol,
       signal.signal,
       sizing.shares,
-      signal.entry.toFixed(2),
+      entryPrice.toFixed(2),          // v2.5.0 — the REAL fill, not the signal close
       signal.stopLoss,
       sizing.totalUsd,
       sizing.riskUsd,
@@ -3057,10 +3473,13 @@ async function run() {
       id:               orderId,
       symbol,
       side:             signal.signal,
-      entry:            signal.entry,
+      // v2.5.0: the REAL filled average price (falls back to the signal close,
+      // flagged via entry_source). stopLoss/shares/riskUsd stay exactly as the
+      // strategy sized them — only the booked entry PRICE is corrected.
+      entry:            entryPrice,
       stopLoss:         signal.stopLoss,
       shares:           sizing.shares,
-      totalUsd:         sizing.totalUsd,
+      totalUsd:         parseFloat((sizing.shares * entryPrice).toFixed(2)),
       riskUsd:          sizing.riskUsd,
       signalDate:       signal.signalDate,
       openDate:         now.toISOString().slice(0, 10),
@@ -3069,13 +3488,20 @@ async function run() {
       strategyTag:      `${BOT_NAME} ${BOT_VERSION}`,
       brokerStopOrderId:   stopOrderId,          // null in pdtSafe mode
       clientOrderIdPrefix: clientOrderIdPrefix,  // null in pdtSafe mode
-    }, CONFIG.pdtSafe ? { pdt_safe: true } : {}));
+    }, {
+      ...(CONFIG.pdtSafe ? { pdt_safe: true } : {}),
+      // v2.5.0 entry provenance — keeps the signal price for audit so the
+      // slippage between "rules fired here" and "we paid this" is inspectable.
+      entry_source: entrySource,                 // 'alpaca_fill' | 'signal_estimate'
+      signal_entry: signal.entry,
+      ...(entryFillQty !== null ? { entry_fill_qty: entryFillQty } : {}),
+    }));
 
     // Fire Telegram alert (best-effort, never blocks trading)
     tg.alertEntryFired({
       symbol,
       side:        signal.signal,
-      entryPrice:  signal.entry,
+      entryPrice,                       // v2.5.0 — the REAL fill
       stopLoss:    signal.stopLoss,
       shares:      sizing.shares,
       riskUsd:     sizing.riskUsd,
@@ -3086,7 +3512,9 @@ async function run() {
     writeLog({
       symbol,
       signal:       signal.signal,
-      entry:        signal.entry,
+      entry:        entryPrice,         // v2.5.0 — the REAL fill
+      signalEntry:  signal.entry,       // the signal close, for audit
+      entrySource,
       stopLoss:     signal.stopLoss,
       shares:       sizing.shares,
       totalUsd:     sizing.totalUsd,
@@ -3168,6 +3596,18 @@ export {
   realisedPnlFor,
   recordMode,
   loadClosedPositions,
+  // v2.4.3 — accounting/display fixes: the external-close consumed-fill ledger
+  // (double-count guard) + the Alpaca account snapshot writer. Exported for the
+  // unit tests only; inert on the direct-run path.
+  consumedExitFillQty,
+  recordExternalClose,
+  // v2.5.0 — the shared TP1-leg guard. Used by BOTH deriveLedger (don't count an
+  // open position's tp1_pnl twice) and recordExternalClose (do carry it into a
+  // full close). Exported for the regression tests on both directions.
+  tp1LegAlreadyInClosedRecords,
+  alpacaSnapshotPathForMode,
+  alpacaStartingEquityFor,
+  writeAlpacaSnapshot,
   appendTrade,
   writeLog,
   loadPendingApprovals,

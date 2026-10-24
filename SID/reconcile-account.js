@@ -47,7 +47,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { AlpacaClient } from './alpaca-client.js';
 import { resolveTradingMode } from './alpaca-executor.js';
 
@@ -55,6 +55,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Paths (relative to SID/, matching bot-sid.js) ────────────────────────────
 const CLOSED_PATH        = path.join(__dirname, 'closed-positions-sid.json');
+const OPEN_PATH          = path.join(__dirname, 'open-positions-sid.json');
 const ACCOUNT_PATH       = path.join(__dirname, 'sid-account.json');
 const ALPACA_SNAP_PATH   = path.join(__dirname, 'alpaca-account-sid.json');
 
@@ -125,13 +126,45 @@ function fillMs(fill)    { const t = Date.parse(fill.transaction_time || fill.tr
 //               leftovers contain a complete round-trip (matched buy + sell qty)
 //               is an ORPHAN trade missing from the records (e.g. the dropped MCD
 //               paper trade) — reconstructOrphans() rebuilds a record for it.
-function allocateFillsFIFO(positions, allFills) {
+//
+// ── v2.4.3 — TWO CORRECTNESS FIXES (this tool was validated on 2026-07-17 when
+//    there were ZERO open positions, which is exactly why neither was caught) ──
+//
+//  (A) OPEN POSITIONS NOW TAKE THEIR OWN SLICES. Pass them via
+//      `opts.openPositions`. They are allocated alongside the closed records in
+//      the same chronological FIFO order, so their fills are CONSUMED and can
+//      never (i) be mistaken for an orphan round-trip by reconstructOrphans, or
+//      (ii) be drawn by an unrelated closed record. An open position draws its
+//      FULL entry leg but only the exit shares it has ACTUALLY closed so far
+//      (shares_total - shares_remaining, minus anything already captured by a
+//      closed partial record sharing its id) — it must never draw an exit it
+//      hasn't taken. A dry-run on 2026-09-05 would otherwise have written
+//      PHANTOM CLOSED RECORDS for IBM (2sh runner) and ABT (4sh runner) — both
+//      still OPEN — because their banked TP1 partial fills looked like a
+//      complete round trip.
+//
+//  (B) MULTI-RECORD POSITIONS ARE ALLOCATED PER RECORD. When one position has
+//      SEVERAL closed records (a partial external close followed by the final
+//      close — same `id`), each record must draw only ITS OWN leg
+//      (`exit_shares`), not the whole `shares_total` round trip. Otherwise the
+//      first record swallows the entire trade and the second is left unmatched
+//      on its (possibly wrong) estimate. Observed on the two PYPL short records:
+//      the 09-02 record was being re-priced to the FULL-trade $106.41 while the
+//      09-04 record kept its $57.58 estimate = $163.99 booked for a trade whose
+//      true total is $106.49. SINGLE-record positions are untouched — they still
+//      use shares_total for both legs, so every previously-reconciled record
+//      (GOOG, UNH, GLD, ADBE, RIOT, MCD, …) allocates EXACTLY as before.
+function allocateFillsFIFO(positions, allFills, opts = {}) {
   const result = new Map();
   const leftovers = new Map();
+  const openPositions = opts.openPositions || [];
+  const openSet = new Set(openPositions);
+  // Closed records + still-open positions share the symbol FIFO queues.
+  const allPositions = [...positions, ...openPositions];
   // Group positions + fills by symbol.
   const bySymbolPos   = new Map();
   const bySymbolFills = new Map();
-  for (const pos of positions) {
+  for (const pos of allPositions) {
     const s = String(pos.symbol).toUpperCase();
     if (!bySymbolPos.has(s)) bySymbolPos.set(s, []);
     bySymbolPos.get(s).push(pos);
@@ -183,14 +216,42 @@ function allocateFillsFIFO(positions, allFills) {
     }
 
     for (const pos of posList) {
-      const need = pos.shares_total ?? pos.shares ?? 0;
+      const sharesTotal = pos.shares_total ?? pos.shares ?? 0;
+      const isOpenPos   = openSet.has(pos);
+      // How many records share this position id? (>1 = a partial close followed
+      // by the final close — see fix (B) in the header.)
+      const idSiblings  = pos.id
+        ? posList.filter(p => p.id === pos.id && !openSet.has(p)).length
+        : 1;
+
+      // ── v2.4.3: per-record leg sizes ───────────────────────────────────────
+      let entryNeed = sharesTotal;
+      let exitNeed  = sharesTotal;
+      if (isOpenPos) {
+        // (A) An OPEN position has closed only part of itself so far. Draw the
+        //     full entry leg (it filled in full), but only the exits it has
+        //     actually taken — minus any already captured by a closed partial
+        //     record that shares this id (else both would draw the same shares).
+        const closedByRecords = positions
+          .filter(r => r && pos.id && r.id === pos.id)
+          .reduce((s, r) => s + (Number(r.exit_shares) || 0), 0);
+        const closedSoFar = sharesTotal - (pos.shares_remaining ?? sharesTotal);
+        exitNeed = Math.max(0, closedSoFar - closedByRecords);
+      } else if (idSiblings > 1) {
+        // (B) One of SEVERAL records for the same position — this record only
+        //     accounts for its own leg.
+        const legShares = Number(pos.exit_shares ?? pos.tp2_shares ?? sharesTotal) || 0;
+        entryNeed = legShares;
+        exitNeed  = legShares;
+      }
+
       const openMs = pos.openDate ? Date.parse(`${pos.openDate}T00:00:00Z`) : -Infinity;
       const isLong = pos.side === 'long';
       // Entry leg first (no time floor), then exit leg constrained to >= entry.
       const entryQueue = isLong ? buyQ  : sellQ;
       const exitQueue  = isLong ? sellQ : buyQ;
-      const entry = draw(entryQueue, need, null);
-      const exit  = draw(exitQueue,  need, openMs);
+      const entry = draw(entryQueue, entryNeed, null);
+      const exit  = draw(exitQueue,  exitNeed,  openMs);
 
       const entryAvg = entry.qty ? entry.cost / entry.qty : null;
       const exitAvg  = exit.qty  ? exit.cost  / exit.qty  : null;
@@ -200,15 +261,22 @@ function allocateFillsFIFO(positions, allFills) {
       //   long:  exit.cost(=sell proceeds) - entry.cost(=buy cost)
       //   short: entry.cost(=sell proceeds) - exit.cost(=buy cost)
       const pnl = isLong ? (exit.cost - entry.cost) : (entry.cost - exit.cost);
-      const matched = need > 0 && entry.qty >= need - 0.5 && exit.qty >= need - 0.5;
+      // An OPEN position is NEVER "matched" — it has no completed round trip and
+      // must never be re-priced or reconstructed as a closed trade.
+      const matched = !isOpenPos && entryNeed > 0 && exitNeed > 0 &&
+                      entry.qty >= entryNeed - 0.5 && exit.qty >= exitNeed - 0.5;
 
       result.set(pos, {
         pnl: parseFloat(pnl.toFixed(2)),
         matched,
+        open: isOpenPos,
         entryQty: parseFloat(entry.qty.toFixed(4)),
         exitQty:  parseFloat(exit.qty.toFixed(4)),
+        entryNeed, exitNeed,
         entryAvg, exitAvg,
-        note: matched ? '' : `partial fills (entry ${entry.qty}/${need}, exit ${exit.qty}/${need})`,
+        note: matched ? ''
+             : isOpenPos ? `still OPEN (consumed ${entry.qty} entry / ${exit.qty} exit fills so they can't be re-used)`
+             : `partial fills (entry ${entry.qty}/${entryNeed}, exit ${exit.qty}/${exitNeed})`,
       });
     }
 
@@ -231,11 +299,32 @@ function allocateFillsFIFO(positions, allFills) {
 // reconstructed:true. Side is inferred from which leg came FIRST in time (an
 // early buy => long; an early sell => short).
 // Returns an array of reconstructed closed-position records.
-function reconstructOrphans(leftovers, reconcileMode = 'paper') {
+//
+// ⚠ v2.4.3 HARD GUARD — NEVER reconstruct a symbol that is CURRENTLY OPEN.
+// This tool was validated on 2026-07-17 when there were ZERO open positions,
+// which is exactly why the hole went unnoticed. A dry-run on 2026-09-05 would
+// have written PHANTOM CLOSED RECORDS for IBM (2 sh runner) and ABT (4 sh
+// runner) — both still open — because their banked TP1 partial fills look like
+// a complete buy+sell round trip in the leftover lots. Writing those would have
+// booked unrealised runners as realised P&L AND left the real positions dangling.
+// `opts.openSymbols` (a Set of UPPERCASE symbols from open-positions-sid.json)
+// short-circuits any such symbol; skipped symbols are pushed to
+// `opts.skippedOut` so the caller can report them loudly. This is belt-and-
+// braces with allocateFillsFIFO's open-position consumption — either alone
+// would prevent the phantom; both together make it structurally impossible.
+function reconstructOrphans(leftovers, reconcileMode = 'paper', opts = {}) {
+  const openSymbols = opts.openSymbols || new Set();
+  const skippedOut  = opts.skippedOut  || [];
   const recs = [];
   for (const [sym, { buyQ, sellQ }] of leftovers) {
     const buyQty  = buyQ.reduce((s, l) => s + l.qtyLeft, 0);
     const sellQty = sellQ.reduce((s, l) => s + l.qtyLeft, 0);
+    if (openSymbols.has(String(sym).toUpperCase())) {
+      if (Math.min(buyQty, sellQty) >= 0.5) {
+        skippedOut.push({ symbol: sym, buyQty, sellQty, reason: 'symbol has an OPEN position — refusing to reconstruct a closed record' });
+      }
+      continue;
+    }
     // Need BOTH legs to reconstruct a realised trade. A one-legged leftover
     // (only buys, or only sells) is an OPEN position or a data-window edge — we
     // do NOT invent an exit for it. Skip (it stays unmatched, flagged below).
@@ -296,6 +385,11 @@ async function main() {
 
   const allClosed = loadJSON(CLOSED_PATH, null);
   const account = loadJSON(ACCOUNT_PATH, null);
+  // v2.4.3: OPEN positions are now first-class inputs. They consume their own
+  // fills (so a closed record can't draw them) and their symbols are barred from
+  // orphan reconstruction (so a live runner can't be booked as a closed trade).
+  const allOpenRaw = loadJSON(OPEN_PATH, []);
+  const allOpen = Array.isArray(allOpenRaw) ? allOpenRaw : [];
   if (!Array.isArray(allClosed)) {
     console.error(`${FAIL} Could not read ${CLOSED_PATH}`);
     process.exit(1);
@@ -317,8 +411,16 @@ async function main() {
   const recMode = (r) => String(r.mode || 'paper').toLowerCase();
   const closed        = allClosed.filter(r => recMode(r) === reconcileMode);
   const quarantined   = allClosed.filter(r => recMode(r) !== reconcileMode);
+  // Only this mode's open positions participate (paper/live stay segregated).
+  const openPositions = allOpen.filter(r => recMode(r) === reconcileMode);
+  const openSymbols   = new Set(openPositions.map(p => String(p.symbol || '').toUpperCase()).filter(Boolean));
 
   console.log(`${OK} Loaded ${allClosed.length} closed record(s) from closed-positions-sid.json`);
+  console.log(`${OK} Loaded ${allOpen.length} open position(s); ${openPositions.length} in the ${reconcileMode.toUpperCase()} scope${openSymbols.size ? ` -> ${[...openSymbols].join(', ')}` : ''}`);
+  if (openSymbols.size) {
+    console.log(`       These symbols are EXCLUDED from orphan reconstruction and their fills are`);
+    console.log(`       consumed first, so a live runner can never be booked as a closed trade.`);
+  }
   console.log(`${OK} Reconcile scope: ${reconcileMode.toUpperCase()} set = ${closed.length} record(s); ${quarantined.length} other-mode record(s) QUARANTINED (untouched)`);
   if (quarantined.length) {
     const q = quarantined.reduce((acc, r) => { acc[recMode(r)] = (acc[recMode(r)] || 0) + 1; return acc; }, {});
@@ -385,7 +487,7 @@ async function main() {
   // record's closeDate), so runners that closed days after their recorded target
   // date (PYPL/ADBE on 2026-07-17) get their real exit fills.
   const { alloc, leftovers } = (alpacaOk && fills.length)
-    ? allocateFillsFIFO(closed, fills)
+    ? allocateFillsFIFO(closed, fills, { openPositions })
     : { alloc: new Map(), leftovers: new Map() };
 
   const rows = [];
@@ -433,7 +535,14 @@ async function main() {
   // at commit a40456fc but never removed from the account totals, so the books
   // are ~$78 short of the paper account. Any symbol with a complete leftover
   // round-trip is such an orphan — rebuild it from the real fills.
-  const reconstructed = alpacaOk ? reconstructOrphans(leftovers, reconcileMode) : [];
+  // v2.4.3: symbols with an OPEN position are hard-skipped (see reconstructOrphans).
+  const orphanSkipped = [];
+  const reconstructed = alpacaOk
+    ? reconstructOrphans(leftovers, reconcileMode, { openSymbols, skippedOut: orphanSkipped })
+    : [];
+  for (const s of orphanSkipped) {
+    console.log(`${WARN} Orphan reconstruction SKIPPED for ${s.symbol} (${s.buyQty} buy / ${s.sellQty} sell leftover) - ${s.reason}`);
+  }
 
   // ── MCD manual fallback (PAPER ONLY) ──────────────────────────────────────
   // If MCD's real fills are NOT in Alpaca's returned activity (window too tight,
@@ -590,7 +699,18 @@ async function main() {
   console.log(`${OK} WRITE complete.`);
 }
 
-main().catch(err => {
-  console.error(`${FAIL} Reconciliation crashed: ${err.stack || err.message}`);
-  process.exit(1);
-});
+// Only auto-run when executed directly (`node reconcile-account.js`, which is how
+// sid-reconcile.yml invokes it). When imported by a test harness the pure
+// allocation functions can be exercised without touching the network or files.
+// Mirrors the same guard bot-sid.js uses.
+const _isDirectRun = import.meta.url === pathToFileURL(process.argv[1] || '').href;
+if (_isDirectRun) {
+  main().catch(err => {
+    console.error(`${FAIL} Reconciliation crashed: ${err.stack || err.message}`);
+    process.exit(1);
+  });
+}
+
+// v2.4.3 — exported for the open-position / multi-record allocation unit tests.
+// Inert on the direct-run path above.
+export { allocateFillsFIFO, reconstructOrphans, fillSideKind, fillQty, fillPrice, fillMs };

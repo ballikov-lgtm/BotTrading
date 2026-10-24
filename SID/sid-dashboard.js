@@ -29,7 +29,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const OUT  = path.join(ROOT, 'docs', 'sid', 'index.html');
 
-const STRATEGY_VERSION = '2.4.2';
+const STRATEGY_VERSION = '2.5.0';
 // v2.4.1 (2026-07-18) = ACCOUNTING RECONCILE. NOT a signal-logic change: the headline
 // LIVE net-P&L now reads the REAL Alpaca paper-account equity from
 // alpaca-account-sid.json (reconciled to the broker's fills) instead of summing the
@@ -208,6 +208,27 @@ const liveHeadlineNetPnl = hasAlpacaSnap ? alpacaAccount.netPnl : liveStats.netP
 const liveHeadlineEquity = hasAlpacaSnap ? alpacaAccount.equity : null;
 const liveHeadlineBase   = hasAlpacaSnap ? (alpacaAccount.startingEquity || 100000) : null;
 const liveHeadlineSource = hasAlpacaSnap ? 'Alpaca paper (real)' : 'records sum';
+
+// ── v2.4.3: STALENESS GUARD on the Alpaca snapshot ──────────────────────────
+// Until v2.4.3 the snapshot's only writer was `reconcile-account.js --write`
+// (a manual workflow_dispatch). The bot never wrote it and this file only reads
+// it, so the headline rendered a FROZEN 2026-07-17 equity as "current" for
+// SEVEN WEEKS. v2.4.3 makes bot-sid.js refresh it every run — but a display
+// that silently presents an old number as live is the actual hazard, so the
+// tile now flags anything older than SNAPSHOT_STALE_DAYS instead of hiding it.
+// The value is still shown (hiding it would be its own kind of lie); it is just
+// unambiguously labelled STALE with its age, so nobody trades off a dead number.
+const SNAPSHOT_STALE_DAYS = 2;
+const snapAsOfMs   = hasAlpacaSnap ? Date.parse(alpacaAccount.asOf || '') : NaN;
+const snapAgeDays  = Number.isFinite(snapAsOfMs) ? (Date.now() - snapAsOfMs) / 86400000 : null;
+// No parsable asOf is treated as stale — an undateable snapshot can't be trusted as current.
+const snapStale    = hasAlpacaSnap && (snapAgeDays === null || snapAgeDays > SNAPSHOT_STALE_DAYS);
+const snapAsOfLabel = Number.isFinite(snapAsOfMs) ? new Date(snapAsOfMs).toISOString().slice(0, 10) : 'unknown date';
+const snapAgeLabel  = snapAgeDays === null ? 'age unknown' : `${Math.floor(snapAgeDays)}d old`;
+// Mode-aware label so a future LIVE snapshot is never captioned as paper money.
+const snapModeLabel = String(alpacaAccount?.mode || 'paper').toLowerCase() === 'live'
+  ? 'Live account (real cash)'
+  : 'Paper account (simulated)';
 
 // Classification breakdown
 const byTier = classification?.tickers
@@ -1520,7 +1541,7 @@ const html = `<!DOCTYPE html>
 ${PAPER_TRADING_MODE ? `
 <!-- PAPER TRADING BANNER -->
 <div style="background:linear-gradient(90deg,#00ffff 0%,#ff1493 100%);color:#000;padding:10px 16px;font-family:'Courier New',monospace;font-weight:bold;font-size:13px;text-align:center;letter-spacing:2px;border-bottom:2px solid #00ffff;text-shadow:0 0 4px rgba(255,255,255,0.5);">
-  ⚠ PAPER TRADING · V2.4.2 SHORTS-TP1 OCO FIX 2026-09-01 · HEADLINE = REAL ALPACA PAPER EQUITY · NO REAL MONEY AT RISK ⚠
+  ⚠ PAPER TRADING · V2.5.0 P&L BOOKING FIXES 2026-10-18 · BOOKS NOW TIE TO THE BROKER TO THE CENT · HEADLINE = REAL ALPACA PAPER EQUITY (LIVE-REFRESHED, STALENESS-FLAGGED) · NO REAL MONEY AT RISK ⚠
 </div>` : ''}
 <div class="container">
 
@@ -1528,7 +1549,7 @@ ${PAPER_TRADING_MODE ? `
   <header>
     <div>
       <div class="brand">SID // v${STRATEGY_VERSION}${PAPER_TRADING_MODE ? ' <span style="color:#ff1493;font-size:0.55em;">[PAPER]</span>' : ''}</div>
-      <div class="brand-sub">V2.4.2 SHORTS-TP1 OCO FIX · HEADLINE = REAL ALPACA PAPER EQUITY · DUAL MODE PDT / PDT-SAFE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
+      <div class="brand-sub">V2.5.0 P&L BOOKING FIXES · HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN) · DUAL MODE PDT / PDT-SAFE · ${HEADLINE_BACKTEST_WR}% BACKTEST WR · PF 3.19</div>
     </div>
     <div class="header-right">
       <div id="market-clock" class="market-clock">
@@ -1595,7 +1616,9 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
       <div class="stat-sub">
         <span class="perf-only-backtest">5y @ $200 risk</span>
         <span class="perf-only-live">${hasAlpacaSnap
-          ? `Paper account (simulated) · $${Number(liveHeadlineEquity).toLocaleString()} on $${Number(liveHeadlineBase).toLocaleString()} base`
+          ? (snapStale
+              ? `<span style="color:var(--amber);font-weight:700;">⚠ STALE SNAPSHOT</span> · ${snapModeLabel} as of ${esc(snapAsOfLabel)} (${esc(snapAgeLabel)}) — not current`
+              : `${snapModeLabel} · $${Number(liveHeadlineEquity).toLocaleString()} on $${Number(liveHeadlineBase).toLocaleString()} base · as of ${esc(snapAsOfLabel)}`)
           : (liveStats.total ? 'realized (records)' : 'no trades yet')}</span>
       </div>
     </div>
@@ -1647,7 +1670,7 @@ The ${HEADLINE_BACKTEST_WR}% WR / ${HEADLINE_BACKTEST_TRADES}-trade AUTO-tier 5y
                 ${backtestSegments.map(s => `<div class="legend-item"><span><span class="legend-swatch" style="background:${s.color};color:${s.color}"></span>${s.label}</span><span style="color:${s.color}">${s.value}</span></div>`).join('')}
               </div>
             </div>
-            <div class="perf-note">V2.4.2 · LIVE HEADLINE = REAL ALPACA PAPER EQUITY · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
+            <div class="perf-note">V2.5.0 · LIVE HEADLINE = REAL ALPACA PAPER EQUITY (REFRESHED EVERY RUN, FLAGGED IF STALE) · REALISED P&L RECONCILED TO ALPACA FILLS · BACKTEST INCLUDES BULLISH-ASSET SHORTS (LIVE GATES THEM) · 5Y · AUTO TIER (80 TICKERS) · FIXED $200 RISK</div>
           </div>
           <div class="perf-only-live">
             <div class="donut-wrap">
