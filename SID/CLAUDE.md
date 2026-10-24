@@ -12,9 +12,9 @@ There are TWO `SID/` folders on disk and they are NOT the same:
 | Path | What it is | git branch | Use? |
 |---|---|---|---|
 | `Trading Setup/SID/` (parent) | **Stale snapshot** — older v1.0 code | `claude/silly-robinson-abcf6c` | ❌ **DO NOT EDIT.** Anything here is out of date. |
-| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — working tree **v2.5.0**; origin/main is **v2.4.2** | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
+| `Trading Setup/SID/.claude/worktrees/silly-robinson-abcf6c/SID/` (worktree) | **LIVE main branch** — working tree **v2.6.0** (uncommitted); origin/main is **v2.5.0** (commit `d05a770a0`) | `main` | ✅ **All bot work goes here.** This is what GitHub Actions deploys. |
 
-**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (**origin/main is v2.4.2**, verified via `git show origin/main:SID/bot-sid.js`; the working tree carries the UNCOMMITTED v2.4.3 + v2.5.0 on top; historical note: **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
+**Verification:** `git worktree list` from the repo root shows the worktree at the path above is on `main`. The deployed bot version (**origin/main is v2.5.0**, commit `d05a770a0`, verified via `git show origin/main:SID/bot-sid.js`; the working tree carries the UNCOMMITTED v2.6.0 on top; historical note: **v2.2.5** — TP1 cancel-first / held-shares fix + dashboard exit-target readout; entry is the v2.2.3 bar-by-bar arm replay, exits the v2.2.1 HYBRID model with the v2.2.5 broker-order fix) is in the worktree's `bot-sid.js`. The v2.2.3 ENTRY is validated at **73.9% WR / PF 3.19 / +$31,426** (tier1, 5y, $200 fixed risk) per `backtest-sid-bot-parity.py` (see `strategy-test-vault/bot-parity-experiment/`). *Historical provenance (do not treat as current-version markers):* entry rules were originally validated at **70.4% WR on the AUTO tier** per the Excel report at `~/Downloads/SID V2 Method Back Testing (tiered + filter subtotals)(1).xlsx`; the V2.1 exits were validated at **77.6% WR / PF 3.62** in `backtest-sid-v2.1.py`.
 
 **Rule of thumb before editing anything:**
 1. Run `git status` to confirm which branch you're on.
@@ -119,12 +119,29 @@ SID/
 
 ## How the Bot Runs
 
-**GitHub Actions** — `.github/workflows/sid.yml` in the repo root runs `bot-sid.js`
-once per weekday at 14:35 UTC (9:35am ET), 5 minutes after US market open.
-The workflow uses `working-directory: SID` so all `./` file paths resolve correctly.
+**TWO schedulers run SID, deliberately (Phase 1, since v2.6.0).**
 
-**Not on Railway** — SID runs via GitHub Actions (daily cadence), not the Railway
-15-minute loop that Ironclad uses.
+**1. GitHub Actions** — `.github/workflows/sid.yml` runs `bot-sid.js` on THREE staggered
+weekday crons: **14:35 / 16:35 / 18:35 UTC** (since the 2026-09-01 cron-redundancy change —
+GHA crons are best-effort and were landing hours late, sometimes past the US close). The
+workflow uses `working-directory: SID` so all `./` file paths resolve correctly.
+
+**2. Railway CRON service** (v2.6.0) — `SID/railway-sid-runner.js`, recommended schedule
+`*/15 13-23 * * 1-5` (UTC). This is a **one-shot cron job, NOT an always-on loop**: each run
+pulls state from `main` via the GitHub Contents API, runs `bot-sid.js` once, pushes changed
+state back, and exits, so it is billed per execution rather than resident 24/7. Added because
+GHA crons were landing ~3h late (14:35 → ~18:15, 18:35 → ~21:10 UTC) while Railway
+documents its cron as varying only "by a few minutes". Whether a cycle does the full scan or
+the cheap exits-only path is decided by **Alpaca's `/v2/clock`**, never a hardcoded calendar.
+Deploy + verification + rollback: **`SID/RAILWAY-DEPLOY.md`**.
+
+**This is SID's OWN Railway service**, separate from Ironclad's. SID owns
+`SID/railway-sid-runner.js` + `SID/railway-sid.json`; the repo-root `railway-runner.js` and
+`railway.json` are **Ironclad's — never touch them**.
+
+**Phase 2 (NOT done yet):** once the Railway service has proven itself over a few clean
+sessions, comment out `sid.yml`'s `schedule:` block and keep `workflow_dispatch` as the manual
+backup. Procedure + go/no-go evidence in `SID/RAILWAY-DEPLOY.md` § Phase 2.
 
 ---
 
@@ -163,7 +180,7 @@ The following live in the parent `Trading Setup/` folder and are shared with Iro
 | File | Purpose |
 |------|---------|
 | `package.json` / `node_modules/` | Shared npm deps — `npm install` from repo root |
-| `railway-runner.js` | Ironclad bot runner on Railway — do not touch |
+| `railway-runner.js` + root `railway.json` | **Ironclad’s** Railway service — do not touch. SID’s own Railway files are `SID/railway-sid-runner.js` + `SID/railway-sid.json` (v2.6.0) and are SID-owned. |
 | `.github/workflows/ironclad.yml` | Ironclad workflow — do not touch |
 | `closed-positions-ironclad.json` | Ironclad trade history — do not touch |
 
@@ -2075,6 +2092,331 @@ and reports `BOT_VERSION = v2.5.0` with every new + pre-existing export resolvin
 - Untracked cruft noticed in the worktree: `SID/strategy-updates.json.tmp.37284.348d7f4b10c6`
   (leftover from an interrupted write), `SID/__pycache__/`, and a dozen untracked
   `backtest-v2.1-validation-report-*.{json,csv}`. Not touched; worth a housekeeping sweep.
+
+---
+
+### QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (v2.6.0, 2026-10-24) - WORKING TREE, NOT COMMITTED
+
+**Status: WORKING TREE ONLY - nothing committed, pushed, or executed against Alpaca (per
+brief). Every broker interaction in this session was a read-only doc fetch; NO order was
+submitted, cancelled or modified.** SID-owned files only (plus root `CLAUDE.md`, which is the
+shared index). **NO canon rule change** - RSI 30/70, RSI(3), MACD alignment, the weekly gates,
+the 45/55 no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings
+blackout, the AUTO/HUMAN tiers and the 50% TP1 portion are byte-for-byte unchanged. Asserted by
+test group V (14 checks on the live source + CONFIG).
+
+#### THE LIVE FAILURE
+
+2026-09-09, IBM runner. TP2 (SMA50 touch) triggered in the last ~35 minutes of the session. The
+next bot run landed **21:06 UTC**, an hour after the close. It correctly swept the resting stop,
+then hit `Market closed - refusing to submit close for IBM` (`alpaca-executor.js:520`),
+re-protected the runner and gave up until the next run. Alan then did it by hand: cancelled the
+stop, queued a market sell, filled at the next open (2 @ $238.39).
+
+**TWO independent faults, and this is the bit to remember:**
+1. GHA crons land ~3h late (14:35 -> ~18:15, 18:35 -> ~21:10 UTC), so a ripe exit can slip for days.
+2. **On-time crons would ALSO have missed this one**, because the touch came after the last
+   in-hours run. Punctuality alone cannot fix it - the bot needed a way to act while the market
+   is shut. Hence both halves of this release.
+
+#### PART 1 - QUEUE-FOR-OPEN EXITS
+
+When an exit triggers and the market is CLOSED (`shouldQueueExitForOpen(executor)` = executor
+exists AND `CONFIG.queueExitsForOpen` AND `!executor.clock.is_open`):
+1. **Sweep every resting order on the symbol first** - `cancelOrderById(brokerStopOrderId)` ->
+   `findOpenOrder(sym,'-stop')` -> `cancelAllOpenOrders(sym)` -> `waitForNoOpenOrders(sym)`.
+   Alan's standing requirement, and the shares cannot be freed otherwise (the
+   v2.2.5/v2.2.6/v2.4.2 held-shares family).
+2. Submit a **market order the broker executes at the next open** (`executor.queueExitAtOpen`).
+3. Stamp `pos.pending_exit` = `{order_id, client_order_id, time_in_force, status:'queued',
+   reason, kind:'partial'|'full', shares, queued_at, attempt, booking:{trigger_date, trigger_rsi,
+   estimate_price, be_price, runner_shares, tp2_reason, exit_level, exit_strategy}}`.
+
+**`pending_exit` is the single-fire guard.** `checkPositions` SKIPS any position carrying one -
+before the candle fetch, so it is free - which is what makes "never queue a second order while
+one is pending" true, and also stops a queued TP1 re-firing (`tp1_hit` flips only when the fill
+is BOOKED, never when it is queued; no P&L is booked at queue time).
+
+**Reconcile (`reconcilePendingExits`) runs at the TOP of `run()`:**
+- **filled** -> booked through the real-fill path, `pending_exit` cleared, and for a TP1 partial
+  the BE stop restored on the remainder.
+- **still open / accepted / new / held / partially_filled** -> left strictly alone.
+- **canceled / rejected / expired / 404** -> cleared, **immediately re-protected with a stop**,
+  loud `alertPendingExitDropped`. A dropped queued exit with no stop is the one genuinely
+  dangerous state here.
+- **a NON-404 lookup error (5xx)** -> left alone. A transient read failure is NOT evidence the
+  order is dead; re-protecting would double-hold the shares and block the live order from
+  filling. (Test I5.)
+- **submission itself rejected** -> fall back to exactly the pre-v2.6.0 behaviour: re-protect,
+  alert (`alertExitQueueFailed`), retry next run, with the attempt counter advanced.
+
+All four exit paths are wired: pre-TP1 stop, TP1 partial, TP2 runner, v2.0 RSI-50 fallback.
+**ENTRIES ARE NEVER QUEUED** - `alpaca-executor.js:202/:278` are untouched, because a stale entry
+signal must be re-evaluated against a fresh bar. `queueExitAtOpen` is the ONLY order-submitting
+method without a market-hours guard (test J4 asserts that).
+
+#### WHAT ALPACA ACTUALLY DOES WITH AN OVERNIGHT / FRIDAY QUEUED EXIT (verified, don't re-derive)
+
+Fetched from `https://docs.alpaca.markets/docs/orders-at-alpaca` on 2026-10-24:
+
+> **opg** - "Use this TIF with a market/limit order type to submit 'market on open' (MOO) and
+> 'limit on open' (LOO) orders. This order is eligible to execute only in the market opening
+> auction. Any unfilled orders after the open will be cancelled. **OPG orders submitted after
+> 9:28am but before 7:00pm ET will be rejected. OPG orders submitted after 7:00pm will be queued
+> and routed to the following day's opening auction.** On open/on close orders are routed to the
+> primary exchange."
+
+> **day** - "...If submitted after the close, it is queued and submitted the following trading
+> day." And from "Orders Submitted Outside of Eligible Trading Hours": **"Orders not eligible for
+> extended hours submitted after 4:00pm ET will be queued up for release the next trading day."**
+
+**THE CRITICAL CONSEQUENCE: OPG has a DEAD ZONE of 09:28-19:00 ET, and the exact IBM failure
+(21:06 UTC) is 17:06 ET - squarely inside it.** A naive "just use OPG" implementation would have
+been REJECTED on precisely the run it was built to fix. So `executor.queuedExitTif(attempt)`:
+- ET >= 19:00 -> `opg` (queued to the following day's opening auction)
+- ET < 09:28   -> `opg` (today's opening auction)
+- otherwise    -> `day` (documented as queued for release the next trading day) - which is also
+                  literally what Alan submitted by hand
+- ET unreadable -> `day` (broader accept window = the safe default)
+- retries ALTERNATE the tif (attempt 2/4 take the other one) so a wrong guess self-corrects on
+  the next cycle rather than looping.
+
+**ET comes from the BROKER's own clock, never a hardcoded timezone.** `etMinutesOfDay()` parses
+`HH:MM` out of `/v2/clock`'s `timestamp` and **asserts the offset is `-04:00` or `-05:00`** - the
+digits are then already Eastern wall-clock and DST is the broker's problem. If Alpaca ever
+switches that field to `Z`, the assertion fails, the function returns `null`, and we take the
+safe `day` branch instead of silently reading UTC digits as ET. (Tests B7-B13.)
+
+**Friday evening -> Monday's open.** Both mechanisms route to the next *trading* day. This is why
+the weekend guard had to change (below): Friday 19:30 ET is **Saturday 00:30 UTC**.
+
+#### THE TRADE-OFF, STATED PLAINLY (documented, not solved)
+
+Between the sweep and the open the position has **NO resting stop**, because a stop HOLDS the
+shares and would block the queued exit. Accepted because: (a) the exposure is the overnight gap
+on a position we are exiting anyway, (b) a market-on-open fill is equivalent-or-better than a
+stop triggering at that same open, and (c) the window only ever exists while the market is
+CLOSED, so there is no intraday price action to be unprotected against. The reconcile's
+dead-order branch exists precisely so this window can never become permanent.
+
+#### WEEKEND GUARD CHANGED (and why it is not a rule change)
+
+It used to `return` BEFORE `checkPositions`, so a position was not even looked at Sat/Sun. With
+queue-for-open that is a real hole (Friday evening ET = Saturday UTC). Now: the guard still blocks
+the **ENTRY SCAN** - which is all it ever protected against, a signal computed off Friday's stale
+close - but position management runs. Revert with `SID_WEEKEND_EXIT_QUEUE=false` (restores the
+hard early return, byte-for-byte).
+
+#### PART 2 - RAILWAY **CRON** RUNNER (design changed mid-session)
+
+`SID/railway-sid-runner.js`. **One-shot, NOT an always-on `setInterval` loop.** The coordinator
+changed this mid-task on cost grounds: Alan is on the ~GBP5/mo Hobby plan with ~$0.35 of usage,
+and a resident 24/7 Node worker would add ~$2-3/mo - a multiple of his entire bill - to run a
+daily-bar strategy that needs seconds per cycle. Railway's cron bills execution time.
+
+Cycle: **assert env -> pull state+config from `main` via the GitHub Contents API -> read Alpaca
+`/v2/clock` -> run `bot-sid.js` once -> push changed state back (sha-aware) -> exit 0.**
+
+- **Market gating is the broker's clock, never a hardcoded calendar.** Open -> FULL cycle.
+  Closed (or clock unreadable) -> CHEAP cycle via the new `SID_EXITS_ONLY=true`: reconcile +
+  queue exits, but skip the 112-ticker Yahoo scan (an entry would be refused out of hours
+  anyway). "Clock unreadable -> cheap" means we never enter blind.
+- **State branch is `main`**, not Ironclad's `logs` branch, because `sid-dashboard.yml` builds
+  the dashboard from main. File list mirrors `sid.yml`'s `git add` lines (test L16 asserts that
+  programmatically, so the two can't drift).
+- **Push is conservative:** a file whose bytes are unchanged from what we pulled is NOT pushed at
+  all (no clobber risk, and no redeploy churn). A changed file re-reads the remote head first; if
+  the sha moved under us, `closed-positions` / `pending-approvals` merge **by id**,
+  `trades-sid.csv` merges as a **row union**, and `open-positions` / `sid-account` / `sid-log` /
+  the snapshot resolve to **LOCAL** (we just acted at the broker, so our view is the one
+  reflecting reality) with the conflict logged loudly. 409 -> re-read + retry once.
+- **Crash-safe:** a bot exception is caught and the cycle still pushes whatever the bot DID
+  write, so a booked exit always reaches the cloud.
+- `RUNNER_VERSION` + an `import.meta.url` main-guard + a `--version` flag, so the module can be
+  imported for tests with no side effects and its version proven at runtime.
+- Commit message `SID railway run ...` - deliberately distinct from Actions' `SID run ...`
+  (added to the root CLAUDE.md glossary). Note it is a **Contents-API write, not a git push**, so
+  it never shows up as an Actions run.
+
+**RAILWAY CRON FACTS (from Railway's own docs, 2026-10-24 - the design depends on these):**
+- Cron Schedule lives in **service Settings**; schedules are **UTC**.
+- Runs must be **>= 5 minutes apart**; `*/15 * * * *` is given as valid.
+- **Overlap: "if a previous execution is still running when the next scheduled execution is due,
+  Railway will skip the new cron job."** So the runner cannot race ITSELF - but a hung cycle costs
+  every subsequent one, which is why it must exit cleanly.
+- **Precision: "Railway does not guarantee execution times to the minute as they can vary by a
+  few minutes."** Minutes, versus GHA's observed HOURS. That is the whole win.
+- Docs do **NOT** promise a retry on a non-zero exit -> the runner exits **0** whenever a cycle
+  ran (the next tick retries transient failures) and reserves **exit 1** for a CONFIGURATION
+  error so it shows as a failed run. `railway-sid.json` sets `restartPolicyType: NEVER` so a
+  failing run can't restart-loop.
+- **UNVERIFIED (flagged, not designed around):** that a cron service bills **no idle time**
+  between runs. The docs present cron as the way to "save resources between executions, as
+  opposed to having an in-code scheduler run 24/7", which implies it - but it is intent, not a
+  stated billing rule. **Check the first month's actual bill.**
+
+**Recommended schedule `*/15 13-23 * * 1-5` (UTC).** `13-23` spans the US session in BOTH DST
+regimes (14:30-21:00 UTC in EST, 13:30-20:00 in EDT) plus the post-19:00-ET window when Alpaca
+accepts an at-the-open order for the next session. The schedule NEVER decides whether the market
+is open - `/v2/clock` does.
+
+#### CONCURRENCY - MADE SAFE AT THE BROKER, NOT JUST IN LOCAL STATE
+
+Phase 1 runs the Railway cron AND the GHA crons. Local state can be stale, so correctness cannot
+rest on it. The hard guard:
+
+**`exitClientOrderId(symbol, tag, YYYYMMDD, attempt)` -> `SID-<SYM>-<tag>-<YYYYMMDD>[-a<n>]`.**
+Deterministic in (symbol, exit kind, calendar date, attempt) and NOTHING else - no timestamp, no
+PID, no randomness - so two processes that both decide to queue the same exit compute the SAME id
+and **Alpaca rejects the second as a duplicate** (`client_order_id must be unique`). Test D3-D8
+drives two executors against one mock broker and asserts exactly ONE market sell exists, with the
+loser re-protecting instead of stamping a `pending_exit` it doesn't own.
+- The **date** in the id permits ONE legitimate re-queue per calendar day while blocking a
+  same-day duplicate.
+- The **attempt** suffix exists because a REJECTED order still consumes its client_order_id at
+  Alpaca; the counter lives in COMMITTED state (`pos.exit_queue_attempts`) so both processes still
+  agree. It is deliberately **monotonic, never reset** - a fresh id is always safer than a reused one.
+
+**Per-path audit of everything that can submit an order:**
+| Path | client_order_id | Concurrency verdict |
+|---|---|---|
+| Entry (`openEntry`/`openEntryNoStop`) | `<prefix>-entry`, prefix = symbol+signalDate+side | **Broker-idempotent.** A concurrent duplicate is rejected. |
+| Entry-time stop (`openEntry`) | `<prefix>-stop` | Broker-idempotent. |
+| Queued exit (v2.6.0) | `SID-<SYM>-<tag>-<date>[-a<n>]` | **Broker-idempotent** (the new guard). |
+| Re-placed stop (`placeStop`) | `<prefix>-<tag>-<Date.now()>` | **NOT deterministic** - see below. |
+| TP1/TP2 close (`DELETE /v2/positions`) | n/a (no client id) | **NOT idempotent** - see below. |
+
+**Two residual risks, DOCUMENTED not fixed (they need their own brief):**
+1. **`placeStop` ids carry `Date.now()`**, so two concurrent runs could place two protective
+   stops. Left alone deliberately: a daily-deterministic stop id would break the legitimate
+   same-day re-place flows (maintain reset, BE migration). It is also self-limiting - the first
+   stop HOLDS the shares, so the second is rejected `insufficient qty available`, and every
+   close/reset path begins with `cancelAllOpenOrders(symbol)` which sweeps strays. A duplicate
+   protective stop over-reserves; it cannot sell twice.
+2. **An IN-HOURS close is not broker-idempotent** (`DELETE /v2/positions/SYM` takes no
+   client_order_id). Two in-hours runs landing within the same seconds could each submit a close;
+   the second would be rejected `insufficient qty` once the first fills, but a true simultaneous
+   race is theoretically possible. Mitigation today: Railway skips its own overlaps, the GHA crons
+   are hours apart, and Phase 2 removes the overlap entirely. **If this ever needs closing, submit
+   the in-hours close as an explicit `submitOrder` with a deterministic client_order_id rather
+   than the positions endpoint.**
+3. `maxPerDay`/`openSymbols` rest on COMMITTED state, so two concurrent runs could each open a
+   DIFFERENT symbol and exceed `maxPerDay`. Same-symbol is blocked by the `-entry` id. Low impact
+   (both would be valid signals, sized correctly), and Phase 2 removes it.
+
+#### PHASE PLAN (Phase 2 NOT done in this release)
+
+- **Phase 1 (this release):** Railway cron runs ALONGSIDE the three `sid.yml` crons. Belt and
+  braces. A banner comment in `sid.yml` says so and points at `RAILWAY-DEPLOY.md`.
+- **Phase 2 (later, only after the Railway service has covered a few clean sessions):** comment
+  out `sid.yml`'s `schedule:` block keeping `workflow_dispatch`, in the exact banner style of
+  `.github/workflows/trade.yml`. The ready-to-paste block and the specific go/no-go evidence to
+  collect first are in `SID/RAILWAY-DEPLOY.md` § "Phase 2".
+
+#### A BUG I INTRODUCED AND CAUGHT (write this down - it is the subtle one)
+
+The first draft of `reconcilePendingExits` handed `deriveLedger` an open set of
+`openPositions.filter(p => p !== pos)`. With **two** positions whose queued exits both fill in the
+same reconcile, the SECOND booking's "open" set still contained the FIRST (already-closed)
+position, so its `tp1_pnl` was added **on top of** its own full-close record - which already
+carries that leg, because `tp1LegAlreadyInClosedRecords` returns FALSE for a full-close record
+**by design** (a full record IS the trade total). Fix: pass the EXACT set - processed-and-still-open
+(`survivors`) + not-yet-processed (`openPositions.slice(idx+1)`) - plus a final
+`updateAccount(null)` re-derive from the saved files as belt-and-braces. Test group N has the
+regression witness (the buggy set inflates the ledger by IBM's +$40.56).
+**Generalised lesson:** `checkPositions` gets this right only because it builds `stillOpen`
+incrementally. Any NEW loop that books multiple closes must construct the open set explicitly -
+`filter(p => p !== current)` is wrong the moment a second close lands in the same pass.
+
+#### OTHER SMALL FIXES IN THIS RELEASE
+
+- **`sid.yml` now stages `SID/pending-approvals-sid.json`** - flagged as missing back in v2.4.3.
+  Without it the approval de-dupe state never persists across cloud runs, so a bullish-asset short
+  that stays pending re-announces itself EVERY run. Tolerable at 3 runs/day; spam at the Railway
+  cadence. The Railway runner pushes it too, so both runners keep the same queue.
+- **The v2.5.0 suite's version assertions were made version-AGNOSTIC** (`>= 2.5.0` instead of an
+  exact pin on A0/F12). That suite tests v2.5.0 BEHAVIOUR, which must survive every later release.
+  **Convention from now on: the exact version pin lives in the NEWEST suite only** - otherwise
+  every release has to edit every old suite, and an edited assertion is a weakened assertion.
+
+#### TESTED - `tests/v2.6.0-queue-for-open.test.mjs`, 217 checks, 217 PASS
+
+Plus `tests/v2.5.0-pnl-booking.test.mjs` re-run: **101/101 still green.** Sandboxed
+(`SID/_v260_sandbox/`, removed on exit, asserted by Z1), NO network, NO broker calls.
+Most of it drives the REAL exported functions against a REAL `AlpacaExecutor` wrapping a mock
+client, so the actual sweep/cancel/wait/submit/poll code executes. The mock enforces the two
+broker behaviours the design depends on: **client_order_id uniqueness** and **an open order HOLDS
+the shares** (so a submit with orders still resting is rejected `insufficient qty available`).
+
+Groups: V version+canon (14) | W the regression witness | A deterministic ids (10) | B the clock
+gate + DST + the OPG dead zone (17) | C one-order-only queueing incl. the TP1 books-nothing-yet
+guarantee (25) | D single-fire, local AND broker (8) | E rejected-submission fallback incl. the
+PDT-safe no-stop case (10) | F weighted fill price (7) | G reconcile FILLED, full + partial (35) |
+H still-pending x5 states | I dead x3 states + 404 + the 5xx-leave-alone case + the under-filled-full-exit guard + no-ops | J entries
+still refuse (6) | K checkPositions wiring (11) | L runner shape/safety/merges/doc (36) |
+M Ironclad segregation | N the multi-position ledger bug above (7).
+
+**Runtime proof (`node --check` is not enough):** real ESM `import()` of `bot-sid.js` ->
+`BOT_VERSION = v2.6.0` with every new + pre-existing export resolving; `node
+railway-sid-runner.js --version` -> `SID Railway cron runner v2.6.0` and exit 0; importing the
+runner is side-effect free. Env hard-fails exercised for real (missing vars -> exit 1 naming them;
+`live` without `SID_LIVE_CONFIRMED` -> exit 1; invalid mode -> exit 1).
+
+**WHAT I COULD NOT PROVE - be honest about this:**
+- **There are ZERO open positions right now**, so the full queue -> overnight -> fill -> book
+  cycle has NOT been exercised against the live broker. Everything about Alpaca's acceptance of an
+  overnight OPG/day order is from the DOCS (quoted above), not from a submitted order.
+- Groups C/D/E/G drive the real functions but against a MOCK broker. The mock's `insufficient qty`
+  and uniqueness rules are modelled on observed live errors, not guaranteed identical.
+- `checkPositions` and `run()` are not executed end-to-end (they need network candle data); their
+  wiring is asserted by regex on the live source (group K).
+- Railway cron behaviour is from Railway's docs; nothing has been deployed.
+- **THE FIRST REAL CANARY:** deploy, then wait for the first position that ripens an exit out of
+  hours. Success looks like: an `exit_queued_for_open` entry in `sid-log.json` + the Telegram
+  "EXIT QUEUED FOR THE OPEN" message, then on the next morning's run a `pending_exit_filled` entry
+  and a closed record carrying `exit_queued_for_open:true` with `pnl_source:'alpaca_fill'`. If
+  nothing ripens naturally, the cheapest deliberate canary is a manual `sid.yml` dispatch AFTER
+  the close while a position holds a ripe TP1 - watch for `QUEUE-FOR-OPEN` in the log instead of
+  `Market closed - refusing to submit`.
+
+#### SHIP-CHECK DONE (v2.6.0, RELEASE)
+
+`BOT_VERSION` v2.6.0 + detailed history one-liner; new exports (`exitClientOrderId`, `exitTagFor`,
+`marketIsOpen`, `shouldQueueExitForOpen`, `queueExitForOpen`, `reconcilePendingExits`,
+`bookQueuedExitFill`, `PENDING_EXIT_DEAD_STATES`); `sid-dashboard.js` `STRATEGY_VERSION='2.6.0'` +
+beta-banner / brand-sub / perf-note markers; `strategy-updates.json` new **RELEASE** entry at top
+(count auto 29 -> **30**, derived from array length in both the tab badge and the panel title);
+`SID-README.md` current-version line + a v2.6.0 history row above v2.5.0 + 4 Files-table rows;
+root `CLAUDE.md` index row -> v2.6.0, Actions inventory, Live runtimes, commit-message glossary
+(`SID railway run ...`) and the segregation table (Railway file ownership made explicit);
+`.sid-update-manifest.txt` + `SID/railway-sid-runner.js`, `SID/railway-sid.json`,
+`SID/RAILWAY-DEPLOY.md`, `SID/tests`; this append. `docs/sid/index.html` is BUILD OUTPUT -
+regenerated to VERIFY (v2.6.0 markers + the `(30)` badge + the new entry) then **RESTORED to
+HEAD**, because `sid-dashboard.yml` rebuilds it from cloud state. No Pine change (the visualiser is
+signal-level and no signal rule moved).
+
+#### QUEUED / NOT DONE
+
+- **NOTHING COMMITTED OR PUSHED** - returned for Alan's review (per brief). If approved, push via
+  the standard protocol (fetch -> pull --rebase --autostash -> push; never without approval).
+- **Alan's actions:** deploy the Railway service per `SID/RAILWAY-DEPLOY.md` (new service, rename
+  to `sid-bot`, **override the start command FIRST** or it runs Ironclad's loop, set the watch
+  paths or every state push triggers a rebuild, set the variables, THEN set the Cron Schedule).
+  Then verify from the logs and leave Phase 2 alone until it has proven itself.
+- **Branch B carries the same latent double-count the v2.6.0 booking guards against.**
+  `checkPositions` Branch B computes `totalPnl = pos.tp1_pnl + tp2Pnl` with NO
+  `tp1LegAlreadyInClosedRecords` guard. If a TP1 was banked by the broker-OCO path (which writes a
+  closed PARTIAL record AND stamps `tp1_pnl` on the live position) and the bot then fires TP2, the
+  leg lands in both records. My new `bookQueuedExitFill` applies the guard (a no-op on the normal
+  bot-banked path, so zero behaviour change there). **Branch B wants the same one-liner** - needs
+  approval + its own regression witness. Candidate v2.6.1.
+- The stop path still does not append to `trades-sid.csv` (carried from v2.5.0; the dashboard
+  reads the JSON, so no displayed number is affected). Still a candidate v2.6.1.
+- `sid-account.json` `reconciledAt` still says 2026-07-17 (belongs to `reconcile-account.js
+  --write`, not run).
+- Untracked cruft still in the worktree: `SID/strategy-updates.json.tmp.37284.*`,
+  `SID/__pycache__/`, a dozen untracked `backtest-v2.1-validation-report-*.{json,csv}`, and
+  `SID/scripts/*.py` one-offs. Not touched; worth a housekeeping sweep.
 
 ---
 

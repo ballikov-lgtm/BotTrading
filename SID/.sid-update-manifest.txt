@@ -26,6 +26,8 @@ SID/approve-trade.js
 SID/manual-trade.js
 SID/manual-close.js
 SID/rsi-target-price.js
+SID/railway-sid-runner.js
+SID/railway-sid.json
 SID/strategy-audit.js
 SID/tax-report.py
 
@@ -46,6 +48,7 @@ SID/SID-UPDATE-PROMPT.md
 SID/HOW-TO-UPDATE.md
 SID/HOW-TO-FUND-ALPACA.md
 SID/HOW-TO-TAX-REPORT.md
+SID/RAILWAY-DEPLOY.md
 
 # ── Offline tax-report tool (double-click launchers — output stays local) ────
 SID/GENERATE-TAX-REPORT.bat
@@ -54,6 +57,7 @@ SID/generate-tax-report.command
 # ── TradingView visualisers + the Telegram approval Worker ───────────────────
 SID/pine
 SID/approval-worker
+SID/tests
 
 # ── The manifest itself (self-updating — an update refreshes this list too) ──
 SID/.sid-update-manifest.txt

@@ -508,6 +508,187 @@ class AlpacaExecutor {
     return { stopOrderId: stopOrder.id };
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // v2.6.0 — QUEUE-FOR-OPEN EXITS
+  //
+  // WHY: on 2026-09-09 IBM's TP2 (SMA50 touch) ripened in the last ~35 minutes
+  // of the session. The next bot run landed 21:06 UTC — an hour after the close.
+  // It correctly swept the resting stop, then hit `Market closed — refusing to
+  // submit close for IBM`, re-protected the runner and gave up until the next
+  // run. Alan then did it by hand: cancel the stop, queue a market sell, filled
+  // at the next open. These helpers let the bot do exactly that by itself.
+  //
+  // WHAT ALPACA ACTUALLY ACCEPTS (verified against
+  // https://docs.alpaca.markets/docs/orders-at-alpaca on 2026-10-24):
+  //   time_in_force 'opg'  "eligible to execute only in the market opening
+  //                         auction ... OPG orders submitted AFTER 9:28am but
+  //                         BEFORE 7:00pm ET will be REJECTED. OPG orders
+  //                         submitted after 7:00pm will be queued and routed to
+  //                         the following day's opening auction."
+  //   time_in_force 'day'  "If submitted after the close, it is queued and
+  //                         submitted the following trading day." And, from
+  //                         "Orders Submitted Outside of Eligible Trading
+  //                         Hours": "Orders not eligible for extended hours
+  //                         submitted after 4:00pm ET will be queued up for
+  //                         release the next trading day."
+  //
+  // So OPG has a DEAD ZONE of 09:28–19:00 ET — and 21:06 UTC (the exact IBM
+  // failure) is 17:06 ET, i.e. squarely inside it. A plain `day` market order
+  // has no such dead zone after the close, and is precisely what Alan submitted
+  // by hand. queuedExitTif() therefore picks OPG when it is accepted
+  // (pre-09:28 ET for today's open, or post-19:00 ET for the next one) and falls
+  // back to `day` in between. Either way the exit executes at the next open.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * ET wall-clock minutes-of-day, derived from the BROKER'S OWN clock timestamp.
+   *
+   * NEVER a hardcoded timezone or a local-machine clock: Alpaca stamps
+   * `/v2/clock`'s `timestamp` with an ET offset (-04:00 in EDT, -05:00 in EST),
+   * so the HH:MM digits are ALREADY Eastern wall-clock and the DST transition is
+   * handled by the broker. The offset is asserted to be -04:00/-05:00 precisely
+   * so a future API change to `Z` (UTC) can't silently make us read UTC digits as
+   * ET — in that case this returns null and the caller takes the safe branch.
+   *
+   * @returns {number|null} minutes since ET midnight, or null if unparseable
+   */
+  etMinutesOfDay(clock = this.clock) {
+    const ts  = typeof clock?.timestamp === 'string' ? clock.timestamp.trim() : '';
+    const hm  = /T(\d{2}):(\d{2})/.exec(ts);
+    const off = /(-0[45]):00$/.exec(ts);   // ET == UTC-4 (EDT) or UTC-5 (EST)
+    if (!hm || !off) return null;
+    return parseInt(hm[1], 10) * 60 + parseInt(hm[2], 10);
+  }
+
+  /**
+   * Which time_in_force will Alpaca ACCEPT right now for a queue-for-open exit?
+   * See the block comment above for the documented windows.
+   *
+   * `attempt` alternates the choice on retries so a rejection for a reason we
+   * guessed wrong about self-corrects on the next cycle instead of looping.
+   *
+   * @param {number} attempt  1-based submission attempt for this exit
+   * @returns {'opg'|'day'}
+   */
+  queuedExitTif(attempt = 1) {
+    const OPG_CUTOFF_ET = 9 * 60 + 28;   // 09:28 ET — after this OPG is rejected
+    const OPG_REOPEN_ET = 19 * 60;       // 19:00 ET — after this OPG queues to the NEXT open
+    const et = this.etMinutesOfDay();
+    // Unknown ET -> 'day': its accept window after the close is the broader of
+    // the two, so it is the safe default.
+    const preferred = (et === null)            ? 'day'
+                    : (et >= OPG_REOPEN_ET)    ? 'opg'
+                    : (et <  OPG_CUTOFF_ET)    ? 'opg'
+                    :                            'day';
+    const alternate = preferred === 'opg' ? 'day' : 'opg';
+    const n = Number(attempt) || 1;
+    return (n > 1 && n % 2 === 0) ? alternate : preferred;
+  }
+
+  /**
+   * Submit an exit that the BROKER executes at the next market open.
+   *
+   * DELIBERATELY HAS NO MARKET-HOURS GUARD — that is the entire point of this
+   * method, and it is the ONLY order-submitting method without one. Entries keep
+   * their guard (openEntry/openEntryNoStop at :202/:278): a stale entry signal
+   * must be re-evaluated against a fresh bar, never queued.
+   *
+   * CALLER CONTRACT: every resting order on the symbol must already have been
+   * swept (cancelAllOpenOrders + waitForNoOpenOrders). A resting stop HOLDS the
+   * shares and this order would be rejected `insufficient qty available: 0`.
+   *
+   * `clientOrderId` MUST be deterministic for (symbol, exit kind, date, attempt)
+   * so a concurrent second submission — e.g. the Railway runner and a GitHub
+   * Actions cron overlapping — is rejected BY ALPACA as a duplicate instead of
+   * double-selling. See exitClientOrderId() in bot-sid.js.
+   *
+   * @returns {{ orderId, clientOrderId, timeInForce, status, submittedAt }}
+   */
+  async queueExitAtOpen({ localPos, qty, reason, clientOrderId, timeInForce }) {
+    if (!(qty > 0)) throw new Error(`Invalid queued-exit qty: ${qty}`);
+    if (!clientOrderId) throw new Error('queueExitAtOpen requires a deterministic clientOrderId');
+    const tif      = timeInForce || this.queuedExitTif();
+    const exitSide = localPos.side === 'long' ? 'sell' : 'buy';
+
+    this.log.log(`    [Alpaca:${this.mode}] QUEUE-FOR-OPEN: ${exitSide.toUpperCase()} ${qty} ${localPos.symbol} @ market, tif=${tif} (${reason}) id=${clientOrderId}`);
+    const order = await this.client.submitOrder({
+      symbol:          localPos.symbol,
+      qty,
+      side:            exitSide,
+      type:            'market',
+      time_in_force:   tif,
+      client_order_id: clientOrderId,
+    });
+    this.log.log(`    [Alpaca:${this.mode}] Queued exit order ${order.id} (status ${order.status}, tif ${tif}) — the broker executes it at the next open`);
+
+    return {
+      orderId:       order.id,
+      clientOrderId,
+      timeInForce:   tif,
+      status:        order.status,
+      submittedAt:   order.submitted_at || order.created_at || null,
+    };
+  }
+
+  /**
+   * The REAL average fill price for ONE order, weighted from the per-fill rows.
+   *
+   * v2.5.0 PITFALL (cost one iteration there, so don't regress it): an order's
+   * `filled_avg_price` is ROUNDED TO 6dp by Alpaca, and for an order whose
+   * individual fills were at DIFFERENT prices that rounding alone can move a leg
+   * by a cent — RIOT's entry reads 19.665526 but is really 747.29/38, and HD's
+   * exit reads 303.346667 but is really 910.04/3. So for any multi-price order we
+   * compute the weighted average from `/v2/account/activities/FILL` rows, which
+   * also give us the per-execution `exit_fills` stamp that consumedExitFillQty()
+   * needs to stop a later close re-using these same fills.
+   *
+   * Single-price orders are already exact, and the order average is used as the
+   * fallback whenever the activity rows are unavailable (never a silent failure —
+   * `source` records which was used).
+   *
+   * @returns {{ price:number|null, source:string, qty:number, fills:Array }}
+   */
+  async weightedFillPrice(order) {
+    const fallback = order?.filled_avg_price != null ? parseFloat(order.filled_avg_price) : null;
+    const out = { price: Number.isFinite(fallback) ? fallback : null, source: 'order_avg', qty: 0, fills: [] };
+    const orderId = order?.id;
+    if (!orderId) return out;
+
+    let rows = [];
+    try {
+      const anchor = order.submitted_at || order.created_at || null;
+      rows = await this.client.getActivities({
+        activity_types: 'FILL',
+        // 60s of slack either side of the submit so a clock skew can't hide a row.
+        ...(anchor ? { after: new Date(new Date(anchor).getTime() - 60_000).toISOString() } : {}),
+      });
+    } catch (err) {
+      this.log.log(`    [Alpaca:${this.mode}] weightedFillPrice: FILL activities unavailable (${err.message}) — using the order's rounded filled_avg_price`);
+      return out;
+    }
+
+    const mine = (rows || []).filter(r => r && r.order_id === orderId);
+    if (!mine.length) return out;
+
+    let q = 0, cost = 0;
+    const fills = [];
+    for (const r of mine) {
+      const rq = parseFloat(r.qty), rp = parseFloat(r.price);
+      if (!(rq > 0) || !(rp > 0)) continue;
+      q += rq; cost += rq * rp;
+      fills.push({ orderId, qty: rq, price: rp });
+    }
+    if (!(q > 0)) return out;
+
+    const distinctPrices = new Set(fills.map(f => f.price)).size;
+    return {
+      price:  cost / q,
+      source: distinctPrices === 1 ? 'fill_rows_single_price' : 'fill_rows_weighted',
+      qty:    q,
+      fills,
+    };
+  }
+
   /**
    * Closes an existing position via market order. Used when SID's RSI 50 exit
    * fires. Also cancels any outstanding stop order tied to this position.

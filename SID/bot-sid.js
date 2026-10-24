@@ -86,6 +86,27 @@ const CONFIG = {
   // position unprotected longer (no broker safety net). Both are inherent to
   // PDT-immunity.
   pdtSafe:            process.env.SID_PDT_SAFE === 'true',
+  // ── V2.6.0 QUEUE-FOR-OPEN EXITS + OUT-OF-HOURS CYCLES ──────────────────────
+  // queueExitsForOpen (default ON): when an EXIT triggers while the market is
+  //   CLOSED, don't refuse it — sweep the symbol's resting orders and submit the
+  //   exit as a market order the broker executes at the NEXT OPEN, recording a
+  //   `pending_exit` block that every later run reconciles first. Set
+  //   SID_QUEUE_EXITS_FOR_OPEN=false to restore the pre-v2.6.0 behaviour
+  //   (refuse, re-protect, retry next run). ENTRIES ARE NEVER QUEUED.
+  // weekendExitQueue (default ON): the weekend guard used to `return` BEFORE
+  //   checkPositions, so an exit that ripened on Friday evening (= Saturday UTC)
+  //   could not even be queued until Monday. Positions are now still MANAGED at
+  //   the weekend (exits queued for Monday's open); only the ENTRY SCAN is
+  //   skipped, which is all the guard was ever protecting against (a signal
+  //   computed off Friday's stale close). Set SID_WEEKEND_EXIT_QUEUE=false for
+  //   the old hard weekend stop.
+  // exitsOnly (default OFF): manage positions and skip the entry scan entirely.
+  //   Used by the Railway cron runner's cheap out-of-hours cycle, where entries
+  //   would be refused anyway — it keeps a 112-ticker Yahoo scan off the clock
+  //   ~40 times a day.
+  queueExitsForOpen:  process.env.SID_QUEUE_EXITS_FOR_OPEN !== 'false',
+  weekendExitQueue:   process.env.SID_WEEKEND_EXIT_QUEUE   !== 'false',
+  exitsOnly:          process.env.SID_EXITS_ONLY === 'true',
 };
 
 // ── RSI thresholds (named to match backtest-sid-bot-parity.py constants) ─────
@@ -112,7 +133,8 @@ const AUTO_APPROVED_TICKERS = new Set([
 
 // ── Bot identity ──────────────────────────────────────────────────────────────
 const BOT_NAME    = 'SID';
-const BOT_VERSION = 'v2.5.0'; // V2.5.0 P&L BOOKING FIXES (accounting + execution plumbing, NOT a signal-logic change): the dashboard was reporting the WRONG profit because three independent booking bugs corrupted the stored records. Verified against the real Alpaca paper account on 2026-10-18 (read-only GETs): broker equity +$543.43, our ledger +$512.02. (1) EXTERNAL FULL CLOSE DROPPED A BOT-BOOKED TP1 LEG — recordExternalClose set total_pnl to the closed leg ALONE, while deriveLedger only counts an open position's tp1_pnl WHILE IT IS OPEN; so the instant a runner closed externally, a TP1 half banked by Branch A fell out of the books (IBM lost +$40.76 -> booked +$42.52 vs truth +$82.88; HON lost +$20.58 -> booked -$0.09 vs truth +$19.83). The bot's own TP2 path never had this bug (it already summed tp1_pnl + tp2Pnl). FIX: a full close now carries the TP1 leg into total_pnl, guarded by the new shared tp1LegAlreadyInClosedRecords() so the PYPL pattern — where the TP1 leg was itself written as a separate closed PARTIAL record (is_full_close:false, same id) — can never be counted twice. (2) THE SAME PREDICATE FIXES THE MIRROR DOUBLE-COUNT queued in v2.4.3: deriveLedger was adding a still-open position's tp1_pnl ON TOP of the closed partial record written for that same leg by the broker-OCO path. Both directions land together, each with its own regression witness. (3) STOP EXITS BOOKED THE STOP LEVEL, NOT THE REAL FILL — the daily-poll stop path submits a MARKET close but never overwrote exitPrice with filledAvgPrice, leaving pnl_source:'estimate' (HD booked 3sh @ $304.00 = -$24.96; the real fill was $303.346667 = -$27.01). v2.4.1 had fixed this for TP1/TP2 only; the stop path and the v2.0 RSI-50 fallback path now mirror the identical pollOrderFill/override shape, so NO close path leaves 'estimate' when a real fill exists. (4) ENTRY PRICE WAS THE SIGNAL CLOSE, NOT THE ENTRY FILL — run() stored signal.entry (the bar the rules fired on) for a MARKET order, so every share of entry error multiplied across the whole position and through BOTH exit legs (HON 204.22 vs real 204.44; IBM 217.13 vs 217.23; HD 312.32 vs 312.35; RIOT 19.65 vs 19.665526). approve-trade.js already polled the fill correctly — the main path now mirrors it, storing filledAvgPrice plus entry_source/signal_entry provenance. Share math, the stop level and riskUsd are deliberately NOT recomputed (the order is already submitted and the broker stop already rests at signal.stopLoss). NO canon rule change (RSI 30/70, RSI(3), MACD alignment, weekly gates, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, AUTO/HUMAN tiers and entry/arm/scan are byte-for-byte unchanged) — this is accounting and execution plumbing only. Ships with the v2.4.3 work (external-close fill-consumption guard, reconcile skipping open positions, the per-run Alpaca snapshot write + sid.yml staging, dashboard stale-snapshot flag) re-badged into this release, and a one-off idempotent record correction (SID/scripts/fix-pnl-booking-2026-10-18.js) that ties the books to the broker: corrected records sum +$543.94, less $0.51 of real TAF/CAT/REG fee activities = +$543.43 = Alpaca equity EXACTLY. (paper trading, 2026-10-18)
+const BOT_VERSION = 'v2.6.0'; // V2.6.0 QUEUE-FOR-OPEN EXITS + RAILWAY CRON RUNNER (execution plumbing + scheduling ONLY, NOT a signal-logic change). THE LIVE FAILURE: on 2026-09-09 IBM's TP2 (SMA50 touch) ripened in the last ~35 minutes of the session; the next bot run landed 21:06 UTC, an hour after the close, correctly swept the resting stop, then hit `Market closed - refusing to submit close for IBM` (alpaca-executor.js :520), re-protected the runner and gave up until the next run. Alan then did it by hand: cancel the stop, queue a market sell, filled at the next open (2 @ $238.39). With GHA crons landing ~3h late (14:35 -> ~18:15, 18:35 -> ~21:10 UTC) an exit that ripens late in the session can slip for DAYS - and ON-TIME crons would ALSO have missed this one, because the touch came after the last in-hours run. Hence both halves. (1) QUEUE-FOR-OPEN EXITS: when an exit triggers (TP1 partial, TP2, the daily-poll stop, or the v2.0 RSI-50 fallback) and the market is CLOSED, the bot now sweeps every resting order on the symbol (cancelAllOpenOrders + waitForNoOpenOrders - the shares cannot be freed otherwise) and submits the exit as a MARKET order the BROKER executes at the next open, recording a `pending_exit` block (order id, reason, shares, queued timestamp, trigger data) that is the single-fire guard: checkPositions SKIPS a position while one is pending, so a second order can never be queued and a queued TP1 cannot re-fire (tp1_hit only flips when the fill is BOOKED). Every later run reconciles `pending_exit` BEFORE syncPositions (load-bearing ordering - otherwise an overnight fill would be booked twice, once as an 'external' close): filled -> booked through the real-fill path at the price WEIGHTED from the per-fill activity rows (the v2.5.0 6dp-rounding pitfall), pending_exit cleared, and for a TP1 partial the break-even stop restored on the remainder; still open/accepted -> left strictly alone; cancelled/rejected/expired -> cleared, IMMEDIATELY re-protected with a stop, loud alarm. A rejected submission falls back to exactly the pre-v2.6.0 behaviour (re-protect, alert, retry) so a position is never both unprotected and unqueued. VERIFIED AGAINST THE ALPACA DOCS (2026-10-24): tif 'opg' is REJECTED between 09:28 and 19:00 ET and queued to the following day's opening auction after 19:00 - and 21:06 UTC is 17:06 ET, squarely in that dead zone - so queuedExitTif() picks 'opg' where Alpaca accepts it and a plain queued 'day' market order (documented: submitted after 16:00 ET it is 'queued up for release the next trading day') in between, alternating on retry; ET is read from the BROKER clock's own -04:00/-05:00 timestamp, never a hardcoded timezone, so DST is the broker's problem. DOCUMENTED TRADE-OFF: between the sweep and the open the position has NO resting stop, because a stop holds the shares and would block the queued exit; the exposure is the overnight gap on a position we are exiting anyway, and a market-on-open fill is equivalent-or-better than a stop triggering at that same open. ENTRIES ARE NEVER QUEUED - the two entry refusals (:202/:278) are untouched, because a stale entry signal must be re-evaluated against a fresh bar. (2) RAILWAY CRON RUNNER (SID/railway-sid-runner.js): one-shot (pull state from main via the GitHub Contents API -> run the bot once -> push changed state back SHA-aware with a re-pull-and-retry on conflict -> exit), driven by a Railway Cron Schedule rather than an always-on loop, gated on Alpaca's /v2/clock so the cheap out-of-hours cycle (SID_EXITS_ONLY) still reconciles and queues exits without a 112-ticker Yahoo scan. Runs ALONGSIDE the existing GHA crons in Phase 1 - they are NOT disabled in this release. CONCURRENCY IS MADE SAFE AT THE BROKER, not just in local state: every queued exit carries a DETERMINISTIC client_order_id (SID-<SYM>-<tag>-<YYYYMMDD>[-a<attempt>]), so a concurrent second submission is rejected by Alpaca as a duplicate instead of double-selling. (3) The weekend guard no longer returns BEFORE checkPositions - positions are managed at the weekend (a Friday-evening exit is queued for Monday's open; Friday 19:30 ET is Saturday UTC) while the ENTRY SCAN stays blocked, which is all that guard ever protected against. NO canon rule change: RSI 30/70, RSI(3), MACD alignment, the weekly gates, the 45/55 no-go zones, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, the AUTO/HUMAN tiers and the 50% TP1 portion are byte-for-byte unchanged. Reverts: SID_QUEUE_EXITS_FOR_OPEN=false / SID_WEEKEND_EXIT_QUEUE=false. (paper trading, 2026-10-24)
+// V2.5.0 P&L BOOKING FIXES (accounting + execution plumbing, NOT a signal-logic change): the dashboard was reporting the WRONG profit because three independent booking bugs corrupted the stored records. Verified against the real Alpaca paper account on 2026-10-18 (read-only GETs): broker equity +$543.43, our ledger +$512.02. (1) EXTERNAL FULL CLOSE DROPPED A BOT-BOOKED TP1 LEG — recordExternalClose set total_pnl to the closed leg ALONE, while deriveLedger only counts an open position's tp1_pnl WHILE IT IS OPEN; so the instant a runner closed externally, a TP1 half banked by Branch A fell out of the books (IBM lost +$40.76 -> booked +$42.52 vs truth +$82.88; HON lost +$20.58 -> booked -$0.09 vs truth +$19.83). The bot's own TP2 path never had this bug (it already summed tp1_pnl + tp2Pnl). FIX: a full close now carries the TP1 leg into total_pnl, guarded by the new shared tp1LegAlreadyInClosedRecords() so the PYPL pattern — where the TP1 leg was itself written as a separate closed PARTIAL record (is_full_close:false, same id) — can never be counted twice. (2) THE SAME PREDICATE FIXES THE MIRROR DOUBLE-COUNT queued in v2.4.3: deriveLedger was adding a still-open position's tp1_pnl ON TOP of the closed partial record written for that same leg by the broker-OCO path. Both directions land together, each with its own regression witness. (3) STOP EXITS BOOKED THE STOP LEVEL, NOT THE REAL FILL — the daily-poll stop path submits a MARKET close but never overwrote exitPrice with filledAvgPrice, leaving pnl_source:'estimate' (HD booked 3sh @ $304.00 = -$24.96; the real fill was $303.346667 = -$27.01). v2.4.1 had fixed this for TP1/TP2 only; the stop path and the v2.0 RSI-50 fallback path now mirror the identical pollOrderFill/override shape, so NO close path leaves 'estimate' when a real fill exists. (4) ENTRY PRICE WAS THE SIGNAL CLOSE, NOT THE ENTRY FILL — run() stored signal.entry (the bar the rules fired on) for a MARKET order, so every share of entry error multiplied across the whole position and through BOTH exit legs (HON 204.22 vs real 204.44; IBM 217.13 vs 217.23; HD 312.32 vs 312.35; RIOT 19.65 vs 19.665526). approve-trade.js already polled the fill correctly — the main path now mirrors it, storing filledAvgPrice plus entry_source/signal_entry provenance. Share math, the stop level and riskUsd are deliberately NOT recomputed (the order is already submitted and the broker stop already rests at signal.stopLoss). NO canon rule change (RSI 30/70, RSI(3), MACD alignment, weekly gates, the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, the 14-day earnings blackout, AUTO/HUMAN tiers and entry/arm/scan are byte-for-byte unchanged) — this is accounting and execution plumbing only. Ships with the v2.4.3 work (external-close fill-consumption guard, reconcile skipping open positions, the per-run Alpaca snapshot write + sid.yml staging, dashboard stale-snapshot flag) re-badged into this release, and a one-off idempotent record correction (SID/scripts/fix-pnl-booking-2026-10-18.js) that ties the books to the broker: corrected records sum +$543.94, less $0.51 of real TAF/CAT/REG fee activities = +$543.43 = Alpaca equity EXACTLY. (paper trading, 2026-10-18)
 // V2.4.3 ACCOUNTING/DISPLAY FIXES (NOT a signal-logic change): (1) DOUBLE-COUNT FIX — recordExternalClose re-scanned ALL of Alpaca's filled exit orders on every external close, so a SECOND external close on the same symbol walked back and re-used fills the FIRST close had already booked. PROVEN on the PYPL short (17sh, entry $60.675): leg 1 banked 9sh @ $52.40 = +$74.47 (correct); leg 2's real fills were 6 @ $56.66 + 2 @ $56.71 (avg $56.6725 → true +$32.02) but the bot booked $57.58 at "exit $53.4775", which decodes EXACTLY as (2 x 56.71 + 6 x 52.40) / 8 — two shares at the correct new price then SIX back-filled at leg 1's already-consumed $52.40. FIX: a consumed-fill ledger (consumedExitFillQty) subtracts, per broker order id, every quantity already stamped into a prior closed record's exit_fills (plus the bot's own TP1 partial-close order, now stamped as tp1_close_order_id) before pricing the new close — mirroring reconcile-account.js's allocateFillsFIFO lot-consumption model rather than inventing a second one. When the surviving fills cover FEWER shares than the close, the record is stamped pnl_source:'estimate' + exit_fill_shortfall instead of silently extrapolating a full-coverage 'alpaca_fill'. (2) STALE-SNAPSHOT FIX — alpaca-account-sid.json (the dashboard's LIVE net-P&L headline) had only ONE writer: reconcile-account.js under an explicit --write. The bot never wrote it, so the dashboard rendered a FROZEN 2026-07-17 equity for 7 weeks. The bot now writes the snapshot every run from its existing preflight account read (equity/startingEquity/netPnl/source/mode/asOf), mode-segregated (paper → alpaca-account-sid.json, live → alpaca-account-<mode>-sid.json) so a paper run can never overwrite a live snapshot; sid.yml now stages the file so the refresh actually reaches the dashboard; and sid-dashboard.js flags a snapshot older than SNAPSHOT_STALE_DAYS (2) as STALE instead of presenting it as current. NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan and the v2.2.5/2.2.6/v2.4.2 cancel-first + sweep close mechanics are all byte-for-byte unchanged). (paper trading, 2026-09-05)
 // V2.4.2 SHORTS-TP1 OCO FIX (broker-order plumbing, NOT a signal-logic change): a v2.2 SHORT's intraday TP1 had no working exit — maintainV2_2BrokerOrders left the full-size entry stop holding ALL shares (it cancelled the wrong id after a blind 800ms sleep, and findOpenOrder's endsWith('-stop')/('-tp1') MISSED the timestamped re-placed orders — the twin of the v2.2.6 closePosition bug), so the runner stop + TP1 OCO failed `insufficient qty available: 0` and, because Branch A skips the daily-poll TP1 for v2.2 shorts, the short could never bank TP1 (live: PYPL 17sh short, RSI ~32.9 << 50, stuck 100% open). FIX: (1) findOpenOrder matches `<suffix>(-\\d+)?$` so timestamped re-places are found; (2) maintain cancels the resting stop by the TRACKED pos.brokerStopOrderId (robust to any client_order_id) + the suffix-found stop + (pre-TP1 short) any resting TP1 OCO, WAITS for release via waitForNoOpenOrders (not a sleep), then places the runner-only stop; (3) the TP1 half is placed as the OCO buy-limit at the RSI-50 target with shares now free — where price has already passed the target (PYPL) it is marketable → fills → banks TP1. (4) Before ANY close/reset the bot sweeps ALL open orders on that ONE symbol (new executor.cancelAllOpenOrders) — incl. a MANUAL break-even stop placed via the Alpaca UI (Alpaca-generated client_order_id, no SID tag) that the tracked-id/suffix cancels can't see and that would otherwise hold the shares + hang waitForNoOpenOrders. Symbol-scoped (never other symbols). NO canon rule change (RSI 30/70, MACD alignment, RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout, share math, entry/arm/scan all byte-for-byte unchanged; the v2.2.5/2.2.6 cancel-first CLOSE mechanics untouched — only a broader symbol-scoped sweep added ahead of them). Ships with the sid.yml cron-redundancy change. (paper trading, 2026-09-01)
 // V2.4.1 ACCOUNTING RECONCILE (NOT a signal-logic change): (1) per-close real-fill booking — TP1 (Branch A), TP2 (Branch B), and recordExternalClose now book the CONFIRMED Alpaca filled_avg_price (from pollOrderFill / the closed-order fills) instead of the simulated bar/SMA trigger price; every closed record is stamped pnl_source ('alpaca_fill' when the real fill was read, 'estimate' on fallback) + mode. Falls back to the bar/SMA estimate only when the real fill is unavailable (never silently wrong). (2) The ledger (sid-account.json realizedPnl/tradeCount/accountUsd) is now RE-DERIVED from the on-disk records every close (realizedPnl = Σ closed records of the account's mode + Σ in-flight TP1 partials of that mode; tradeCount = distinct closed records of that mode; accountUsd = startingUsd + realizedPnl) instead of a running `+=` counter — so a deleted/edited record can NEVER leave a phantom loss again (the exact drift the account reconcile fixed retroactively: MCD phantom -$78.14 + inflated tradeCount). PAPER/LIVE SEGREGATED: the ledger sums ONLY the current mode's records; the other mode's records are ignored (a future live ledger starts fresh, mode:live, and never mixes with paper). NO canon rule change — the RSI-50 TP1 trigger, TP2 SMA50/200/BE/timeout exits, share math, cancel-first stop logic, entry/arm/scan logic are all byte-for-byte unchanged; only the exit PRICE source + the ledger DERIVATION changed. Pairs with reconcile-account.js + alpaca-account-sid.json + the dashboard re-point at real Alpaca paper equity. (paper trading, 2026-07-18)
@@ -1507,6 +1529,586 @@ async function maintainV2_2BrokerOrders(pos, executor, closes) {
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// V2.6.0 — QUEUE-FOR-OPEN EXITS
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// THE LIVE FAILURE THIS PREVENTS (2026-09-09, IBM runner). TP2 (SMA50 touch)
+// ripened in the last ~35 minutes of the session. The next bot run landed at
+// 21:06 UTC, an hour after the close. It correctly swept the resting stop, then
+// hit `Market closed — refusing to submit close for IBM` (alpaca-executor.js
+// :520), re-protected the runner and gave up until the next run. Alan then did
+// it by hand: cancel the stop, queue a market sell, filled at the next open
+// (2 @ $238.39). With GHA crons landing ~3h late, an exit that ripens late in
+// the session can slip for DAYS. Note carefully: ON-TIME crons would ALSO have
+// missed this, because the touch came after the last in-hours run — which is why
+// queue-for-open and the Railway runner are both needed.
+//
+// WHAT CHANGES: when an exit triggers and the market is CLOSED, instead of
+// refusing, the bot (1) sweeps every resting order on the symbol, (2) submits the
+// exit as a market order the BROKER executes at the next open, and (3) records a
+// `pending_exit` block on the position. Every later run reconciles that block
+// BEFORE anything else. ENTRIES ARE UNTOUCHED — a stale entry signal must be
+// re-evaluated against a fresh bar, never queued.
+//
+// ⚠ THE ONE REAL TRADE-OFF, STATED PLAINLY: between the sweep and the open the
+// position has NO resting stop, because a stop HOLDS the shares and would block
+// the queued exit (`insufficient qty available: 0` — the v2.2.5/v2.2.6/v2.4.2
+// held-shares family of bugs). The exposure is the overnight gap on a position we
+// are exiting anyway, and a market-on-open fill is equivalent-or-better than a
+// stop triggering at that same open. The window only ever exists while the market
+// is CLOSED, so there is no intraday price action to be unprotected against.
+//
+// WHAT ALPACA ACTUALLY DOES WITH AN OVERNIGHT QUEUED EXIT (verified 2026-10-24
+// against https://docs.alpaca.markets/docs/orders-at-alpaca):
+//   • tif 'opg' — "eligible to execute only in the market opening auction ...
+//     OPG orders submitted after 9:28am but before 7:00pm ET will be REJECTED.
+//     OPG orders submitted after 7:00pm will be queued and routed to the
+//     following day's opening auction."
+//   • tif 'day' — "If submitted after the close, it is queued and submitted the
+//     following trading day", and "Orders not eligible for extended hours
+//     submitted after 4:00pm ET will be queued up for release the next trading
+//     day."
+//   So OPG has a DEAD ZONE of 09:28–19:00 ET, and 21:06 UTC — the exact IBM
+//   failure — is 17:06 ET, squarely inside it. `executor.queuedExitTif()` picks
+//   OPG where Alpaca accepts it and `day` in the dead zone; both execute at the
+//   next open. A Friday-evening queue lands at MONDAY's open (OPG routes to "the
+//   following day's opening auction", `day` to "the next trading day").
+//   If a submission is rejected anyway we fall back to EXACTLY today's behaviour
+//   (re-protect with a stop, alert, retry next run) and alternate the tif.
+//
+// SINGLE-FIRE GUARANTEE — two independent layers:
+//   (local)  `pos.pending_exit` makes checkPositions SKIP the position entirely,
+//            so no second order can ever be queued while one is pending.
+//   (broker) every queued exit carries a DETERMINISTIC client_order_id
+//            (`SID-<SYM>-<tag>-<YYYYMMDD>`), so a concurrent second submission —
+//            the Railway cron and a GHA cron overlapping — is rejected BY ALPACA
+//            as a duplicate rather than double-selling. Local state can be stale;
+//            the broker id cannot.
+
+// Short, stable tags for the client_order_id. Deliberately 3 chars so the whole
+// id stays far inside Alpaca's client_order_id limit.
+const EXIT_TAG = {
+  tp1_rsi50:          'tp1',
+  tp2_sma50_touch:    'tp2',
+  tp2_sma200_touch:   'tp2',
+  tp2_breakeven_stop: 'tp2',
+  tp2_timeout:        'tp2',
+  stop:               'stp',
+  v20_rsi50:          'r50',
+};
+
+function exitTagFor(reason) {
+  return EXIT_TAG[reason] || 'xit';
+}
+
+/**
+ * The DETERMINISTIC broker idempotency key for a queued exit.
+ *
+ * Deterministic in (symbol, exit kind, calendar date, attempt) and NOTHING else —
+ * no timestamp, no PID, no random — so two processes that both decide to queue
+ * the same exit compute the SAME id and Alpaca rejects the second as a duplicate.
+ * That is the only double-sell guard that survives stale local state.
+ *
+ * Why the date is in it: it lets ONE legitimate re-queue per calendar day (e.g.
+ * yesterday's queued order was cancelled by the exchange) while blocking a
+ * same-day duplicate. Why `attempt` is in it: a REJECTED order still consumes its
+ * client_order_id at Alpaca, so a retry needs a fresh one — and because the
+ * attempt counter lives in COMMITTED state, both processes still compute the same
+ * id on the same attempt.
+ */
+function exitClientOrderId(symbol, tag, yyyymmdd, attempt = 1) {
+  const base = `SID-${String(symbol || '').toUpperCase()}-${tag}-${yyyymmdd}`;
+  const n = Number(attempt) || 1;
+  return (n > 1 ? `${base}-a${n}` : base).slice(0, 48);
+}
+
+/** Is the broker's market open right now? Reads the preflight clock, never a local clock. */
+function marketIsOpen(executor) {
+  return executor?.clock?.is_open === true;
+}
+
+/** Should this exit be queued for the open instead of refused? */
+function shouldQueueExitForOpen(executor) {
+  return !!executor && CONFIG.queueExitsForOpen && !marketIsOpen(executor);
+}
+
+/**
+ * Sweep the symbol, submit the exit for the next open, and stamp `pending_exit`.
+ *
+ * MUTATES `pos` (pending_exit / brokerStopOrderId / exit_queue_attempts). The
+ * CALLER persists it — every call site pushes `pos` back into `stillOpen` so the
+ * usual saveOpenPositions() at the end of checkPositions writes it.
+ *
+ * @returns {{ queued: boolean, pendingExit?: Object, error?: string, reprotected?: boolean }}
+ */
+async function queueExitForOpen({ pos, executor, qty, isFullClose, reason, booking = {} }) {
+  const attempt  = (Number(pos.exit_queue_attempts) || 0) + 1;
+  const tag      = exitTagFor(reason);
+  const dateStr  = todayString().replace(/-/g, '');
+  const clientId = exitClientOrderId(pos.symbol, tag, dateStr, attempt);
+  const tif      = executor.queuedExitTif(attempt);
+  pos.exit_queue_attempts = attempt;
+
+  // ── (1) SWEEP FIRST — a resting order HOLDS the shares ────────────────────
+  // Same cancel-first ordering as the v2.2.5 TP1 / v2.2.6 TP2 close paths, incl.
+  // the v2.4.2 symbol-scoped sweep that also catches a MANUAL stop placed via the
+  // Alpaca UI (no SID client_order_id → invisible to the targeted cancels, and it
+  // would hang waitForNoOpenOrders). Alan's standing requirement, and the shares
+  // cannot be freed otherwise.
+  try {
+    if (pos.brokerStopOrderId) await executor.cancelOrderById(pos.brokerStopOrderId);
+    const lingeringStop = await findOpenOrder(executor.client, pos.symbol, '-stop');
+    if (lingeringStop) await executor.cancelOrderById(lingeringStop.id);
+    await executor.cancelAllOpenOrders(pos.symbol);
+    await executor.waitForNoOpenOrders(pos.symbol);
+    pos.brokerStopOrderId = null;   // swept — do not keep a dead id on the record
+  } catch (err) {
+    console.log(`\n    ⚠ Could not fully sweep resting orders on ${pos.symbol} before queueing the exit: ${err.message} — attempting the queue anyway`);
+  }
+
+  // ── (2) SUBMIT the queued exit ────────────────────────────────────────────
+  try {
+    const res = await executor.queueExitAtOpen({
+      localPos: pos, qty, reason, clientOrderId: clientId, timeInForce: tif,
+    });
+    const pendingExit = {
+      order_id:        res.orderId,
+      client_order_id: res.clientOrderId,
+      time_in_force:   res.timeInForce,
+      status:          'queued',
+      reason,                                   // tp1_rsi50 | tp2_sma50_touch | stop | ...
+      kind:            isFullClose ? 'full' : 'partial',
+      shares:          qty,
+      queued_at:       new Date().toISOString(),
+      queued_for:      'next_market_open',
+      attempt,
+      broker_status:   res.status || null,
+      mode:            pos.mode || CONFIG.tradingMode,
+      bot_version:     BOT_VERSION,
+      booking,                                  // everything the reconcile needs to book it
+    };
+    pos.pending_exit = pendingExit;
+    writeLog({
+      kind: 'exit_queued_for_open', symbol: pos.symbol, side: pos.side,
+      reason, shares: qty, order_id: res.orderId, client_order_id: res.clientOrderId,
+      time_in_force: res.timeInForce, attempt,
+    });
+    tg.alertExitQueuedForOpen({
+      symbol: pos.symbol, side: pos.side, shares: qty, reason,
+      timeInForce: res.timeInForce, orderId: res.orderId,
+      mode: pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
+    console.log(`⏭  EXIT QUEUED FOR THE OPEN — ${reason} (${qty} sh, tif ${tif}, order ${res.orderId}). No resting stop until it fills (documented trade-off).`);
+    return { queued: true, pendingExit };
+  } catch (err) {
+    // ── (3) Submission REJECTED — fall back to today's behaviour: re-protect,
+    // alert, retry next run. NEVER leave the position both unprotected and
+    // unqueued; that is the one genuinely dangerous state here.
+    let reprotected = false;
+    if (pos.pdt_safe) {
+      // PDT-safe positions deliberately carry NO broker order (a resting stop
+      // could fill the same day as entry = a day trade). Re-placing one here
+      // would break the v2.4.0 PDT-immunity guarantee. The daily poll IS the
+      // protection for these.
+      console.log(`\n    ⚠ ${pos.symbol} is PDT-safe — NOT placing a protective stop (would break PDT-immunity). The daily poll retries the queue next run.`);
+    } else {
+      try {
+        const rp = await executor.placeStop(pos, pos.shares_remaining ?? pos.shares_total, pos.stopLoss, 'restop');
+        pos.brokerStopOrderId = rp.stopOrderId;
+        reprotected = true;
+      } catch (rpErr) {
+        console.log(`\n    🚨 RE-PROTECT FAILED for ${pos.symbol}: ${rpErr.message}`);
+      }
+    }
+    console.log(`\n    🚫 Queue-for-open submission FAILED for ${pos.symbol} (${reason}, tif ${tif}): ${err.message} — ${reprotected ? 're-protected' : (pos.pdt_safe ? 'PDT-safe, no stop by design' : 'RE-PROTECT FAILED')}, will retry next run`);
+    writeLog({
+      kind: 'exit_queue_fail', symbol: pos.symbol, reason, shares: qty,
+      time_in_force: tif, attempt, error: err.message, reprotected,
+      client_order_id: clientId,
+    });
+    tg.alertExitQueueFailed({
+      symbol: pos.symbol, side: pos.side, shares: qty, reason,
+      timeInForce: tif, error: err.message, reprotected,
+      pdtSafe: !!pos.pdt_safe, mode: pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
+    return { queued: false, error: err.message, reprotected };
+  }
+}
+
+// Alpaca order states that mean "this queued exit is NEVER going to fill".
+const PENDING_EXIT_DEAD_STATES = ['canceled', 'cancelled', 'rejected', 'expired', 'suspended', 'stopped'];
+
+/**
+ * Reconcile every `pending_exit` BEFORE anything else in the run.
+ *
+ * ⚠ ORDERING IS LOAD-BEARING: this MUST run before executor.syncPositions().
+ * syncPositions compares Alpaca's position list to local state and routes any
+ * difference through recordExternalClose — so if a queued exit filled overnight
+ * and we let syncPositions see it first, the leg would be booked TWICE (once as
+ * an "external" close, once here). Reconciling first leaves syncPositions looking
+ * at consistent state: a filled partial has already had shares_remaining reduced,
+ * and a filled full close has already been removed from open-positions.
+ *
+ * Branches, per the brief:
+ *   filled                     → book it through the real-fill path (weighted from
+ *                                the per-fill rows), clear pending_exit, and for a
+ *                                TP1 partial restore the break-even stop.
+ *   still open/accepted/new    → LEAVE IT ALONE. No re-sweep, no re-queue.
+ *   cancelled/rejected/expired → clear pending_exit, IMMEDIATELY re-protect with a
+ *                                stop, and raise the loud alarm. A dropped queued
+ *                                exit with no stop is the dangerous state.
+ */
+async function reconcilePendingExits(executor) {
+  const result = { checked: 0, filled: 0, stillOpen: 0, dead: 0 };
+  if (!executor) return result;
+
+  const openPositions = loadOpenPositions();
+  if (!openPositions.some(p => p?.pending_exit?.order_id)) return result;
+
+  const closedPositions = loadClosedPositions();
+  const survivors = [];
+  let mutated = false;
+
+  console.log('\n── Reconciling queued (for-the-open) exits ──');
+
+  for (let idx = 0; idx < openPositions.length; idx++) {
+    const pos = openPositions[idx];
+    const pe = pos?.pending_exit;
+    if (!pe?.order_id) { survivors.push(pos); continue; }
+    result.checked++;
+
+    let order = null;
+    let lookupFailed = false;
+    try {
+      order = await executor.client.getOrder(pe.order_id);
+    } catch (err) {
+      // A 404 means Alpaca has no such order — treat as dead (re-protect). Any
+      // OTHER error (network, 5xx, auth) is NOT evidence about the order, so we
+      // must leave it alone rather than re-protect against a live order (which
+      // would double-hold the shares and block the fill).
+      if (err.status === 404) {
+        console.log(`  ▶ ${pos.symbol} queued ${pe.reason}: order ${pe.order_id} NOT FOUND at Alpaca (404) — treating as dropped`);
+      } else {
+        lookupFailed = true;
+        console.log(`  ▶ ${pos.symbol} queued ${pe.reason}: could not read order ${pe.order_id} (${err.message}) — leaving the pending exit alone this run`);
+      }
+    }
+
+    if (lookupFailed) { result.stillOpen++; survivors.push(pos); continue; }
+
+    const status    = String(order?.status || '').toLowerCase();
+    const filledQty = parseFloat(order?.filled_qty || 0);
+    const isFilled  = status === 'filled' || (filledQty > 0 && status !== 'partially_filled');
+    const isDead    = !order || PENDING_EXIT_DEAD_STATES.includes(status);
+
+    // ── STILL PENDING — do nothing. ─────────────────────────────────────────
+    if (!isFilled && !isDead) {
+      console.log(`  ▶ ${pos.symbol} queued ${pe.reason}: still ${status || 'pending'} (${pe.shares} sh, tif ${pe.time_in_force}) — leaving it alone`);
+      result.stillOpen++;
+      survivors.push(pos);
+      continue;
+    }
+
+    // ── DEAD (cancelled / rejected / expired / gone) ────────────────────────
+    if (!isFilled) {
+      result.dead++;
+      delete pos.pending_exit;
+      mutated = true;
+      let reprotected = false;
+      if (pos.pdt_safe) {
+        console.log(`  ▶ ${pos.symbol} queued ${pe.reason}: ${status || 'gone'} — PDT-safe, no broker stop by design; the daily poll re-queues next run`);
+      } else {
+        try {
+          const rp = await executor.placeStop(pos, pos.shares_remaining ?? pos.shares_total, pos.stopLoss, 'restop');
+          pos.brokerStopOrderId = rp.stopOrderId;
+          reprotected = true;
+        } catch (rpErr) {
+          console.log(`  🚨 RE-PROTECT FAILED for ${pos.symbol}: ${rpErr.message}`);
+        }
+      }
+      console.log(`  🚨 ${pos.symbol} queued ${pe.reason} was ${status || 'dropped'} — ${reprotected ? 're-protected with a stop' : (pos.pdt_safe ? 'PDT-safe (daily poll protects)' : 'RE-PROTECT FAILED — CHECK ALPACA')}`);
+      writeLog({
+        kind: 'pending_exit_dropped', symbol: pos.symbol, reason: pe.reason,
+        order_id: pe.order_id, broker_status: status || 'not_found',
+        shares: pe.shares, reprotected, pdt_safe: !!pos.pdt_safe,
+      });
+      tg.alertPendingExitDropped({
+        symbol: pos.symbol, side: pos.side, shares: pe.shares, reason: pe.reason,
+        brokerStatus: status || 'not_found', reprotected, pdtSafe: !!pos.pdt_safe,
+        mode: pos.mode || CONFIG.tradingMode,
+      }).catch(() => {});
+      survivors.push(pos);
+      continue;
+    }
+
+    // ── FILLED — book it at the REAL weighted fill price ────────────────────
+    result.filled++;
+    mutated = true;
+    // ⚠ The open set handed to the ledger must be EXACT, or a second booking in
+    // the same loop double-counts the first position's TP1 leg (its full-close
+    // record already carries that leg, and tp1LegAlreadyInClosedRecords returns
+    // FALSE for a full-close record by design — a full record IS the trade
+    // total). So: positions already processed and still open (`survivors`), this
+    // position only if it stays open, plus everything not yet processed.
+    const notYetProcessed = openPositions.slice(idx + 1);
+    const keepOpen = await bookQueuedExitFill({
+      pos, order, filledQty, executor, closedPositions,
+      openPeers: [...survivors, ...notYetProcessed],
+    });
+    if (keepOpen) survivors.push(pos);
+  }
+
+  if (mutated) {
+    saveOpenPositions(survivors);
+    saveClosedPositions(closedPositions);
+    // Belt-and-braces: the files on disk are now the truth, so re-derive the
+    // ledger straight from them. Each booking above already stamped its own
+    // accountAfter from an exact in-memory open set; this guarantees the
+    // PERSISTED ledger is right even if that set were ever wrong.
+    updateAccount(null);
+  }
+  console.log(`  ── queued exits: ${result.filled} filled, ${result.stillOpen} still pending, ${result.dead} dropped ──`);
+  return result;
+}
+
+/**
+ * Book a FILLED queued exit. Mirrors the booking shape of checkPositions Branch A
+ * (partial / TP1) and Branch B (full / TP2) EXACTLY — same fields, same
+ * realisedPnlFor(), same record-first-then-re-derive ledger ordering (the v2.4.1
+ * gotcha), same 'alpaca_fill' provenance — so a queued exit and an in-hours exit
+ * produce indistinguishable records.
+ *
+ * @returns {boolean} true if the position stays OPEN (a TP1 partial), false if it closed
+ */
+async function bookQueuedExitFill({ pos, order, filledQty, executor, closedPositions, openPeers }) {
+  const pe      = pos.pending_exit || {};
+  const booking = pe.booking || {};
+  const shares  = filledQty > 0 ? filledQty : (pe.shares || 0);
+
+  // ── UNDER-FILLED FULL EXIT — do NOT book, defer to the tested path ────────
+  // A market-on-open order for N shares filling fewer than N is unlikely, but if
+  // it happened and we booked a FULL close for the filled portion, the position
+  // would leave our books while the BROKER still held the remainder — an orphan
+  // nothing reconciles (syncPositions only reports positions ALPACA has lost, not
+  // ones we have lost). So: book nothing here, clear pending_exit, re-protect the
+  // remainder, and alarm. The next run's syncPositions sees a smaller Alpaca qty
+  // and routes the filled portion through recordExternalClose — the existing,
+  // tested partial-close path, which will find this very order's fills (we
+  // consumed nothing, so they are still available to it).
+  // A TP1 PARTIAL does not need this: it books `filledQty` and sets
+  // shares_remaining accordingly, so local and broker stay in agreement.
+  if (pe.kind === 'full' && filledQty > 0 && filledQty < (pe.shares || 0)) {
+    delete pos.pending_exit;
+    let reprotected = false;
+    if (!pos.pdt_safe) {
+      try {
+        const remaining = Math.max(1, (pos.shares_remaining ?? pos.shares_total) - filledQty);
+        const rp = await executor.placeStop(pos, remaining, pos.stopLoss, 'restop');
+        pos.brokerStopOrderId = rp.stopOrderId;
+        reprotected = true;
+      } catch (rpErr) {
+        console.log(`  🚨 RE-PROTECT FAILED for ${pos.symbol} after an under-filled queued exit: ${rpErr.message}`);
+      }
+    }
+    console.log(`  🚨 ${pos.symbol} queued ${pe.reason} filled only ${filledQty}/${pe.shares} sh — NOT booking a full close. ${reprotected ? 'Re-protected the remainder' : (pos.pdt_safe ? 'PDT-safe, no stop by design' : 'RE-PROTECT FAILED')}; next run's Alpaca sync books the filled portion.`);
+    writeLog({
+      kind: 'pending_exit_partial_fill', symbol: pos.symbol, reason: pe.reason,
+      order_id: pe.order_id, requested: pe.shares, filled: filledQty, reprotected,
+    });
+    tg.alertPendingExitDropped({
+      symbol: pos.symbol, side: pos.side, shares: pe.shares, reason: pe.reason,
+      brokerStatus: `partially filled ${filledQty}/${pe.shares}`, reprotected,
+      pdtSafe: !!pos.pdt_safe, mode: pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
+    return true;   // stays open; the Alpaca sync reconciles the real qty
+  }
+
+  // v2.5.0 pitfall: never trust the order's ROUNDED filled_avg_price for a
+  // multi-price order — weight it from the per-fill rows.
+  const fp = await executor.weightedFillPrice(order);
+  let exitPrice  = Number.isFinite(fp.price) && fp.price > 0 ? fp.price : null;
+  let pnlSource  = 'alpaca_fill';
+  if (exitPrice === null) {
+    // Honesty guard: no real price means we must NOT present an estimate as a fill.
+    exitPrice = booking.estimate_price ?? pos.entry;
+    pnlSource = 'estimate';
+    console.log(`  ⚠ ${pos.symbol}: queued exit filled but no fill price available — booking the ${booking.estimate_price != null ? 'trigger-bar estimate' : 'entry'} $${Number(exitPrice).toFixed(2)} flagged as an estimate`);
+  }
+  const exitFills = fp.fills && fp.fills.length ? fp.fills : null;
+  const filledAt  = order?.filled_at || order?.updated_at || new Date().toISOString();
+  const fillDate  = String(filledAt).slice(0, 10);
+
+  delete pos.pending_exit;
+
+  // ───────────────────────────── TP1 PARTIAL ─────────────────────────────────
+  if (pe.kind === 'partial') {
+    const tp1Pnl       = realisedPnlFor(pos.side, pos.entry, exitPrice, shares);
+    const runnerShares = (pos.shares_total ?? pos.shares) - shares;
+    const bePrice      = booking.be_price ?? parseFloat(pos.entry.toFixed(2));
+
+    pos.tp1_hit            = true;
+    pos.tp1_date           = booking.trigger_date || fillDate;
+    pos.tp1_price          = exitPrice;
+    pos.tp1_shares         = shares;
+    pos.tp1_pnl            = tp1Pnl;
+    pos.tp1_reason         = booking.tp1_reason || 'rsi50';
+    pos.tp1_rsi            = booking.trigger_rsi ?? null;
+    pos.tp1_pnl_source     = pnlSource;
+    pos.tp1_close_order_id = pe.order_id;    // so a later close can't re-use this fill
+    pos.tp1_queued_for_open = true;          // provenance: banked at the open, not in-session
+    pos.shares_remaining   = runnerShares;
+    pos.stopLoss           = bePrice;
+    if (exitFills) pos.tp1_exit_fills = exitFills;
+
+    // Re-derive the ledger from records + this in-flight TP1 leg (v2.4.1: the
+    // on-disk files aren't saved yet, so pass the in-memory arrays).
+    const acct = updateAccount(null, { closed: closedPositions, open: [...openPeers, pos] });
+
+    appendTrade([
+      pos.tp1_date,
+      (new Date()).toISOString().slice(11, 19),
+      'V2.1/TP1',
+      pos.symbol,
+      `${pos.side}-tp1`,
+      shares,
+      pos.entry.toFixed(2),
+      pos.stopLoss,
+      (shares * exitPrice).toFixed(2),
+      tp1Pnl,
+      ((tp1Pnl / acct.accountUsd) * 100).toFixed(2),
+      pos.signalDate,
+      `TP1-${pos.id}`,
+      pos.mode || CONFIG.tradingMode,
+      `${BOT_NAME} v2.1`,
+    ].join(','));
+
+    // Restore the break-even stop on the remainder (the sweep removed it).
+    if (runnerShares > 0 && !pos.pdt_safe) {
+      try {
+        const rp = await executor.placeStop(pos, runnerShares, bePrice, 'stop');
+        pos.brokerStopOrderId = rp.stopOrderId;
+      } catch (rpErr) {
+        console.log(`  🚨 BE stop placement FAILED for ${pos.symbol} runner: ${rpErr.message} — next run's broker-order maintenance re-places it`);
+        writeLog({ kind: 'be_stop_place_fail', symbol: pos.symbol, error: rpErr.message, via: 'queued_tp1' });
+        tg.alertTp1CloseFailed({
+          symbol: pos.symbol, side: pos.side, tp1Shares: shares, sharesTotal: pos.shares_total,
+          error: `Queued TP1 banked at the open but the BE stop failed: ${rpErr.message}`,
+          reprotected: false, mode: pos.mode || CONFIG.tradingMode,
+        }).catch(() => {});
+      }
+    }
+
+    tg.alertExitFired({
+      symbol: pos.symbol, side: pos.side, exitPrice,
+      exitReason: 'tp1_rsi50_at_open', realizedPnl: tp1Pnl,
+      accountAfter: acct.accountUsd, mode: pos.mode || CONFIG.tradingMode,
+    }).catch(() => {});
+
+    console.log(`  ✓ ${pos.symbol} QUEUED TP1 FILLED AT THE OPEN — ${shares} sh @ $${exitPrice.toFixed(4)} (${pnlSource}), P&L ${tp1Pnl >= 0 ? '+' : ''}$${tp1Pnl}, runner ${runnerShares} sh, stop -> $${bePrice}`);
+    writeLog({
+      kind: 'pending_exit_filled', symbol: pos.symbol, reason: pe.reason, kindOfExit: 'partial',
+      shares, exitPrice, pnl: tp1Pnl, pnl_source: pnlSource, price_source: fp.source,
+      order_id: pe.order_id,
+    });
+    return true;   // stays open as the runner
+  }
+
+  // ───────────────────────────── FULL CLOSE ──────────────────────────────────
+  const legPnl = realisedPnlFor(pos.side, pos.entry, exitPrice, shares);
+
+  // v2.5.0: carry the bot-booked TP1 leg into the trade total — UNLESS a closed
+  // record already holds that same leg (the broker-OCO TP1 path writes one). The
+  // shared predicate defaults to "already booked" on ambiguity: for an accounting
+  // fix, never inflate.
+  const tp1Leg = (pos.tp1_hit && !tp1LegAlreadyInClosedRecords(pos, closedPositions))
+    ? (pos.tp1_pnl || 0) : 0;
+  const totalPnl = parseFloat((legPnl + tp1Leg).toFixed(2));
+  const outcome  = totalPnl >= 0 ? 'WIN' : 'LOSS';
+  const icon     = totalPnl >= 0 ? '✅' : '❌';
+  const isTp2    = pos.tp1_hit === true;
+  const tp1Src   = pos.tp1_pnl_source || (pos.tp1_hit ? 'estimate' : null);
+  const combinedSource = isTp2
+    ? ((tp1Src === 'alpaca_fill' && pnlSource === 'alpaca_fill') ? 'alpaca_fill' : 'estimate')
+    : pnlSource;
+
+  const closedRec = {
+    ...pos,
+    ...(isTp2 ? {
+      tp2_date:   booking.trigger_date || fillDate,
+      tp2_price:  exitPrice,
+      tp2_shares: shares,
+      tp2_pnl:    legPnl,
+      tp2_reason: booking.tp2_reason || pe.reason,
+      tp2_rsi:    booking.trigger_rsi ?? null,
+      exit_strategy: 'v2.1-tp1+tp2',
+    } : {
+      tp1_date:   booking.trigger_date || fillDate,
+      tp1_price:  exitPrice,
+      tp1_shares: shares,
+      tp1_pnl:    legPnl,
+      tp1_reason: booking.tp1_reason || pe.reason,
+      tp1_rsi:    booking.trigger_rsi ?? null,
+      tp2_shares: 0,
+      tp2_pnl:    0,
+      tp2_reason: pe.reason === 'stop' ? 'stopped_before_tp1' : pe.reason,
+      exit_strategy: booking.exit_strategy || (pe.reason === 'stop' ? 'v2.1-stop' : 'v2.0-rsi50-full'),
+    }),
+    total_pnl:   totalPnl,
+    pnl_source:  combinedSource,
+    mode:        pos.mode || CONFIG.tradingMode,
+    exit_queued_for_open: true,
+    exit_fill_price_source: fp.source,
+    ...(exitFills ? { exit_fills: exitFills } : {}),
+    // v2.0-compat fields the dashboard reads
+    exitLevel:   booking.exit_level || pe.reason,
+    exitPrice,
+    exitRsi:     booking.trigger_rsi ?? null,
+    closeDate:   booking.trigger_date || fillDate,
+    realizedPnl: totalPnl,
+    outcome,
+  };
+  delete closedRec.pending_exit;
+
+  // Record FIRST, then re-derive the ledger from records (never a counter — it
+  // can't then carry a phantom). pos is fully closed, so exclude it from `open`.
+  closedPositions.push(closedRec);
+  const acct = updateAccount(null, { closed: closedPositions, open: openPeers });
+  closedRec.accountAfter = acct.accountUsd;
+
+  appendTrade([
+    closedRec.closeDate,
+    (new Date()).toISOString().slice(11, 19),
+    isTp2 ? `V2.1/TP2-${closedRec.tp2_reason}` : `V2.1/${pe.reason}`,
+    pos.symbol,
+    `${pos.side}-${isTp2 ? 'tp2' : 'exit'}`,
+    shares,
+    pos.entry.toFixed(2),
+    pos.stopLoss,
+    (shares * exitPrice).toFixed(2),
+    legPnl,
+    ((legPnl / acct.accountUsd) * 100).toFixed(2),
+    pos.signalDate,
+    `${isTp2 ? 'TP2' : 'EXIT'}-${pos.id}`,
+    pos.mode || CONFIG.tradingMode,
+    `${BOT_NAME} v2.1`,
+  ].join(','));
+
+  tg.alertExitFired({
+    symbol: pos.symbol, side: pos.side, exitPrice,
+    exitReason: `${pe.reason}_at_open`, realizedPnl: legPnl,
+    accountAfter: acct.accountUsd, mode: pos.mode || CONFIG.tradingMode,
+  }).catch(() => {});
+
+  console.log(`  ${icon} ${pos.symbol} QUEUED ${pe.reason.toUpperCase()} FILLED AT THE OPEN — ${shares} sh @ $${exitPrice.toFixed(4)} (${pnlSource}), leg ${legPnl >= 0 ? '+' : ''}$${legPnl}, trade total ${totalPnl >= 0 ? '+' : ''}$${totalPnl}`);
+  writeLog({
+    kind: 'pending_exit_filled', symbol: pos.symbol, reason: pe.reason, kindOfExit: 'full',
+    shares, exitPrice, pnl: legPnl, total_pnl: totalPnl, pnl_source: combinedSource,
+    price_source: fp.source, order_id: pe.order_id,
+  });
+  return false;   // closed
+}
+
 // ── Market Data (Yahoo Finance — no API key needed) ───────────────────────────
 
 async function fetchDailyCandles(symbol, range = '6mo') {
@@ -2159,6 +2761,20 @@ async function checkPositions(executor = null) {
     const tp1Tag = pos.tp1_hit ? ' [TP1✓]' : '';
     process.stdout.write(`  ▶ ${pos.symbol} ${pos.side.toUpperCase()} @ $${pos.entry}${tp1Tag} (entry ${pos.openDate}) … `);
 
+    // ── v2.6.0 SINGLE-FIRE GUARD: a queued exit is already resting ──────────
+    // reconcilePendingExits() (run at the TOP of run(), before syncPositions)
+    // owns this position until the queued order fills or dies. Skipping here is
+    // what makes "never queue a second order while one is pending" true — and it
+    // also stops a TP1 whose order has not yet filled from being re-triggered
+    // (tp1_hit only flips when the fill is BOOKED, never when it is queued).
+    // Skipped before the candle fetch, so it costs nothing.
+    if (pos.pending_exit?.order_id) {
+      const pe = pos.pending_exit;
+      console.log(`queued ${pe.reason} resting for the open (${pe.shares} sh, tif ${pe.time_in_force}, order ${pe.order_id}) — skipping exit evaluation`);
+      stillOpen.push(pos);
+      continue;
+    }
+
     // V2.1 needs ~200 trading-day SMA → fetch 2y of history (was 6mo in v2.0)
     let candles;
     try {
@@ -2259,6 +2875,31 @@ async function checkPositions(executor = null) {
           : c.high >= pos.stopLoss;
 
         if (stopHit) {
+          // ── v2.6.0: market CLOSED → queue the exit for the open ───────────
+          // Pre-v2.6.0 this fell straight into executor.closePosition(), which
+          // throws `Market closed — refusing to submit close for X` (:520), so a
+          // stop breached after the last in-hours run was not acted on until the
+          // next one — potentially days, given 3h-late GHA crons.
+          if (shouldQueueExitForOpen(executor)) {
+            await queueExitForOpen({
+              pos, executor,
+              qty: pos.shares_remaining ?? pos.shares_total,
+              isFullClose: true,
+              reason: 'stop',
+              booking: {
+                trigger_date:   c.date,
+                trigger_rsi:    rsi,
+                estimate_price: pos.stopLoss,
+                exit_level:     'sl',
+                exit_strategy:  'v2.1-stop',
+                tp1_reason:     'stop',
+              },
+            });
+            stillOpen.push(pos);
+            positionHandled = true;
+            break;
+          }
+
           // Start at the SIMULATED stop level; overwritten below with the real
           // Alpaca fill once the market close confirms (v2.5.0).
           let exitPrice   = pos.stopLoss;
@@ -2361,6 +3002,27 @@ async function checkPositions(executor = null) {
 
         // V2.0 fallback: full close at RSI 50 if dynamic TP disabled
         if (!CONFIG.useDynamicTp) {
+          // ── v2.6.0: market CLOSED → queue the exit for the open ───────────
+          if (shouldQueueExitForOpen(executor)) {
+            await queueExitForOpen({
+              pos, executor,
+              qty: pos.shares_remaining ?? pos.shares_total,
+              isFullClose: true,
+              reason: 'v20_rsi50',
+              booking: {
+                trigger_date:   c.date,
+                trigger_rsi:    rsi,
+                estimate_price: c.close,
+                exit_level:     'rsi50',
+                exit_strategy:  'v2.0-rsi50-full',
+                tp1_reason:     'rsi50',
+              },
+            });
+            stillOpen.push(pos);
+            positionHandled = true;
+            break;
+          }
+
           let exitPrice   = c.close;
           let realizedPnl = parseFloat((
             pos.side === 'long'
@@ -2445,6 +3107,32 @@ async function checkPositions(executor = null) {
         const beBias  = pos.side === 'long' ? 1 : -1;
         const bePrice = (beCents + beBias) / 100;
         const runnerShares = pos.shares_total - tp1Shares;
+
+        // ── v2.6.0: market CLOSED → queue the TP1 partial for the open ──────
+        // NOTE what is deliberately NOT done here: tp1_hit stays FALSE and no
+        // P&L is booked. The shares have not been sold yet — only ORDERED. The
+        // reconcile books tp1_* (and restores the BE stop on the remainder) when
+        // the fill is confirmed at the open. Until then `pending_exit` makes this
+        // position skip exit evaluation entirely, so the TP1 cannot re-fire.
+        if (shouldQueueExitForOpen(executor)) {
+          await queueExitForOpen({
+            pos, executor,
+            qty: tp1Shares,
+            isFullClose: false,
+            reason: 'tp1_rsi50',
+            booking: {
+              trigger_date:   c.date,
+              trigger_rsi:    rsi,
+              estimate_price: c.close,
+              be_price:       bePrice,
+              runner_shares:  runnerShares,
+              tp1_reason:     'rsi50',
+            },
+          });
+          stillOpen.push(pos);
+          positionHandled = true;
+          break;
+        }
 
         // ── CANCEL-FIRST TP1 close (v2.2.5 fix) ─────────────────────────────
         // ROOT CAUSE (PYPL, 2026-06-26→07-01): the v2.2 broker design leaves a
@@ -2693,6 +3381,32 @@ async function checkPositions(executor = null) {
       // actual filled_avg_price so the booked P&L matches the broker, not the bar.
       // tp2PnlSource records which was used. ACCOUNTING ONLY — the TP2 triggers
       // (SMA50/200/BE/timeout) are unchanged (instructor rule untouched).
+      // ── v2.6.0: market CLOSED → queue the runner exit for the open ────────
+      // THIS IS THE IBM 2026-09-09 CASE. The SMA50 touch ripened in the last
+      // ~35 minutes of the session; the next run landed 21:06 UTC and
+      // closePosition() threw `Market closed`. Now the runner's exit is handed
+      // to the broker to execute at the next open — exactly what Alan did by
+      // hand (cancel the stop, queue a market sell, filled 2 @ $238.39).
+      if (shouldQueueExitForOpen(executor)) {
+        await queueExitForOpen({
+          pos, executor,
+          qty: pos.shares_remaining,
+          isFullClose: true,
+          reason: `tp2_${tp2Reason}`,
+          booking: {
+            trigger_date:   c.date,
+            trigger_rsi:    rsi,
+            estimate_price: tp2ExitPrice,
+            tp2_reason:     tp2Reason,
+            exit_level:     tp2Reason,
+            exit_strategy:  'v2.1-tp1+tp2',
+          },
+        });
+        stillOpen.push(pos);
+        positionHandled = true;
+        break;
+      }
+
       let tp2Pnl = realisedPnlFor(pos.side, pos.entry, tp2ExitPrice, pos.shares_remaining);
       let tp2PnlSource = 'estimate';
 
@@ -2992,6 +3706,22 @@ async function run() {
       console.log(`\n⏸  Market is closed — will read positions but place no orders this run.`);
     }
 
+    // ── v2.6.0: RECONCILE QUEUED (for-the-open) EXITS — FIRST, BEFORE SYNC ──
+    // ⚠ THE ORDERING HERE IS LOAD-BEARING. syncPositions() below compares
+    // Alpaca's position list to local state and routes any difference through
+    // recordExternalClose(). If a queued exit filled at the open and syncPositions
+    // saw it FIRST, the same leg would be booked twice — once as an "external"
+    // close and once by the reconcile. Reconciling first leaves syncPositions
+    // looking at consistent state (a filled TP1 partial has already had
+    // shares_remaining reduced; a filled full close is already out of
+    // open-positions). Do not move this below the sync.
+    try {
+      await reconcilePendingExits(executor);
+    } catch (err) {
+      console.error(`[Alpaca] Queued-exit reconcile failed: ${err.message} — pending exits are left untouched and retried next run`);
+      writeLog({ kind: 'pending_exit_reconcile_fail', error: err.message });
+    }
+
     // Sync local open positions against Alpaca's authoritative view.
     // Any positions Alpaca no longer has (because a stop filled overnight, say)
     // get pulled out of open-positions-sid.json. The local position monitor
@@ -3109,18 +3839,42 @@ async function run() {
 
   // ── Weekend guard (stocks/ETFs only — markets are closed Sat/Sun) ─────────
   // Any signal fired on a weekend is driven by Friday's stale close price.
-  // False entries are guaranteed — do nothing until Monday open.
+  // False ENTRIES are guaranteed — which is all this guard ever protected
+  // against. Before v2.6.0 it `return`ed here, BEFORE checkPositions, so a
+  // position was not even LOOKED AT at the weekend. That is a real hole now that
+  // exits can be queued for the open: Friday 19:30 ET is Saturday 00:30 UTC, so
+  // an exit that ripened on Friday's completed bar could not be queued until
+  // Monday. v2.6.0 keeps the guard on the ENTRY SCAN and lets position
+  // management (reconcile + queue-for-Monday's-open) run. Revert with
+  // SID_WEEKEND_EXIT_QUEUE=false.
   const dayOfWeek = new Date().getUTCDay(); // 0=Sun, 6=Sat
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
+  const isWeekendUtc = dayOfWeek === 0 || dayOfWeek === 6;
+  if (isWeekendUtc && !CONFIG.weekendExitQueue) {
     const dayName = dayOfWeek === 6 ? 'Saturday' : 'Sunday';
-    console.log(`\n🚫 Weekend guard — ${dayName} UTC. Stock markets closed, no action taken.`);
+    console.log(`\n🚫 Weekend guard (hard, SID_WEEKEND_EXIT_QUEUE=false) — ${dayName} UTC. Stock markets closed, no action taken.`);
     console.log(`   Open positions will be reviewed at Monday market open.`);
     console.log(`\n══ SID run complete ══`);
     return;
   }
+  if (isWeekendUtc) {
+    const dayName = dayOfWeek === 6 ? 'Saturday' : 'Sunday';
+    console.log(`\n🗓  Weekend (${dayName} UTC) — EXIT MANAGEMENT ONLY. No entry scan (a weekend signal is Friday's stale close). A ripe exit is queued for Monday's open.`);
+  }
 
   // Step 0: Check open positions for RSI-50 exits
   await checkPositions(executor);
+
+  // ── v2.6.0 exits-only cycle (SID_EXITS_ONLY=true) ─────────────────────────
+  // Used by the Railway cron runner's cheap out-of-hours cycle: positions are
+  // reconciled + managed (so a late-ripening exit still reaches the open) but the
+  // 112-ticker Yahoo entry scan is skipped, because an entry would be refused
+  // out-of-hours anyway. Nothing about WHICH trades fire changes — an entry is
+  // only ever placed by an in-hours run.
+  if (isWeekendUtc || CONFIG.exitsOnly) {
+    console.log(`\n⏭  Entry scan skipped (${isWeekendUtc ? 'weekend' : 'SID_EXITS_ONLY=true'}) — positions were still managed above.`);
+    console.log(`\n══ SID run complete (exit management only) ══`);
+    return;
+  }
 
   // Step 1: Check if we're already at the position limit
   const openPositions = loadOpenPositions();
@@ -3605,6 +4359,17 @@ export {
   // open position's tp1_pnl twice) and recordExternalClose (do carry it into a
   // full close). Exported for the regression tests on both directions.
   tp1LegAlreadyInClosedRecords,
+  // v2.6.0 — queue-for-open exits. Exported for the regression suite only; inert
+  // on the direct-run path. exitClientOrderId is the broker-level double-sell
+  // guard, so its determinism is asserted by test.
+  exitClientOrderId,
+  exitTagFor,
+  marketIsOpen,
+  shouldQueueExitForOpen,
+  queueExitForOpen,
+  reconcilePendingExits,
+  bookQueuedExitFill,
+  PENDING_EXIT_DEAD_STATES,
   alpacaSnapshotPathForMode,
   alpacaStartingEquityFor,
   writeAlpacaSnapshot,

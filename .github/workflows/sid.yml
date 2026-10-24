@@ -3,6 +3,19 @@ name: SID Swing Bot
 on:
   workflow_dispatch: # Manual trigger for testing
 
+  # ── PHASE 1 (v2.6.0, 2026-10-24): these crons STAY ENABLED ──────────────────
+  # SID now ALSO runs from a Railway cron service (SID/railway-sid-runner.js),
+  # because GitHub Actions crons have been landing ~3h late (14:35 -> ~18:15,
+  # 18:35 -> ~21:10 UTC) while Railway documents its cron as varying only "by a
+  # few minutes". The two run side by side on purpose — belt and braces while the
+  # Railway service proves itself. Duplicate work is safe: the bot is idempotent
+  # across same-day runs, and every v2.6.0 queued exit carries a DETERMINISTIC
+  # client_order_id so a concurrent second submission is rejected by Alpaca as a
+  # duplicate instead of double-selling.
+  # PHASE 2 (only after the Railway service has covered a few clean sessions):
+  # comment out the `schedule:` block below and keep `workflow_dispatch`. The
+  # exact procedure + the ready-to-paste banner are in
+  # SID/RAILWAY-DEPLOY.md § "Phase 2 — retire the GitHub Actions crons".
   schedule:
     # ── WEEKDAYS ONLY — REDUNDANT market-hours runs (14:35 / 16:35 / 18:35 UTC) ──
     # WHY 3 runs, not 1: GitHub Actions scheduled crons are best-effort and can be
@@ -97,6 +110,13 @@ jobs:
           # frozen number (it sat on the 2026-07-17 equity for SEVEN WEEKS).
           # Glob covers the mode-segregated live file (alpaca-account-live-sid.json).
           git add 'SID/alpaca-account*-sid.json'                  || true
+          # v2.6.0 — the Telegram approval queue. Flagged as missing back in
+          # v2.4.3: without this the de-dupe state never persists across cloud
+          # runs, so a bullish-asset short that stays pending re-announces itself
+          # on EVERY run. Harmless-ish at 3 runs/day; spam at the Railway cron's
+          # cadence. The Railway runner pushes this file too, so both runners now
+          # keep the same queue.
+          git add SID/pending-approvals-sid.json                  || true
           git diff --staged --quiet || git commit -m "SID run $(date -u '+%Y-%m-%d %H:%M UTC')"
           git pull --rebase --autostash origin main
           git push

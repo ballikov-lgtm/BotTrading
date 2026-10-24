@@ -287,6 +287,85 @@ export async function alertTp2CloseFailed({ symbol, side, runnerShares, reason, 
   return sendMessage(msg);
 }
 
+// ── v2.6.0 QUEUE-FOR-OPEN EXITS ─────────────────────────────────────────
+
+/**
+ * An exit ripened while the market was CLOSED, so the bot handed it to the
+ * broker to execute at the next open (the IBM 2026-09-09 case). Informational —
+ * this is the SUCCESS path, not an alarm.
+ */
+export async function alertExitQueuedForOpen({ symbol, side, shares, reason, timeInForce, orderId, mode }) {
+  const modeTag = formatModeTag(mode);
+  const msg = [
+    `⏭ <b>SID EXIT QUEUED FOR THE OPEN</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> — ${String(side || '').toUpperCase()}`,
+    shares != null ? `Shares: ${shares}` : '',
+    reason ? `Trigger: ${escape(reason)}` : '',
+    ``,
+    `The market was closed, so the exit was submitted to Alpaca as a market order (<code>${escape(timeInForce)}</code>) that the broker executes at the <b>next market open</b>.`,
+    orderId ? `Order: <code>${escape(orderId)}</code>` : '',
+    ``,
+    `<i>No resting stop until it fills — by design, a stop would hold the shares and block this order. The exposure is the overnight gap on a position we are exiting anyway.</i>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
+/**
+ * The queue-for-open SUBMISSION was rejected by the broker. The bot has fallen
+ * back to the pre-v2.6.0 behaviour (re-protect with a stop, retry next run), so
+ * the position is NOT naked — but it is also not exiting yet.
+ */
+export async function alertExitQueueFailed({ symbol, side, shares, reason, timeInForce, error, reprotected, pdtSafe, mode }) {
+  const modeTag = formatModeTag(mode);
+  const protLine = pdtSafe
+    ? 'ℹ️ PDT-safe position — no broker stop by design; the daily poll is the protection and will retry the queue.'
+    : reprotected === true
+      ? '🛡️ Position RE-PROTECTED with a stop — it is NOT naked. The bot retries the queue next run.'
+      : '🚨 <b>RE-PROTECT ALSO FAILED — the position may be UNPROTECTED. CHECK ALPACA NOW.</b>';
+  const msg = [
+    `⚠️ <b>SID COULD NOT QUEUE AN EXIT FOR THE OPEN</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> — ${String(side || '').toUpperCase()}`,
+    shares != null ? `Shares: ${shares}` : '',
+    reason ? `Trigger: ${escape(reason)}` : '',
+    timeInForce ? `Tried time-in-force: <code>${escape(timeInForce)}</code>` : '',
+    ``,
+    `<b>Error:</b> ${escape(error)}`,
+    protLine,
+    ``,
+    `<i>Alpaca rejects an OPG order submitted between 09:28 and 19:00 ET; the bot alternates to a plain queued market order on the next attempt. If this repeats for more than a day, check Alpaca for a resting order still holding the shares.</i>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
+/**
+ * A queued exit was CANCELLED / REJECTED / EXPIRED at the broker before it
+ * filled. This is the one genuinely dangerous state in the queue-for-open
+ * design (an exit that is neither resting nor protected), so it is loud.
+ */
+export async function alertPendingExitDropped({ symbol, side, shares, reason, brokerStatus, reprotected, pdtSafe, mode }) {
+  const modeTag = formatModeTag(mode);
+  const protLine = pdtSafe
+    ? 'ℹ️ PDT-safe position — no broker stop by design; the daily poll protects it and re-queues the exit.'
+    : reprotected === true
+      ? '🛡️ Position IMMEDIATELY RE-PROTECTED with a stop. The bot re-queues the exit next run.'
+      : '🚨 <b>RE-PROTECT FAILED — the position may be UNPROTECTED with no exit resting. CHECK ALPACA NOW.</b>';
+  const msg = [
+    `🆘 <b>SID QUEUED EXIT WAS DROPPED</b> ${modeTag}`,
+    ``,
+    `<b>${escape(symbol)}</b> — ${String(side || '').toUpperCase()}`,
+    shares != null ? `Shares: ${shares}` : '',
+    reason ? `Trigger: ${escape(reason)}` : '',
+    `Broker status: <code>${escape(brokerStatus)}</code>`,
+    ``,
+    protLine,
+    ``,
+    `<i>An on-open order that goes unfilled in the opening auction is cancelled by the exchange. The bot re-queues the exit on its next cycle.</i>`,
+  ].filter(Boolean).join('\n');
+  return sendMessage(msg);
+}
+
 // ── Internals ───────────────────────────────────────────────────────────
 
 function formatModeTag(mode) {

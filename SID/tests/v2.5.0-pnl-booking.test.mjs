@@ -134,7 +134,17 @@ function oldStopPnl({ side, signalEntry, stopLevel, shares }) {
 // ═══════════════════════════════════════════════════════════════════════════
 section('A. BUG 1 — external full close dropped a bot-booked TP1 leg');
 
-check('A0  bot reports v2.5.0', BOT_VERSION, 'v2.5.0');
+// v2.6.0: this suite asserts the v2.5.0 BEHAVIOUR, which must survive every later
+// release — so the version gate is "at least 2.5.0", not an exact pin. The exact
+// version pin lives in the NEWEST suite only (otherwise every release has to edit
+// every old suite, and an edited assertion is a weakened assertion).
+function semverAtLeast(v, min) {
+  const n = String(v || '').replace(/^v/, '').split('.').map(x => parseInt(x, 10) || 0);
+  const m = String(min).split('.').map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) { if ((n[i] || 0) !== (m[i] || 0)) return (n[i] || 0) > (m[i] || 0); }
+  return true;
+}
+ok('A0  bot reports v2.5.0 or later (behaviour suite, not a version pin)', semverAtLeast(BOT_VERSION, '2.5.0'));
 
 // Regression witnesses: the OLD algorithm reproduces the exact numbers on disk.
 check('A1  WITNESS old IBM total = the live bad +42.52',
@@ -395,7 +405,7 @@ ok('F9  sid.yml stages the Alpaca snapshot', /git add .*alpaca-account\*-sid\.js
 ok('F10 sid.yml keeps the staggered cron redundancy', (yml.match(/cron:/g) || []).length >= 3);
 const dash = fs.readFileSync(path.join(SID_DIR, 'sid-dashboard.js'), 'utf8');
 ok('F11 dashboard keeps the stale-snapshot guard', /SNAPSHOT_STALE_DAYS/.test(dash));
-ok('F12 dashboard version marker is v2.5.0', /STRATEGY_VERSION\s*=\s*'2\.5\.0'/.test(dash));
+ok('F12 dashboard version marker is 2.5.0 or later', semverAtLeast((/STRATEGY_VERSION\s*=\s*'([0-9.]+)'/.exec(dash) || [])[1], '2.5.0'));
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('G. Canon rules untouched (instructor non-negotiables)');

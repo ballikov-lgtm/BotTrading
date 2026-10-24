@@ -14,7 +14,7 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 
 | Strategy | Style | Timeframe | Assets | Best in market | Exchange | Status | Bot file | Deep context |
 |----------|-------|-----------|--------|----------------|----------|--------|----------|---------------|
-| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.5.0) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
+| **SID** | SWING | Daily | US stocks & ETFs | Mean-reversion (RSI extremes) | Alpaca | **LIVE PAPER** (v2.6.0) | `SID/bot-sid.js` | [`SID/CLAUDE.md`](SID/CLAUDE.md) |
 | **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 | **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |
@@ -132,8 +132,8 @@ Each strategy owns specific files. Full lists live in each strategy's memory fil
 
 | Strategy | Owned area |
 |----------|------------|
-| SID | `SID/` folder, `docs/sid/`, `.github/workflows/sid*.yml`, `SID/requirements.txt` |
-| Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `audit.js`, `monitor.js`, `railway-runner.js`, `rules-ironclad.json`, `*-ironclad.json/csv`, `hype-state.json`, `docs/index.html` (research dashboard), `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` |
+| SID | `SID/` folder (incl. `SID/railway-sid-runner.js` + `SID/railway-sid.json` — SID’s OWN Railway service, v2.6.0), `docs/sid/`, `.github/workflows/sid*.yml`, `SID/requirements.txt` |
+| Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `audit.js`, `monitor.js`, `railway-runner.js` + the repo-root `railway.json` (Ironclad’s Railway service — **not** SID’s), `rules-ironclad.json`, `*-ironclad.json/csv`, `hype-state.json`, `docs/index.html` (research dashboard), `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` |
 | VWAP Scalper | `bot.js`, `rules.json`, `trades.csv`, `safety-check-log.json`, `.github/workflows/trade.yml` |
 | **C.A.T.S.** | `bot-cats.js` (TBD), `rules-cats.json` (TBD), `*-cats.json/csv` (TBD), `cats/` folder if needed, `docs/cats/` (TBD), `pine/cats-visualiser.pine` (TBD), `.github/workflows/cats.yml` (TBD), `CATS-MEMORY.md` |
 | Shared infra | `package.json`, `node_modules/`, `.env.example`, `README.md` (human-facing readmes are not memory files) |
@@ -258,6 +258,7 @@ Different workflows write different commit messages — don't confuse them when 
 | `Dashboard update YYYY-MM-DD ...` | `research.yml` | `docs/index.html` (Ironclad dashboard) |
 | `SID dashboard update YYYY-MM-DD ...` | `sid-dashboard.yml` | `docs/sid/index.html` |
 | `SID run YYYY-MM-DD ...` | `sid.yml` | SID state files |
+| `SID railway run YYYY-MM-DD ...` | `SID/railway-sid-runner.js` on Railway cron (v2.6.0) | SID state files, pushed via the GitHub Contents API — NOT a git push, so it never appears as an Actions run |
 | `Bot run YYYY-MM-DD ...` | `trade.yml` | VWAP state files |
 | `Ironclad run YYYY-MM-DD ...` | `ironclad.yml` | Ironclad state (manual runs only) |
 
@@ -364,7 +365,7 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 
 | Workflow | Cadence | Trigger | Strategy | What it does |
 |----------|---------|---------|----------|--------------|
-| `sid.yml` | Daily 14:35 UTC weekdays | schedule + manual | SID | Runs SID bot at market open |
+| `sid.yml` | 14:35 / 16:35 / 18:35 UTC weekdays | schedule + manual | SID | Runs SID bot. **Phase 1 (v2.6.0): still enabled**, running alongside the Railway cron service — see `SID/RAILWAY-DEPLOY.md` |
 | `sid-dashboard.yml` | 3× daily | schedule + manual | SID | Scans + rebuilds `docs/sid/index.html` |
 | `research.yml` | 2× daily | schedule + manual | Ironclad | Runs research, rebuilds `docs/index.html` |
 | `ironclad.yml` | Manual only | workflow_dispatch | Ironclad | Backup bot run (Railway is primary; Cloudflare blocks GH IPs from BitGet) |
@@ -374,7 +375,7 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 
 ## Live runtimes
 
-- **SID** → GitHub Actions runner. Daily, fully automated. Alpaca paper.
+- **SID** → **GitHub Actions runner AND (v2.6.0) a Railway CRON service** (`SID/railway-sid-runner.js`, one-shot per cycle, `*/15 13-23 * * 1-5` UTC, gated on Alpaca `/v2/clock`). Both run in Phase 1 because GHA crons were landing ~3h late. Alpaca paper. Deploy + cutover plan: `SID/RAILWAY-DEPLOY.md`.
 - **Ironclad** → **Railway** (continuous 15-min loop). `railway-runner.js` is the driver. State pushed to `logs` branch.
 - **VWAP Scalper** → GitHub Actions runner. Schedule per `trade.yml`.
 
