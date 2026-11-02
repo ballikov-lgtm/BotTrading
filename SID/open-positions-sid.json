@@ -43,7 +43,7 @@
     "openTime": "19:33:10",
     "mode": "paper",
     "strategy": "SID v2.6.1",
-    "brokerStopOrderId": "d3428f80-832c-40da-b82b-3c094a6fdcae",
+    "brokerStopOrderId": null,
     "clientOrderIdPrefix": "SID-GE-20261023-long",
     "entry_source": "alpaca_fill",
     "signal_entry": 297.80999755859375,
@@ -57,7 +57,31 @@
     "tp1_reason": "rsi50",
     "tp1_rsi": 53.51,
     "tp1_pnl_source": "alpaca_fill",
-    "tp1_close_order_id": "306f319b-4fa7-4030-baa9-310d648d1417"
+    "tp1_close_order_id": "306f319b-4fa7-4030-baa9-310d648d1417",
+    "exit_queue_attempts": 1,
+    "pending_exit": {
+      "order_id": "141598d8-8d23-4c06-a780-7ef42a15be23",
+      "client_order_id": "SID-GE-tp2-20261102",
+      "time_in_force": "day",
+      "status": "queued",
+      "reason": "tp2_sma50_touch",
+      "kind": "full",
+      "shares": 2,
+      "queued_at": "2026-11-02T22:50:51.168Z",
+      "queued_for": "next_market_open",
+      "attempt": 1,
+      "broker_status": "accepted",
+      "mode": "paper",
+      "bot_version": "v2.6.1",
+      "booking": {
+        "trigger_date": "2026-11-02",
+        "trigger_rsi": 55.17,
+        "estimate_price": 316.6598,
+        "tp2_reason": "sma50_touch",
+        "exit_level": "sma50_touch",
+        "exit_strategy": "v2.1-tp1+tp2"
+      }
+    }
   },
   {
     "id": "de206b56-18e7-4b21-a490-ae65f4bf7c1d",
