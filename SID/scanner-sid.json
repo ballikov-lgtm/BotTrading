@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-11-06T22:17:39.750Z",
+  "scanDate": "2026-11-07T00:57:57.506Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
   "tickersWithError": 0,
-  "elapsedMs": 263631,
+  "elapsedMs": 300625,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -38,7 +38,7 @@
       "dailySma200": 337.52,
       "rsi50Target": 312.91,
       "note": "RSI oversold + MACD rising — ready to ARM on TV",
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "INTC",
@@ -194,7 +194,7 @@
       "dailySma200": 65.64,
       "rsi50Target": 67.51,
       "note": "RSI oversold but MACD not yet rising",
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "EWZ",
@@ -1624,7 +1624,7 @@
       "dailySma200": 147.61,
       "rsi50Target": 49.84,
       "note": null,
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "WMT",
