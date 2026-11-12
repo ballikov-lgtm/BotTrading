@@ -18,6 +18,7 @@ This file is a **searchable index of every strategy in this codebase**. Its job 
 | **Ironclad** | SWING | Daily + 15m | Crypto + stocks + commodities | Trending | BitGet (3× futures) | **PAUSED** (being replaced by C.A.T.S.) | `bot-ironclad.js` | [`IRONCLAD-MEMORY.md`](IRONCLAD-MEMORY.md) |
 | **VWAP Scalper** | SCALP | 4h | Crypto | Ranging / choppy | BitGet | **LIVE PAPER** | `bot.js` | [`VWAP-MEMORY.md`](VWAP-MEMORY.md) |
 | **C.A.T.S.** | SCALP / short swing | 1H | Crypto | TBD (S&D levels-based design in progress) | BitGet | **ALPHA** (Pine visualiser built; bot TBD) | `bot-cats.js` (TBD) | [`CATS-MEMORY.md`](CATS-MEMORY.md) |
+| **Maven** | Trend-pullback (long-only) | 4h + daily MTF | Crypto (BTC-outperforming alts) | Trending (sits out chop) | BitGet (public data; no keys) | **LIVE PAPER** | `maven/bot-maven.py` | [`maven/MAVEN.md`](maven/MAVEN.md) |
 
 **Status legend:**
 - **ALPHA** — in-development, not deployed
@@ -58,14 +59,14 @@ When the user references a *type* of strategy rather than naming one, use this l
 | "a swing strategy" / "swing rules" | SID, Ironclad | Both hold positions days-weeks |
 | "a scalp" / "intraday" / "scalping logic" | VWAP Scalper, C.A.T.S. | VWAP=4h holds, C.A.T.S.=1H entries |
 | "how we handle pullbacks" | SID, Ironclad | SID = daily RSI<30 pullback; Ironclad = 15m pullback within daily trend |
-| "a crypto strategy" | VWAP, Ironclad, C.A.T.S. | All trade BitGet |
+| "a crypto strategy" | VWAP, Ironclad, C.A.T.S., Maven | All trade BitGet |
 | "a stocks strategy" / "US equities" | SID, Ironclad (stocks mode) | |
 | "a ranging-market strategy" | VWAP | Explicitly skips trending |
-| "a trending-market strategy" | Ironclad | Explicitly requires daily trend |
+| "a trending-market strategy" | Ironclad, Maven | Ironclad = daily trend; Maven = 4h long-only trend-pullback (needs confirmed uptrend) |
 | "daily timeframe rules" | SID, Ironclad | |
 | "intraday rules" | VWAP, Ironclad (15m entry side), C.A.T.S. (1H) | |
 | "1H rules" / "hourly entries" | C.A.T.S. | Only one on 1H primary |
-| "live status" / "running now" | SID + VWAP (LIVE PAPER), Ironclad PAUSED, C.A.T.S. ALPHA | |
+| "live status" / "running now" | SID + VWAP + Maven (LIVE PAPER), Ironclad PAUSED, C.A.T.S. ALPHA | |
 | "backtest vault" / "tested variants" | SID — see `SID/strategy-test-vault/` | Others use ad-hoc records |
 | "oversold entry" / "RSI extreme" | SID (RSI<30 daily) | Mean-reversion play |
 | "trend break entry" | Ironclad (15m break of swing low/high) | Trend-following |
@@ -75,6 +76,10 @@ When the user references a *type* of strategy rather than naming one, use this l
 | "Alpaca" / "PDT-immune" | SID | Only one on Alpaca |
 | "supply / demand zones" / "S&D" / "rejection zones" / "order blocks" / "ICT" / "SMC" / "Wyckoff" | C.A.T.S. | Levels-based methodology research lives in CATS-MEMORY.md |
 | "Ironclad replacement" / "new crypto bot" | C.A.T.S. | Explicitly the successor |
+| "trend-pullback" / "pullback in an uptrend" / "4h trend-pullback" | Maven | Long-only; buys the first shallow RSI pullback after a confirmed uptrend |
+| "MTF trend gate" / "multi-timeframe 200 slope" / "20×200 cross" | Maven | Needs 20>200 AND both 4h & daily 200-SMA sloping up before any entry |
+| "relative strength vs BTC" / "BTC-outperforming alts" / "narrative rotation" | Maven | Coin selection = current narrative + live RS vs BTC, not deep history |
+| "crypto on GitHub Actions" / "keyless / public-data-only crypto" | Maven | Only crypto strat running on GHA cron with BitGet public data (no API keys) |
 
 When two strategies match, **read both memory files** and report what each does separately.
 
@@ -135,6 +140,7 @@ Each strategy owns specific files. Full lists live in each strategy's memory fil
 | SID | `SID/` folder (incl. `SID/railway-sid-runner.js` + `SID/railway-sid.json` — SID’s OWN Railway service, v2.6.0), `docs/sid/`, `.github/workflows/sid*.yml`, `SID/requirements.txt` |
 | Ironclad | `bot-ironclad.js`, `bot-hype-manager.js`, `audit.js`, `monitor.js`, `railway-runner.js` + the repo-root `railway.json` (Ironclad’s Railway service — **not** SID’s), `rules-ironclad.json`, `*-ironclad.json/csv`, `hype-state.json`, `docs/index.html` (research dashboard), `.github/workflows/ironclad.yml`, `.github/workflows/research.yml` |
 | VWAP Scalper | `bot.js`, `rules.json`, `trades.csv`, `safety-check-log.json`, `.github/workflows/trade.yml` |
+| **Maven** | `maven/` folder, `docs/maven/`, `maven/maven-*.json/csv`, `.github/workflows/maven-*.yml`, `MAVEN.md`, `MAVEN*.png` |
 | **C.A.T.S.** | `bot-cats.js` (TBD), `rules-cats.json` (TBD), `*-cats.json/csv` (TBD), `cats/` folder if needed, `docs/cats/` (TBD), `pine/cats-visualiser.pine` (TBD), `.github/workflows/cats.yml` (TBD), `CATS-MEMORY.md` |
 | Shared infra | `package.json`, `node_modules/`, `.env.example`, `README.md` (human-facing readmes are not memory files) |
 
@@ -302,6 +308,7 @@ Different workflows write different commit messages — don't confuse them when 
 | `SID railway run YYYY-MM-DD ...` | `SID/railway-sid-runner.js` on Railway cron (v2.6.0) | SID state files, pushed via the GitHub Contents API — NOT a git push, so it never appears as an Actions run |
 | `Bot run YYYY-MM-DD ...` | `trade.yml` | VWAP state files |
 | `Ironclad run YYYY-MM-DD ...` | `ironclad.yml` | Ironclad state (manual runs only) |
+| `Maven paper run YYYY-MM-DD ...` | `maven-paper.yml` | `docs/maven/state.json` (Maven paper state + dashboard) |
 
 ### Dashboard is shared between strategies (additive-only rule)
 The dashboard HTML files serve both SID and Ironclad on different subpaths. **New features for one strategy must be additive-only — never modify another strategy's sections.**
@@ -411,6 +418,9 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 | `research.yml` | 2× daily | schedule + manual | Ironclad | Runs research, rebuilds `docs/index.html` |
 | `ironclad.yml` | Manual only | workflow_dispatch | Ironclad | Backup bot run (Railway is primary; Cloudflare blocks GH IPs from BitGet) |
 | `trade.yml` | Multi-cadence | schedule + manual | VWAP | Runs VWAP scalper |
+| `maven-paper.yml` | Every 30 min | schedule + manual | Maven | Runs the Maven paper bot (Python); commits `docs/maven/state.json` |
+
+> **Maven note:** `maven-research.yml` and `maven-strategist.yml` exist locally but are **NOT committed** (untracked) — they can't run in the cloud and would be lost with the machine. They back the research/strategist agents, which are still at the spec stage (`maven/research-agent-spec.md`), not built. Commit them only when those agents are real.
 
 ---
 
@@ -419,6 +429,7 @@ Same trade set, wildly different totals. Always cite the methodology when quotin
 - **SID** → **GitHub Actions runner AND (v2.6.0) a Railway CRON service** (`SID/railway-sid-runner.js`, one-shot per cycle, `*/15 13-23 * * 1-5` UTC, gated on Alpaca `/v2/clock`). Both run in Phase 1 because GHA crons were landing ~3h late. Alpaca paper. Deploy + cutover plan: `SID/RAILWAY-DEPLOY.md`. **v2.6.1:** the Railway runner now holds the ENTRY SCAN until **T-3 minutes before the close** (window derived from `/v2/clock`'s `next_close`, so DST and half-day sessions are the broker's problem) — because the strategy is defined as `entry = close`. Every other cycle is exits-only. Knobs `SID_CLOSE_WINDOW_MIN` / `SID_ENTRY_SUBMIT_OFFSET_MIN`; the cron expression is unchanged. See `SID/RAILWAY-DEPLOY.md` § 5a.
 - **Ironclad** → **Railway** (continuous 15-min loop). `railway-runner.js` is the driver. State pushed to `logs` branch.
 - **VWAP Scalper** → GitHub Actions runner. Schedule per `trade.yml`.
+- **Maven** → GitHub Actions runner (`maven-paper.yml`, every ~30 min). **BitGet public market data only — no API keys** (so unaffected by the 2026-09-04 key revocation). Paper. NB: a Railway *project* historically named "Ironclad" also hosts a Maven session (rename pending) — but the GHA cron is the paper-bot runtime that produces the live state + dashboard.
 
 ---
 
