@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-11-17T23:59:04.438Z",
+  "scanDate": "2026-11-18T02:57:08.136Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
-  "tickersWithError": 0,
-  "elapsedMs": 308886,
+  "tickersWithError": 1,
+  "elapsedMs": 288354,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -82,7 +82,7 @@
       "rsi": 26.7,
       "macdDirection": "falling",
       "weeklyAdx": 20,
-      "choppinessIdx": 47.3,
+      "choppinessIdx": 47.2,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 92.9000015258789,
@@ -264,7 +264,7 @@
       "rsi": 34.1,
       "macdDirection": "falling",
       "weeklyAdx": 21.2,
-      "choppinessIdx": 43.5,
+      "choppinessIdx": 43.6,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 163.25999450683594,
@@ -282,7 +282,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 11.1,
+        "dailyChoppinessLow": 11.2,
         "historicalExtremes": 25,
         "meanReversionActive": 20
       },
@@ -360,7 +360,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 6.1,
+        "dailyChoppinessLow": 6,
         "historicalExtremes": 16.7,
         "meanReversionActive": 20
       },
@@ -394,7 +394,7 @@
       "rsi": 30.8,
       "macdDirection": "falling",
       "weeklyAdx": 18.7,
-      "choppinessIdx": 56.8,
+      "choppinessIdx": 56.7,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 163.91000366210938,
@@ -542,7 +542,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 10.2,
+        "dailyChoppinessLow": 10.1,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -984,7 +984,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 10.6,
-        "dailyChoppinessLow": 9.1,
+        "dailyChoppinessLow": 9,
         "historicalExtremes": 25,
         "meanReversionActive": 20
       },
@@ -1062,7 +1062,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 12.8,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 13.6,
+        "dailyChoppinessLow": 13.5,
         "historicalExtremes": 16.7,
         "meanReversionActive": 20
       },
@@ -1434,7 +1434,7 @@
       "rsi": 37.6,
       "macdDirection": "rising",
       "weeklyAdx": 24.1,
-      "choppinessIdx": 44.1,
+      "choppinessIdx": 44.2,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 210.69000244140625,
@@ -1478,7 +1478,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 19.7,
-        "dailyChoppinessLow": 14.9,
+        "dailyChoppinessLow": 14.8,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -1616,39 +1616,13 @@
       "rsi": 40.4,
       "macdDirection": "falling",
       "weeklyAdx": 44.3,
-      "choppinessIdx": 44,
+      "choppinessIdx": 44.1,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 2.9100000858306885,
       "dailySma50": 3.66,
       "dailySma200": 6.41,
       "rsi50Target": 3.38,
-      "note": null,
-      "transitionedFrom": null
-    },
-    {
-      "symbol": "AVGO",
-      "status": "IDLE",
-      "direction": null,
-      "score": 70,
-      "scoreBreakdown": {
-        "weeklyTrendDirection": 20,
-        "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 9.8,
-        "historicalExtremes": 0,
-        "meanReversionActive": 20
-      },
-      "weeklyTrend": "up",
-      "rsi": 51.4,
-      "macdDirection": "rising",
-      "weeklyAdx": 18.1,
-      "choppinessIdx": 48.5,
-      "daysToEarnings": null,
-      "earningsBlackout": false,
-      "lastClose": 341.6000061035156,
-      "dailySma50": 344.35,
-      "dailySma200": 367.49,
-      "rsi50Target": 337.36,
       "note": null,
       "transitionedFrom": null
     },
@@ -1679,6 +1653,32 @@
       "transitionedFrom": null
     },
     {
+      "symbol": "AVGO",
+      "status": "IDLE",
+      "direction": null,
+      "score": 69,
+      "scoreBreakdown": {
+        "weeklyTrendDirection": 20,
+        "weeklyAdxHealthyBand": 20,
+        "dailyChoppinessLow": 9.3,
+        "historicalExtremes": 0,
+        "meanReversionActive": 20
+      },
+      "weeklyTrend": "up",
+      "rsi": 51.4,
+      "macdDirection": "rising",
+      "weeklyAdx": 18.1,
+      "choppinessIdx": 48.8,
+      "daysToEarnings": null,
+      "earningsBlackout": false,
+      "lastClose": 341.6000061035156,
+      "dailySma50": 344.35,
+      "dailySma200": 367.49,
+      "rsi50Target": 337.36,
+      "note": null,
+      "transitionedFrom": null
+    },
+    {
       "symbol": "CVNA",
       "status": "IDLE",
       "direction": null,
@@ -1686,7 +1686,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 0.7,
+        "dailyChoppinessLow": 0.6,
         "historicalExtremes": 8.3,
         "meanReversionActive": 20
       },
@@ -1738,7 +1738,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 9.8,
         "weeklyAdxHealthyBand": 17.7,
-        "dailyChoppinessLow": 11,
+        "dailyChoppinessLow": 10.9,
         "historicalExtremes": 8.3,
         "meanReversionActive": 20
       },
@@ -1790,7 +1790,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 6.1,
+        "dailyChoppinessLow": 6.2,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -1876,7 +1876,7 @@
       "rsi": 39.4,
       "macdDirection": "falling",
       "weeklyAdx": 14.2,
-      "choppinessIdx": 49.5,
+      "choppinessIdx": 49.4,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 36.630001068115234,
@@ -1954,7 +1954,7 @@
       "rsi": 45.6,
       "macdDirection": "rising",
       "weeklyAdx": 21.6,
-      "choppinessIdx": 52.3,
+      "choppinessIdx": 52.4,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 91.83999633789062,
@@ -1987,32 +1987,6 @@
       "dailySma50": 339.54,
       "dailySma200": 325.13,
       "rsi50Target": 339.23,
-      "note": null,
-      "transitionedFrom": null
-    },
-    {
-      "symbol": "MARA",
-      "status": "IDLE",
-      "direction": null,
-      "score": 62,
-      "scoreBreakdown": {
-        "weeklyTrendDirection": 20,
-        "weeklyAdxHealthyBand": 20,
-        "dailyChoppinessLow": 1.5,
-        "historicalExtremes": 0,
-        "meanReversionActive": 20
-      },
-      "weeklyTrend": "down",
-      "rsi": 38.2,
-      "macdDirection": "falling",
-      "weeklyAdx": 16.5,
-      "choppinessIdx": 54,
-      "daysToEarnings": null,
-      "earningsBlackout": false,
-      "lastClose": 6.420000076293945,
-      "dailySma50": 9.32,
-      "dailySma200": 10.59,
-      "rsi50Target": 7.61,
       "note": null,
       "transitionedFrom": null
     },
@@ -2065,6 +2039,32 @@
       "dailySma50": 109.71,
       "dailySma200": 103.85,
       "rsi50Target": 114.13,
+      "note": null,
+      "transitionedFrom": null
+    },
+    {
+      "symbol": "MARA",
+      "status": "IDLE",
+      "direction": null,
+      "score": 61,
+      "scoreBreakdown": {
+        "weeklyTrendDirection": 20,
+        "weeklyAdxHealthyBand": 20,
+        "dailyChoppinessLow": 1.5,
+        "historicalExtremes": 0,
+        "meanReversionActive": 20
+      },
+      "weeklyTrend": "down",
+      "rsi": 38.2,
+      "macdDirection": "falling",
+      "weeklyAdx": 16.5,
+      "choppinessIdx": 54,
+      "daysToEarnings": null,
+      "earningsBlackout": false,
+      "lastClose": 6.420000076293945,
+      "dailySma50": 9.32,
+      "dailySma200": 10.59,
+      "rsi50Target": 7.61,
       "note": null,
       "transitionedFrom": null
     },
@@ -2136,7 +2136,7 @@
       "rsi": 35.3,
       "macdDirection": "falling",
       "weeklyAdx": 16.8,
-      "choppinessIdx": 54.8,
+      "choppinessIdx": 54.9,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 58.27000045776367,
@@ -2474,7 +2474,7 @@
       "rsi": 48.3,
       "macdDirection": "falling",
       "weeklyAdx": 11.5,
-      "choppinessIdx": 47.6,
+      "choppinessIdx": 47.7,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 29.059999465942383,
@@ -2719,32 +2719,6 @@
       "transitionedFrom": null
     },
     {
-      "symbol": "ROKU",
-      "status": "IDLE",
-      "direction": null,
-      "score": 51,
-      "scoreBreakdown": {
-        "weeklyTrendDirection": 20,
-        "weeklyAdxHealthyBand": 10.7,
-        "dailyChoppinessLow": 0.6,
-        "historicalExtremes": 0,
-        "meanReversionActive": 20
-      },
-      "weeklyTrend": "up",
-      "rsi": 61.1,
-      "macdDirection": "rising",
-      "weeklyAdx": 42,
-      "choppinessIdx": 54.6,
-      "daysToEarnings": null,
-      "earningsBlackout": false,
-      "lastClose": 160.52000427246094,
-      "dailySma50": 155.33,
-      "dailySma200": 129.11,
-      "rsi50Target": 156.71,
-      "note": null,
-      "transitionedFrom": null
-    },
-    {
       "symbol": "WFC",
       "status": "IDLE",
       "direction": null,
@@ -2752,7 +2726,7 @@
       "scoreBreakdown": {
         "weeklyTrendDirection": 20,
         "weeklyAdxHealthyBand": 9.4,
-        "dailyChoppinessLow": 2,
+        "dailyChoppinessLow": 1.9,
         "historicalExtremes": 0,
         "meanReversionActive": 20
       },
@@ -2864,7 +2838,7 @@
       "rsi": 45.7,
       "macdDirection": "falling",
       "weeklyAdx": 11.2,
-      "choppinessIdx": 58.4,
+      "choppinessIdx": 58.5,
       "daysToEarnings": null,
       "earningsBlackout": false,
       "lastClose": 41.66999816894531,
@@ -2925,6 +2899,10 @@
       "rsi50Target": 13.09,
       "note": null,
       "transitionedFrom": null
+    },
+    {
+      "symbol": "ROKU",
+      "error": "Insufficient data (2 daily, 2 weekly)"
     }
   ]
 }
