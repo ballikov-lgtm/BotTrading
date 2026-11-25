@@ -1,5 +1,101 @@
 [
   {
+    "timestamp": "2026-11-25T20:57:47.148Z",
+    "symbol": "B",
+    "signal": "long",
+    "entry": 34.6,
+    "signalEntry": 34.595001220703125,
+    "entrySource": "alpaca_fill",
+    "stopLoss": 31,
+    "shares": 29,
+    "totalUsd": 1003.26,
+    "riskUsd": 104.26,
+    "rsiAtSignal": 27.2,
+    "rsiAtEntry": 41.01,
+    "signalDate": "2026-11-20",
+    "earningsDates": [],
+    "orderId": "96b6a540-fef7-4c4c-8211-3b3cc244013f",
+    "reason": "RSI armed long (RSI 27.2) on 2026-11-20 → RSI(41.0) & MACD both up, 3d into 3d arm"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:41.887Z",
+    "symbol": "AXP",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:41.458Z",
+    "symbol": "AVGO",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:41.086Z",
+    "symbol": "ARM",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:40.734Z",
+    "symbol": "AMZN",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:40.355Z",
+    "symbol": "AMD",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:39.990Z",
+    "symbol": "AMC",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:39.630Z",
+    "symbol": "AMAT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:39.252Z",
+    "symbol": "AI",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:38.882Z",
+    "symbol": "ADBE",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:38.509Z",
+    "symbol": "ABT",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:38.093Z",
+    "symbol": "ABBV",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:37.727Z",
+    "symbol": "AAPL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
+    "timestamp": "2026-11-25T20:57:37.351Z",
+    "symbol": "AAL",
+    "signal": null,
+    "reason": "No RSI/MACD entry alignment"
+  },
+  {
     "timestamp": "2026-11-23T20:58:16.219Z",
     "symbol": "NVDA",
     "signal": "long",
@@ -2976,90 +3072,6 @@
   {
     "timestamp": "2026-11-19T20:57:19.703Z",
     "symbol": "F",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:19.223Z",
-    "symbol": "EXPE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:18.748Z",
-    "symbol": "EWZ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:18.321Z",
-    "symbol": "EWJ",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:17.903Z",
-    "symbol": "EWG",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:17.485Z",
-    "symbol": "EFA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:17.017Z",
-    "symbol": "EEM",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:16.590Z",
-    "symbol": "DIS",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:16.140Z",
-    "symbol": "DIA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:15.671Z",
-    "symbol": "DE",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:15.151Z",
-    "symbol": "CVX",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:14.646Z",
-    "symbol": "CVNA",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:14.206Z",
-    "symbol": "CSCO",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:13.788Z",
-    "symbol": "CRM",
-    "signal": null,
-    "reason": "No RSI/MACD entry alignment"
-  },
-  {
-    "timestamp": "2026-11-19T20:57:13.319Z",
-    "symbol": "COST",
     "signal": null,
     "reason": "No RSI/MACD entry alignment"
   }
