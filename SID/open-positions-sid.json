@@ -102,5 +102,29 @@
     "entry_fill_qty": 2,
     "manual_watch": false,
     "manual_watch_reason": null
+  },
+  {
+    "id": "96b6a540-fef7-4c4c-8211-3b3cc244013f",
+    "symbol": "B",
+    "side": "long",
+    "entry": 34.6,
+    "stopLoss": 31,
+    "shares": 29,
+    "shares_total": 29,
+    "shares_remaining": 29,
+    "orig_stop": 31,
+    "tp1_hit": false,
+    "totalUsd": 1003.4,
+    "riskUsd": 104.26,
+    "signalDate": "2026-11-20",
+    "openDate": "2026-11-25",
+    "openTime": "20:57:42",
+    "mode": "paper",
+    "strategy": "SID v2.6.1",
+    "brokerStopOrderId": null,
+    "clientOrderIdPrefix": "SID-B-20261120-long",
+    "entry_source": "alpaca_fill",
+    "signal_entry": 34.595001220703125,
+    "entry_fill_qty": 29
   }
 ]
