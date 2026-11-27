@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-11-27T01:10:16.103Z",
+  "scanDate": "2026-11-27T03:41:16.677Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
-  "tickersWithError": 1,
-  "elapsedMs": 312230,
+  "tickersWithError": 0,
+  "elapsedMs": 280889,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -2693,6 +2693,32 @@
       "transitionedFrom": null
     },
     {
+      "symbol": "ROKU",
+      "status": "IDLE",
+      "direction": null,
+      "score": 51,
+      "scoreBreakdown": {
+        "weeklyTrendDirection": 20,
+        "weeklyAdxHealthyBand": 10.7,
+        "dailyChoppinessLow": 0.6,
+        "historicalExtremes": 0,
+        "meanReversionActive": 20
+      },
+      "weeklyTrend": "up",
+      "rsi": 61.1,
+      "macdDirection": "rising",
+      "weeklyAdx": 42,
+      "choppinessIdx": 54.6,
+      "daysToEarnings": null,
+      "earningsBlackout": false,
+      "lastClose": 160.52000427246094,
+      "dailySma50": 155.33,
+      "dailySma200": 129.11,
+      "rsi50Target": 156.71,
+      "note": null,
+      "transitionedFrom": null
+    },
+    {
       "symbol": "AAL",
       "status": "IDLE",
       "direction": null,
@@ -2899,10 +2925,6 @@
       "rsi50Target": 18.68,
       "note": null,
       "transitionedFrom": null
-    },
-    {
-      "symbol": "ROKU",
-      "error": "Insufficient data (2 daily, 2 weekly)"
     }
   ]
 }
