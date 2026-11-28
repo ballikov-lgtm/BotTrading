@@ -1,11 +1,11 @@
 {
-  "scanDate": "2026-11-27T21:46:34.306Z",
+  "scanDate": "2026-11-28T00:41:10.051Z",
   "scannerVersion": "1.0",
   "strategyVersion": "1.1",
   "watchlistVersion": "4.1",
   "tickersScanned": 112,
-  "tickersWithError": 1,
-  "elapsedMs": 299493,
+  "tickersWithError": 0,
+  "elapsedMs": 295627,
   "scoreWeights": {
     "weeklyTrendDirection": 20,
     "weeklyAdxHealthyBand": 20,
@@ -38,7 +38,7 @@
       "dailySma200": 130.71,
       "rsi50Target": 110.21,
       "note": "RSI oversold + MACD rising — ready to ARM on TV",
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "WMT",
@@ -90,7 +90,7 @@
       "dailySma200": 104.38,
       "rsi50Target": 117.58,
       "note": "RSI overbought but MACD not yet falling",
-      "transitionedFrom": "APPROACHING_SHORT"
+      "transitionedFrom": null
     },
     {
       "symbol": "NOW",
@@ -142,7 +142,7 @@
       "dailySma200": 171.32,
       "rsi50Target": 130.92,
       "note": null,
-      "transitionedFrom": "SIGNAL_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "COST",
@@ -168,7 +168,7 @@
       "dailySma200": 981.13,
       "rsi50Target": 1059.24,
       "note": null,
-      "transitionedFrom": "IDLE"
+      "transitionedFrom": null
     },
     {
       "symbol": "KHC",
@@ -376,7 +376,7 @@
       "dailySma200": 403.17,
       "rsi50Target": 353.66,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "JNJ",
@@ -480,7 +480,7 @@
       "dailySma200": 60.36,
       "rsi50Target": 44.12,
       "note": null,
-      "transitionedFrom": "OVERSOLD_WAIT_MACD"
+      "transitionedFrom": null
     },
     {
       "symbol": "SOXL",
@@ -506,7 +506,7 @@
       "dailySma200": 123.15,
       "rsi50Target": 62.79,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "UNH",
@@ -532,7 +532,7 @@
       "dailySma200": 369.9,
       "rsi50Target": 377.27,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "TQQQ",
@@ -1338,7 +1338,7 @@
       "dailySma200": 951.44,
       "rsi50Target": 870.34,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "IWM",
@@ -1390,7 +1390,7 @@
       "dailySma200": 10.51,
       "rsi50Target": 6.82,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "NIO",
@@ -1572,7 +1572,7 @@
       "dailySma200": 800.1,
       "rsi50Target": 607.82,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "EWJ",
@@ -2352,7 +2352,7 @@
       "dailySma200": 35.07,
       "rsi50Target": 32.86,
       "note": null,
-      "transitionedFrom": "APPROACHING_LONG"
+      "transitionedFrom": null
     },
     {
       "symbol": "CVNA",
@@ -2693,6 +2693,32 @@
       "transitionedFrom": null
     },
     {
+      "symbol": "ROKU",
+      "status": "IDLE",
+      "direction": null,
+      "score": 51,
+      "scoreBreakdown": {
+        "weeklyTrendDirection": 20,
+        "weeklyAdxHealthyBand": 10.7,
+        "dailyChoppinessLow": 0.6,
+        "historicalExtremes": 0,
+        "meanReversionActive": 20
+      },
+      "weeklyTrend": "up",
+      "rsi": 61.1,
+      "macdDirection": "rising",
+      "weeklyAdx": 42,
+      "choppinessIdx": 54.6,
+      "daysToEarnings": null,
+      "earningsBlackout": false,
+      "lastClose": 160.52000427246094,
+      "dailySma50": 155.33,
+      "dailySma200": 129.11,
+      "rsi50Target": 156.71,
+      "note": null,
+      "transitionedFrom": null
+    },
+    {
       "symbol": "AAL",
       "status": "IDLE",
       "direction": null,
@@ -2899,10 +2925,6 @@
       "rsi50Target": 18.57,
       "note": null,
       "transitionedFrom": null
-    },
-    {
-      "symbol": "ROKU",
-      "error": "Insufficient data (2 daily, 2 weekly)"
     }
   ]
 }
